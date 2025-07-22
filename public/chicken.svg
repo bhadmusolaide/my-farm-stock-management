@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Body -->
+  <ellipse cx="256" cy="280" rx="160" ry="140" fill="#f5a623" />
+  
+  <!-- Head -->
+  <circle cx="400" cy="180" r="60" fill="#f5a623" />
+  
+  <!-- Eye -->
+  <circle cx="420" cy="160" r="12" fill="#333" />
+  
+  <!-- Beak -->
+  <polygon points="460,180 500,160 460,200" fill="#e74c3c" />
+  
+  <!-- Comb -->
+  <path d="M380,120 L400,90 L420,120 L440,90 L460,120" fill="#e74c3c" stroke="#e74c3c" stroke-width="5" />
+  
+  <!-- Feet -->
+  <path d="M200,420 L180,460 L220,460 L200,420" fill="#e74c3c" />
+  <path d="M300,420 L280,460 L320,460 L300,420" fill="#e74c3c" />
+  
+  <!-- Wing -->
+  <path d="M180,240 C140,260 120,300 140,340 C180,320 200,280 180,240 Z" fill="#d8871e" />
+</svg>
