@@ -1,4 +1,4 @@
-# 🐔 Chicken Stock Management System
+# 🐔 Omzo-Farmz Stock Management System
 
 A modern, full-featured web application for managing chicken stock inventory, orders, transactions, and business operations. Built with React, Vite, and Supabase.
 
@@ -71,7 +71,7 @@ A modern, full-featured web application for managing chicken stock inventory, or
 ### 1. Clone the Repository
 ```bash
 git clone <your-repo-url>
-cd chicken-stock-react
+cd omzo-farmz
 ```
 
 ### 2. Install Dependencies
