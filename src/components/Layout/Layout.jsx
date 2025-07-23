@@ -2,12 +2,15 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAppContext } from '../../context/AppContext'
 import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
+import ThemeToggle from '../ThemeToggle/ThemeToggle'
 import './Layout.css'
 
 const Layout = ({ children }) => {
   const location = useLocation()
   const { calculateStats } = useAppContext()
   const { user, logout, isAdmin } = useAuth()
+  const { theme } = useTheme()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const userMenuRef = useRef(null)
@@ -111,6 +114,7 @@ const Layout = ({ children }) => {
           
           {/* User Menu */}
            <div className="header-right">
+             <ThemeToggle />
              <div className="balance-display">
                <span className="balance-label">Current Balance:</span>
                <span className="balance-amount">₦{stats.balance.toFixed(2)}</span>

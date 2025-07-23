@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AppProvider } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
+import { ThemeProvider } from './context/ThemeContext'
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary'
 import Layout from './components/Layout/Layout'
 import Dashboard from './pages/Dashboard'
@@ -15,7 +16,9 @@ import AuditTrail from './pages/AuditTrail'
 import MigrationPrompt from './components/UI/MigrationPrompt'
 import LoadingSpinner from './components/LoadingSpinner/LoadingSpinner'
 import { useAppContext } from './context/AppContext'
-import './pages/LightModeOverride.css' // Import light mode override styles
+
+// Import theme styles
+import './styles/theme.css'
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -117,13 +120,15 @@ function App() {
   return (
     <ErrorBoundary>
       <Router>
-        <AuthProvider>
-          <AppProvider>
-            <NotificationProvider>
-              <AppContent />
-            </NotificationProvider>
-          </AppProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppProvider>
+              <NotificationProvider>
+                <AppContent />
+              </NotificationProvider>
+            </AppProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </Router>
     </ErrorBoundary>
   )
