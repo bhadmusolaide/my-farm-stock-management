@@ -105,6 +105,7 @@ export const AuthProvider = ({ children }) => {
       if (!user && action !== 'LOGIN') return;
 
       const auditData = {
+        id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         user_id: user?.id || 'anonymous',
         action,
         table_name: tableName,

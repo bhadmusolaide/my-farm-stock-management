@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { supabase, supabaseUrl } from '../utils/supabaseClient'
 import { isMigrationNeeded, migrateFromLocalStorage } from '../utils/migrateData'
+import { useAuth } from './AuthContext'
 
 const AppContext = createContext()
 
@@ -9,7 +10,7 @@ export function useAppContext() {
 }
 
 export function AppProvider({ children }) {
-  // State management
+  const { logAuditAction } = useAuth()
   const [chickens, setChickens] = useState([])
   const [stock, setStock] = useState([])
   const [transactions, setTransactions] = useState([])
@@ -149,6 +150,9 @@ export function AppProvider({ children }) {
       const { error } = await supabase.from('chickens').insert(chicken)
       if (error) throw error
 
+      // Log audit action
+      await logAuditAction('CREATE', 'chickens', chicken.id, null, chicken)
+
       // Update local state
       setChickens(prev => [chicken, ...prev])
       return chicken
@@ -175,6 +179,10 @@ export function AppProvider({ children }) {
         .eq('id', id)
 
       if (error) throw error
+
+      // Log audit action
+      const oldChicken = chickens.find(c => c.id === id)
+      await logAuditAction('UPDATE', 'chickens', id, oldChicken, updatedChicken)
 
       // Update local state
       setChickens(prev => 
@@ -240,6 +248,9 @@ export function AppProvider({ children }) {
         setBalance(newBalance)
       }
       
+      // Log audit action
+      await logAuditAction('DELETE', 'chickens', id, chickenToDelete, null)
+
       // Update local state for chickens
       setChickens(prev => prev.filter(chicken => chicken.id !== id))
     } catch (err) {
@@ -286,6 +297,9 @@ export function AppProvider({ children }) {
       // Update balance
       const { error: balanceError } = await supabase.from('balance').insert({ amount: newBalance })
       if (balanceError) throw balanceError
+
+      // Log audit action
+      await logAuditAction('CREATE', 'stock', stockItem.id, null, stockItem)
 
       // Add totalCost to stockItem for frontend display only
       const stockItemWithTotal = { ...stockItem, totalCost }
@@ -347,6 +361,9 @@ export function AppProvider({ children }) {
       
       if (balanceError) throw balanceError
       
+      // Log audit action
+      await logAuditAction('DELETE', 'stock', id, stockToDelete, null)
+
       // Update local state
       setStock(prev => prev.filter(item => item.id !== id))
       setTransactions(prev => [reversalTransaction, ...prev])
@@ -378,10 +395,13 @@ export function AppProvider({ children }) {
       const { error: balanceError } = await supabase.from('balance').insert({ amount: newBalance })
       if (balanceError) throw balanceError
 
+      // Log audit action
+      await logAuditAction('CREATE', 'transactions', transaction.id, null, transaction)
+
       // Update local state
       setTransactions(prev => [transaction, ...prev])
       setBalance(newBalance)
-
+      
       return transaction
     } catch (err) {
       console.error('Error adding funds:', err)
@@ -408,10 +428,13 @@ export function AppProvider({ children }) {
       const { error: balanceError } = await supabase.from('balance').insert({ amount: newBalance })
       if (balanceError) throw balanceError
 
+      // Log audit action
+      await logAuditAction('CREATE', 'transactions', transaction.id, null, transaction)
+
       // Update local state
       setTransactions(prev => [transaction, ...prev])
       setBalance(newBalance)
-
+      
       return transaction
     } catch (err) {
       console.error('Error adding expense:', err)
@@ -442,10 +465,13 @@ export function AppProvider({ children }) {
       const { error: balanceError } = await supabase.from('balance').insert({ amount: newBalance })
       if (balanceError) throw balanceError
 
+      // Log audit action
+      await logAuditAction('CREATE', 'transactions', transaction.id, null, transaction)
+
       // Update local state
       setTransactions(prev => [transaction, ...prev])
       setBalance(newBalance)
-
+      
       return transaction
     } catch (err) {
       console.error('Error withdrawing funds:', err)
@@ -581,15 +607,46 @@ export function AppProvider({ children }) {
   // Delete transaction
   const deleteTransaction = async (id) => {
     try {
+      // First, find the transaction to be deleted
+      const transactionToDelete = transactions.find(transaction => transaction.id === id)
+      
+      if (!transactionToDelete) throw new Error('Transaction not found')
+      
+      // Calculate balance adjustment based on transaction type
+      let balanceAdjustment = 0
+      if (transactionToDelete.type === 'fund') {
+        balanceAdjustment = -transactionToDelete.amount // Remove the added funds
+      } else if (transactionToDelete.type === 'expense' || transactionToDelete.type === 'withdrawal') {
+        balanceAdjustment = transactionToDelete.amount // Add back the spent/withdrawn amount
+      }
+      
+      const newBalance = balance + balanceAdjustment
+      
       const { error } = await supabase
         .from('transactions')
         .delete()
         .eq('id', id)
 
       if (error) throw error
+      
+      // Update balance if there was an adjustment
+      if (balanceAdjustment !== 0) {
+        const { error: balanceError } = await supabase
+          .from('balance')
+          .insert({ amount: newBalance })
+        
+        if (balanceError) throw balanceError
+      }
+
+      // Log audit action
+      await logAuditAction('DELETE', 'transactions', id, transactionToDelete, null)
 
       // Update local state
       setTransactions(prev => prev.filter(transaction => transaction.id !== id))
+      if (balanceAdjustment !== 0) {
+        setBalance(newBalance)
+      }
+      
     } catch (err) {
       console.error('Error deleting transaction:', err)
       throw err
