@@ -231,7 +231,7 @@ const Layout = ({ children }) => {
       </main>
       
       <footer className="app-footer">
-        <p>&copy; {new Date().getFullYear()} Chicken Stock Manager</p>
+        <p>&copy; {new Date().getFullYear()} Omzo Farmz Stock Manager</p>
       </footer>
     </div>
   )

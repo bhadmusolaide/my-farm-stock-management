@@ -60,3 +60,17 @@ table td {
 table tbody tr:hover {
   background-color: #f9fafb !important;
 }
+
+/* User Management specific light mode styles */
+.user-management .header-content h1 {
+  color: #1f2937 !important;
+}
+
+.users-table tbody tr:hover {
+  background-color: #f9fafb !important;
+}
+
+/* Remove any green overlay from user info sections */
+.user-info {
+  background: transparent !important;
+}

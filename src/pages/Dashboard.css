@@ -63,6 +63,15 @@
   background-color: #e53935;
 }
 
+.clear {
+  background-color: #9c27b0;
+  color: white;
+}
+
+.clear:hover {
+  background-color: #8e24aa;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));

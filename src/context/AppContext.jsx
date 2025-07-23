@@ -189,14 +189,58 @@ export function AppProvider({ children }) {
 
   const deleteChicken = async (id) => {
     try {
-      const { error } = await supabase
+      // First, find the chicken order to be deleted
+      const chickenToDelete = chickens.find(chicken => chicken.id === id)
+      
+      if (!chickenToDelete) throw new Error('Chicken order not found')
+      
+      // For chicken orders, we need to handle the financial impact differently
+      // If there was an amount_paid, we need to refund it (decrease balance)
+      const amountPaid = chickenToDelete.amount_paid || 0
+      
+      // Calculate new balance
+      const newBalance = balance - amountPaid
+      
+      // Create a transaction for the refund if there was any payment
+      let refundTransaction = null
+      if (amountPaid > 0) {
+        refundTransaction = {
+          id: Date.now().toString(),
+          type: 'expense', // Using 'expense' type to remove money
+          amount: amountPaid,
+          description: `Refund for deleted chicken order: ${chickenToDelete.customer}`,
+          date: new Date().toISOString().split('T')[0]
+        }
+      }
+      
+      // Delete the chicken order
+      const { error: chickenError } = await supabase
         .from('chickens')
         .delete()
         .eq('id', id)
-
-      if (error) throw error
-
-      // Update local state
+      
+      if (chickenError) throw chickenError
+      
+      // If there was a payment, add the refund transaction and update balance
+      if (refundTransaction) {
+        const { error: transactionError } = await supabase
+          .from('transactions')
+          .insert(refundTransaction)
+        
+        if (transactionError) throw transactionError
+        
+        const { error: balanceError } = await supabase
+          .from('balance')
+          .insert({ amount: newBalance })
+        
+        if (balanceError) throw balanceError
+        
+        // Update local state for transactions and balance
+        setTransactions(prev => [refundTransaction, ...prev])
+        setBalance(newBalance)
+      }
+      
+      // Update local state for chickens
       setChickens(prev => prev.filter(chicken => chicken.id !== id))
     } catch (err) {
       console.error('Error deleting chicken:', err)
@@ -260,15 +304,54 @@ export function AppProvider({ children }) {
 
   const deleteStock = async (id) => {
     try {
-      const { error } = await supabase
+      // First, find the stock item to be deleted
+      const stockToDelete = stock.find(item => item.id === id)
+      
+      if (!stockToDelete) throw new Error('Stock item not found')
+      
+      // Calculate the amount to be reversed (add back to balance)
+      const amountToReverse = stockToDelete.totalCost || 
+        (stockToDelete.count * stockToDelete.size * stockToDelete.cost_per_kg)
+      
+      // Create a reversal transaction
+      const reversalTransaction = {
+        id: Date.now().toString(),
+        type: 'fund', // Using 'fund' type to add money back
+        amount: amountToReverse,
+        description: `Reversal for deleted stock: ${stockToDelete.description}`,
+        date: new Date().toISOString().split('T')[0]
+      }
+      
+      // Calculate new balance
+      const newBalance = balance + amountToReverse
+      
+      // Delete the stock item
+      const { error: stockError } = await supabase
         .from('stock')
         .delete()
         .eq('id', id)
-
-      if (error) throw error
-
+      
+      if (stockError) throw stockError
+      
+      // Add the reversal transaction
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .insert(reversalTransaction)
+      
+      if (transactionError) throw transactionError
+      
+      // Update balance
+      const { error: balanceError } = await supabase
+        .from('balance')
+        .insert({ amount: newBalance })
+      
+      if (balanceError) throw balanceError
+      
       // Update local state
       setStock(prev => prev.filter(item => item.id !== id))
+      setTransactions(prev => [reversalTransaction, ...prev])
+      setBalance(newBalance)
+      
     } catch (err) {
       console.error('Error deleting stock:', err)
       throw err
@@ -366,6 +449,40 @@ export function AppProvider({ children }) {
       return transaction
     } catch (err) {
       console.error('Error withdrawing funds:', err)
+      throw err
+    }
+  }
+
+  const clearBalance = async () => {
+    try {
+      if (balance === 0) {
+        return // Nothing to clear
+      }
+
+      const transaction = {
+        id: Date.now().toString(),
+        type: 'withdrawal',
+        amount: balance,
+        description: 'Balance cleared to zero',
+        date: new Date().toISOString().split('T')[0]
+      }
+
+      // Set balance to zero
+      const newBalance = 0
+
+      const { error: transactionError } = await supabase.from('transactions').insert(transaction)
+      if (transactionError) throw transactionError
+
+      const { error: balanceError } = await supabase.from('balance').insert({ amount: newBalance })
+      if (balanceError) throw balanceError
+
+      // Update local state
+      setTransactions(prev => [transaction, ...prev])
+      setBalance(newBalance)
+
+      return transaction
+    } catch (err) {
+      console.error('Error clearing balance:', err)
       throw err
     }
   }
@@ -501,6 +618,7 @@ export function AppProvider({ children }) {
     addFunds,
     addExpense,
     withdrawFunds,
+    clearBalance,
     deleteTransaction,
     
     // Stats and reports

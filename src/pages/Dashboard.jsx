@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import './Dashboard.css'
 
 const Dashboard = () => {
-  const { calculateStats, chickens, transactions, addFunds, addExpense, withdrawFunds } = useAppContext()
+  const { calculateStats, chickens, transactions, addFunds, addExpense, withdrawFunds, clearBalance } = useAppContext()
   const [activeModal, setActiveModal] = useState(null)
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
@@ -100,6 +100,17 @@ const Dashboard = () => {
         </button>
         <button className="action-button withdraw" onClick={() => openModal('withdrawFunds')}>
           Withdraw
+        </button>
+        <button className="action-button clear" onClick={async () => {
+          if (window.confirm('Are you sure you want to clear the balance to zero?')) {
+            try {
+              await clearBalance()
+            } catch (error) {
+              alert(`Error: ${error.message}`)
+            }
+          }
+        }}>
+          Clear
         </button>
       </div>
       
