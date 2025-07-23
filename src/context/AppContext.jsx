@@ -135,11 +135,15 @@ export function AppProvider({ children }) {
   // CRUD operations for chickens
   const addChicken = async (chickenData) => {
     try {
+      // Convert amountPaid to amount_paid to match database schema
+      const { amountPaid, ...otherData } = chickenData;
+      
       const chicken = {
         id: Date.now().toString(),
         date: new Date().toISOString().split('T')[0],
-        ...chickenData,
-        balance: (chickenData.count * chickenData.size * chickenData.price) - (chickenData.amountPaid || 0)
+        ...otherData,
+        amount_paid: amountPaid || 0,
+        balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0)
       }
 
       const { error } = await supabase.from('chickens').insert(chicken)
@@ -156,9 +160,13 @@ export function AppProvider({ children }) {
 
   const updateChicken = async (id, chickenData) => {
     try {
+      // Convert amountPaid to amount_paid to match database schema
+      const { amountPaid, ...otherData } = chickenData;
+      
       const updatedChicken = {
-        ...chickenData,
-        balance: (chickenData.count * chickenData.size * chickenData.price) - (chickenData.amountPaid || 0)
+        ...otherData,
+        amount_paid: amountPaid || 0,
+        balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0)
       }
 
       const { error } = await supabase
@@ -199,24 +207,30 @@ export function AppProvider({ children }) {
   // CRUD operations for stock
   const addStock = async (stockData) => {
     try {
+      // Calculate total cost separately
+      const totalCost = stockData.count * stockData.size * stockData.costPerKg
+      
+      // Create stock item without totalCost field (not in database schema)
       const stockItem = {
         id: Date.now().toString(),
         date: new Date().toISOString().split('T')[0],
-        ...stockData,
-        totalCost: stockData.count * stockData.size * stockData.costPerKg
+        description: stockData.description,
+        count: stockData.count,
+        size: stockData.size,
+        cost_per_kg: stockData.costPerKg  // Map frontend field to database column name
       }
 
       // Create expense transaction for stock purchase
       const stockTransaction = {
         id: (Date.now() + 1).toString(),
         type: 'expense',
-        amount: stockItem.totalCost,
+        amount: totalCost,
         description: `Stock Purchase: ${stockItem.description}`,
         date: stockItem.date
       }
 
       // Update balance
-      const newBalance = balance - stockItem.totalCost
+      const newBalance = balance - totalCost
 
       // Add stock to inventory
       const { error: stockError } = await supabase.from('stock').insert(stockItem)
@@ -229,12 +243,15 @@ export function AppProvider({ children }) {
       const { error: balanceError } = await supabase.from('balance').insert({ amount: newBalance })
       if (balanceError) throw balanceError
 
+      // Add totalCost to stockItem for frontend display only
+      const stockItemWithTotal = { ...stockItem, totalCost }
+      
       // Update local state
-      setStock(prev => [stockItem, ...prev])
+      setStock(prev => [stockItemWithTotal, ...prev])
       setTransactions(prev => [stockTransaction, ...prev])
       setBalance(newBalance)
 
-      return stockItem
+      return stockItemWithTotal
     } catch (err) {
       console.error('Error adding stock:', err)
       throw err

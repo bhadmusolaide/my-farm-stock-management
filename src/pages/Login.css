@@ -98,6 +98,7 @@
   transition: all 0.2s ease;
   background-color: white;
   color: #1f2937;
+  -webkit-text-fill-color: #1f2937; /* For WebKit browsers */
 }
 
 .form-group input:focus {

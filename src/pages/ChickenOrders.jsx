@@ -121,7 +121,7 @@ const ChickenOrders = () => {
       count: chicken.count,
       size: chicken.size,
       price: chicken.price,
-      amountPaid: chicken.amountPaid || 0,
+      amountPaid: chicken.amount_paid || 0, // Use amount_paid from database
       status: chicken.status
     })
     setEditMode(true)
@@ -225,7 +225,7 @@ const ChickenOrders = () => {
         Size: chicken.size,
         Price: chicken.price,
         Total: chicken.count * chicken.size * chicken.price,
-        'Amount Paid': chicken.amountPaid || 0,
+        'Amount Paid': chicken.amount_paid || 0,
         Balance: chicken.balance,
         Status: chicken.status
       }))
@@ -356,7 +356,7 @@ const ChickenOrders = () => {
                   <td>{chicken.size}</td>
                   <td>₦{chicken.price.toFixed(2)}</td>
                   <td>₦{(chicken.count * chicken.size * chicken.price).toFixed(2)}</td>
-                  <td>₦{(chicken.amountPaid || 0).toFixed(2)}</td>
+                  <td>₦{(chicken.amount_paid || 0).toFixed(2)}</td>
                   <td>₦{chicken.balance.toFixed(2)}</td>
                   <td>
                     <span className={getStatusBadgeClass(chicken.status)}>

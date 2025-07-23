@@ -20,7 +20,7 @@ const StockInventory = () => {
     description: '',
     count: '',
     size: '',
-    cost: ''
+    costPerKg: ''
   })
   
   // Get filtered stock
@@ -77,7 +77,7 @@ const StockInventory = () => {
       description: '',
       count: '',
       size: '',
-      cost: ''
+      costPerKg: ''
     })
     setShowModal(true)
   }
@@ -94,7 +94,7 @@ const StockInventory = () => {
     // Validate form
     const count = parseInt(formData.count)
     const size = parseFloat(formData.size)
-    const cost = parseFloat(formData.cost)
+    const costPerKg = parseFloat(formData.costPerKg)
     
     if (isNaN(count) || count <= 0) {
       alert('Please enter a valid count')
@@ -106,8 +106,8 @@ const StockInventory = () => {
       return
     }
     
-    if (isNaN(cost) || cost <= 0) {
-      alert('Please enter a valid cost')
+    if (isNaN(costPerKg) || costPerKg <= 0) {
+      alert('Please enter a valid cost per kg')
       return
     }
     
@@ -116,7 +116,7 @@ const StockInventory = () => {
         description: formData.description,
         count,
         size,
-        cost
+        costPerKg
       })
       
       closeModal()
@@ -139,8 +139,9 @@ const StockInventory = () => {
   // Calculate total stock value
   const calculateTotalValue = () => {
     return filteredStock.reduce((total, item) => {
-      return total + (item.count * item.size * item.cost)
-    }, 0)
+      const costPerKg = item.cost_per_kg || 0;
+      return total + (item.count * item.size * costPerKg);
+    }, 0);
   }
   
   return (
@@ -227,8 +228,8 @@ const StockInventory = () => {
                   <td>{item.description}</td>
                   <td>{item.count}</td>
                   <td>{item.size}</td>
-                  <td>₦{item.cost.toFixed(2)}</td>
-                  <td>₦{item.totalCost.toFixed(2)}</td>
+                  <td>₦{item.cost_per_kg ? item.cost_per_kg.toFixed(2) : '0.00'}</td>
+                  <td>₦{item.totalCost ? item.totalCost.toFixed(2) : '0.00'}</td>
                   <td>
                     <button 
                       className="delete-btn" 
@@ -300,12 +301,12 @@ const StockInventory = () => {
               </div>
               
               <div className="form-group">
-                <label htmlFor="cost">Cost per kg*</label>
+                <label htmlFor="costPerKg">Cost per kg*</label>
                 <input
                   type="number"
-                  id="cost"
-                  name="cost"
-                  value={formData.cost}
+                  id="costPerKg"
+                  name="costPerKg"
+                  value={formData.costPerKg}
                   onChange={handleInputChange}
                   min="0.01"
                   step="0.01"
@@ -319,7 +320,7 @@ const StockInventory = () => {
                   ₦{(
                     parseFloat(formData.count || 0) * 
                     parseFloat(formData.size || 0) * 
-                    parseFloat(formData.cost || 0)
+                    parseFloat(formData.costPerKg || 0)
                   ).toFixed(2)}
                 </span>
               </div>

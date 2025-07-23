@@ -55,7 +55,7 @@ const Layout = ({ children }) => {
       <header className="app-header">
         <div className="header-content">
           <div className="logo-container">
-            <h1>Chicken Stock Manager</h1>
+            <h1>Omzo Farmz Stock Manager</h1>
           </div>
           
           <nav className={`main-nav ${isMobileMenuOpen ? 'mobile-open' : ''}`}>

@@ -109,6 +109,9 @@ input, select, textarea {
   border: 1px solid var(--border-color);
   border-radius: 4px;
   transition: border-color 0.2s;
+  color: var(--text-color);
+  background-color: var(--card-background);
+  -webkit-text-fill-color: var(--text-color); /* For WebKit browsers */
 }
 
 input:focus, select:focus, textarea:focus {

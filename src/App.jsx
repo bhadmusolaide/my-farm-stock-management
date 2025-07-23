@@ -15,6 +15,7 @@ import AuditTrail from './pages/AuditTrail'
 import MigrationPrompt from './components/UI/MigrationPrompt'
 import LoadingSpinner from './components/LoadingSpinner/LoadingSpinner'
 import { useAppContext } from './context/AppContext'
+import './pages/LightModeOverride.css' // Import light mode override styles
 
 // Protected Route Component
 function ProtectedRoute({ children }) {

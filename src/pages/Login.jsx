@@ -52,7 +52,7 @@ const Login = () => {
               <path d="M12 16L13.09 22.26L20 23L13.09 23.74L12 30L10.91 23.74L4 23L10.91 22.26L12 16Z" fill="#4F46E5" opacity="0.6"/>
             </svg>
           </div>
-          <h1>Omzo Farms</h1>
+          <h1>Omzo Farmz</h1>
           <p>Sign in to your account</p>
         </div>
 

@@ -107,6 +107,9 @@
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 0.9rem;
+  color: #333; /* Explicitly set text color */
+  background-color: #fff; /* Explicitly set background color */
+  -webkit-text-fill-color: #333; /* For WebKit browsers */
 }
 
 .filter-group input:focus,
@@ -291,6 +294,8 @@
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 1rem;
+  color: #333; /* Explicitly set text color */
+  background-color: #fff; /* Explicitly set background color */
 }
 
 .form-group input:focus {

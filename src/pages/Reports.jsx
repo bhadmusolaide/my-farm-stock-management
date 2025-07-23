@@ -42,7 +42,7 @@ const Reports = () => {
         Size: order.size,
         Price: order.price,
         Total: order.count * order.size * order.price,
-        'Amount Paid': order.amountPaid || 0,
+        'Amount Paid': order.amount_paid || 0,
         Balance: order.balance,
         Status: order.status
       }))
@@ -288,7 +288,7 @@ const Reports = () => {
                           <td>{order.size}</td>
                           <td>₦{order.price.toFixed(2)}</td>
                           <td>₦{(order.count * order.size * order.price).toFixed(2)}</td>
-                          <td>₦{(order.amountPaid || 0).toFixed(2)}</td>
+                          <td>₦{(order.amount_paid || 0).toFixed(2)}</td>
                           <td>₦{order.balance.toFixed(2)}</td>
                           <td>
                             <span className={getStatusBadgeClass(order.status)}>
