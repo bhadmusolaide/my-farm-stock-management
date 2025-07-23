@@ -9,6 +9,116 @@
   color: var(--text-color) !important;
 }
 
+/* Orders Carousel Dark Mode Styles */
+[data-theme="dark"] .orders-carousel {
+  background-color: var(--card-background) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+[data-theme="dark"] .orders-carousel h3 {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .carousel-item {
+  background: linear-gradient(135deg, rgba(55, 65, 81, 0.8) 0%, rgba(31, 41, 55, 0.9) 100%) !important;
+  border-left-color: #4caf50 !important;
+}
+
+[data-theme="dark"] .carousel-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.25) !important;
+}
+
+[data-theme="dark"] .customer-name {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .order-quantity {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .order-balance {
+  color: #f87171 !important;
+}
+
+[data-theme="dark"] .order-status.pending {
+  background-color: rgba(251, 191, 36, 0.2) !important;
+  color: #fbbf24 !important;
+  border-color: rgba(251, 191, 36, 0.3) !important;
+}
+
+[data-theme="dark"] .order-status.partial {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  color: #60a5fa !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+[data-theme="dark"] .indicator {
+  background-color: #4b5563 !important;
+}
+
+[data-theme="dark"] .indicator.active {
+  background-color: #4caf50 !important;
+}
+
+[data-theme="dark"] .indicator:hover {
+  background-color: #6b7280 !important;
+}
+
+[data-theme="dark"] .no-data {
+  color: var(--text-light) !important;
+}
+
+/* Enhanced Carousel Dark Mode Styles */
+[data-theme="dark"] .carousel-title {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .carousel-count {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: #60a5fa !important;
+}
+
+[data-theme="dark"] .order-meta {
+  color: var(--text-light) !important;
+  border-top-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="dark"] .order-date {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .order-size {
+  background: rgba(75, 85, 99, 0.5) !important;
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .carousel-nav-btn {
+  background: rgba(55, 65, 81, 0.8) !important;
+  border-color: rgba(75, 85, 99, 0.5) !important;
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .carousel-nav-btn:hover {
+  background: rgba(75, 85, 99, 0.8) !important;
+  border-color: rgba(107, 114, 128, 0.7) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .carousel-nav-btn:disabled {
+  background: rgba(31, 41, 55, 0.5) !important;
+  border-color: rgba(55, 65, 81, 0.3) !important;
+  color: rgba(156, 163, 175, 0.5) !important;
+}
+
+[data-theme="dark"] .progress-bar {
+  background: rgba(75, 85, 99, 0.5) !important;
+}
+
+[data-theme="dark"] .progress-fill {
+  background: linear-gradient(90deg, #4caf50 0%, #45a049 100%) !important;
+}
+
 /* Card backgrounds and text colors */
 [data-theme="dark"] .stat-card,
 [data-theme="dark"] .chart-container,

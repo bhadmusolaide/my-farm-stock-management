@@ -7,69 +7,252 @@
   color: #333;
 }
 
-.dashboard-actions {
-  display: flex;
-  gap: 1rem;
+.orders-carousel {
+  background-color: white;
+  border-radius: 12px;
+  padding: 1.25rem;
   margin-bottom: 2rem;
-  flex-wrap: wrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.action-button {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 4px;
+.orders-carousel h3 {
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+  color: #555;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.carousel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.carousel-title {
+  color: #555;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.carousel-count {
+  background: #f0f9ff;
+  color: #0369a1;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.carousel-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.carousel-track {
+  display: flex;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  gap: 1rem;
+}
+
+.carousel-item {
+  flex: 0 0 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.carousel-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 123, 255, 0.12);
+  border-left-color: #0056b3;
+}
+
+@media (min-width: 768px) {
+  .carousel-item {
+    flex: 0 0 calc(50% - 0.5rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  .carousel-item {
+    flex: 0 0 calc(33.333% - 0.667rem);
+  }
+}
+
+.order-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.customer-name {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #333;
+}
+
+.order-status {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.order-status.pending {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.order-status.partial {
+  background-color: #d1ecf1;
+  color: #0c5460;
+  border: 1px solid #bee5eb;
+}
+
+.order-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.order-quantity {
+  color: #666;
   font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.order-balance {
+  color: #dc3545;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.order-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: #8b949e;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.order-date {
+  font-weight: 500;
+}
+
+.order-size {
+  background: #f3f4f6;
+  padding: 0.125rem 0.5rem;
+  border-radius: 12px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.carousel-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1.25rem;
+}
+
+.carousel-indicators {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #e2e8f0;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.indicator.active {
+  background-color: #007bff;
+  transform: scale(1.1);
+  border-color: rgba(0, 123, 255, 0.3);
+}
+
+.indicator:hover {
+  background-color: #94a3b8;
+  transform: scale(1.05);
+}
+
+.carousel-nav-btn {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 120px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
 }
 
-.action-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+.carousel-nav-btn:hover {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #475569;
+  transform: scale(1.05);
 }
 
-.action-button:active {
-  transform: translateY(0);
+.carousel-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
 }
 
-.add-funds {
-  background-color: #4caf50;
-  color: white;
+.carousel-nav-btn:disabled:hover {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #64748b;
 }
 
-.add-funds:hover {
-  background-color: #43a047;
+.carousel-progress {
+  margin-top: 0.75rem;
 }
 
-.add-expense {
-  background-color: #ff9800;
-  color: white;
+.progress-bar {
+  width: 100%;
+  height: 3px;
+  background: #e2e8f0;
+  border-radius: 2px;
+  overflow: hidden;
 }
 
-.add-expense:hover {
-  background-color: #f57c00;
-}
-
-.withdraw {
-  background-color: #f44336;
-  color: white;
-}
-
-.withdraw:hover {
-  background-color: #e53935;
-}
-
-.clear {
-  background-color: #9c27b0;
-  color: white;
-}
-
-.clear:hover {
-  background-color: #8e24aa;
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+  border-radius: 2px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .stats-grid {

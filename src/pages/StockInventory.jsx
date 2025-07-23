@@ -104,7 +104,7 @@ const StockInventory = () => {
         alert('Please enter a valid count')
         return
       }
-      if (isNaN(costPerKg) || costPerKg <= 0) {
+      if (isNaN(costPerKg) || costPerKg < 0) {
         alert('Please enter a valid cost')
         return
       }
@@ -113,7 +113,7 @@ const StockInventory = () => {
         alert('Please enter a valid size')
         return
       }
-      if (isNaN(costPerKg) || costPerKg <= 0) {
+      if (isNaN(costPerKg) || costPerKg < 0) {
         alert('Please enter a valid cost')
         return
       }
@@ -126,7 +126,7 @@ const StockInventory = () => {
         alert('Please enter a valid size')
         return
       }
-      if (isNaN(costPerKg) || costPerKg <= 0) {
+      if (isNaN(costPerKg) || costPerKg < 0) {
         alert('Please enter a valid cost per kg')
         return
       }
@@ -352,7 +352,7 @@ const StockInventory = () => {
                     name="costPerKg"
                     value={formData.costPerKg}
                     onChange={handleInputChange}
-                    min="0.01"
+                    min="0"
                     step="0.01"
                     required
                   />

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { supabase, supabaseUrl } from '../utils/supabaseClient'
 import { isMigrationNeeded, migrateFromLocalStorage } from '../utils/migrateData'
 import { useAuth } from './AuthContext'
@@ -85,7 +85,9 @@ export function AppProvider({ children }) {
             .limit(1)
           
           if (balanceError) throw balanceError
-          setBalance(balanceData && balanceData.length > 0 ? balanceData[0].amount : 0)
+          const currentBalance = balanceData && balanceData.length > 0 ? balanceData[0].amount : 0
+          console.log('Loaded balance from database:', currentBalance)
+          setBalance(currentBalance)
         } catch (fetchError) {
           // If we get a fetch error and we're using the placeholder URL, it's expected
           // Just log it but don't set the error state
@@ -151,6 +153,33 @@ export function AppProvider({ children }) {
       const { error } = await supabase.from('chickens').insert(chicken)
       if (error) throw error
 
+      // If there's a payment, create a transaction and update balance
+      if (amountPaid > 0) {
+        const paymentTransaction = {
+          id: (Date.now() + 1).toString(),
+          type: 'income',
+          amount: amountPaid,
+          description: `Payment from ${chicken.customer} for chicken order`,
+          date: chicken.date
+        }
+
+        // Update balance
+        const newBalance = balance + amountPaid
+
+        const { error: transactionError } = await supabase.from('transactions').insert(paymentTransaction)
+        if (transactionError) throw transactionError
+
+        // Update the balance record instead of inserting a new one
+        const { error: balanceError } = await supabase
+          .from('balance')
+          .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
+        if (balanceError) throw balanceError
+
+        // Update local state for transactions and balance
+        setTransactions(prev => [paymentTransaction, ...prev])
+        setBalance(newBalance)
+      }
+
       // Log audit action
       await logAuditAction('CREATE', 'chickens', chicken.id, null, chicken)
 
@@ -182,8 +211,45 @@ export function AppProvider({ children }) {
 
       if (error) throw error
 
-      // Log audit action
+      // Handle balance changes when amount paid is updated
       const oldChicken = chickens.find(c => c.id === id)
+      const oldAmountPaid = oldChicken?.amount_paid || 0
+      const newAmountPaid = amountPaid || 0
+      const paymentDifference = newAmountPaid - oldAmountPaid
+
+      if (paymentDifference !== 0) {
+        const transactionType = paymentDifference > 0 ? 'income' : 'expense'
+        const transactionAmount = Math.abs(paymentDifference)
+        const transactionDescription = paymentDifference > 0 
+          ? `Additional payment from ${updatedChicken.customer} for chicken order`
+          : `Payment refund to ${updatedChicken.customer} for chicken order`
+
+        const paymentTransaction = {
+          id: (Date.now() + 1).toString(),
+          type: transactionType,
+          amount: transactionAmount,
+          description: transactionDescription,
+          date: new Date().toISOString().split('T')[0]
+        }
+
+        // Update balance
+        const newBalance = balance + paymentDifference
+
+        const { error: transactionError } = await supabase.from('transactions').insert(paymentTransaction)
+        if (transactionError) throw transactionError
+
+        // Update the balance record instead of inserting a new one
+        const { error: balanceError } = await supabase
+          .from('balance')
+          .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
+        if (balanceError) throw balanceError
+
+        // Update local state for transactions and balance
+        setTransactions(prev => [paymentTransaction, ...prev])
+        setBalance(newBalance)
+      }
+
+      // Log audit action
       await logAuditAction('UPDATE', 'chickens', id, oldChicken, updatedChicken)
 
       // Update local state
@@ -241,7 +307,7 @@ export function AppProvider({ children }) {
         
         const { error: balanceError } = await supabase
           .from('balance')
-          .insert({ amount: newBalance })
+          .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
         
         if (balanceError) throw balanceError
         
@@ -298,7 +364,9 @@ export function AppProvider({ children }) {
       if (transactionError) throw transactionError
 
       // Update balance
-      const { error: balanceError } = await supabase.from('balance').insert({ amount: newBalance })
+      const { error: balanceError } = await supabase
+        .from('balance')
+        .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
       if (balanceError) throw balanceError
 
       // Log audit action
@@ -360,7 +428,7 @@ export function AppProvider({ children }) {
       // Update balance
       const { error: balanceError } = await supabase
         .from('balance')
-        .insert({ amount: newBalance })
+        .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
       
       if (balanceError) throw balanceError
       
@@ -395,7 +463,9 @@ export function AppProvider({ children }) {
       const { error: transactionError } = await supabase.from('transactions').insert(transaction)
       if (transactionError) throw transactionError
 
-      const { error: balanceError } = await supabase.from('balance').insert({ amount: newBalance })
+      const { error: balanceError } = await supabase
+        .from('balance')
+        .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
       if (balanceError) throw balanceError
 
       // Log audit action
@@ -428,7 +498,9 @@ export function AppProvider({ children }) {
       const { error: transactionError } = await supabase.from('transactions').insert(transaction)
       if (transactionError) throw transactionError
 
-      const { error: balanceError } = await supabase.from('balance').insert({ amount: newBalance })
+      const { error: balanceError } = await supabase
+        .from('balance')
+        .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
       if (balanceError) throw balanceError
 
       // Log audit action
@@ -465,7 +537,9 @@ export function AppProvider({ children }) {
       const { error: transactionError } = await supabase.from('transactions').insert(transaction)
       if (transactionError) throw transactionError
 
-      const { error: balanceError } = await supabase.from('balance').insert({ amount: newBalance })
+      const { error: balanceError } = await supabase
+        .from('balance')
+        .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
       if (balanceError) throw balanceError
 
       // Log audit action
@@ -502,7 +576,9 @@ export function AppProvider({ children }) {
       const { error: transactionError } = await supabase.from('transactions').insert(transaction)
       if (transactionError) throw transactionError
 
-      const { error: balanceError } = await supabase.from('balance').insert({ amount: newBalance })
+      const { error: balanceError } = await supabase
+        .from('balance')
+        .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
       if (balanceError) throw balanceError
 
       // Update local state
@@ -516,8 +592,8 @@ export function AppProvider({ children }) {
     }
   }
 
-  // Stats calculations
-  const calculateStats = () => {
+  // Memoized stats calculations for better performance
+  const stats = useMemo(() => {
     const totalChickens = chickens.reduce((sum, chicken) => sum + chicken.count, 0)
     const totalRevenue = chickens.reduce((sum, chicken) => {
       return sum + (chicken.count * chicken.size * chicken.price)
@@ -543,7 +619,10 @@ export function AppProvider({ children }) {
       pendingCount,
       balance
     }
-  }
+  }, [chickens, transactions, balance])
+  
+  // Legacy function for backward compatibility
+  const calculateStats = () => stats
 
   // Generate report for date range
   const generateReport = (startDate, endDate) => {
@@ -636,7 +715,7 @@ export function AppProvider({ children }) {
       if (balanceAdjustment !== 0) {
         const { error: balanceError } = await supabase
           .from('balance')
-          .insert({ amount: newBalance })
+          .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
         
         if (balanceError) throw balanceError
       }
@@ -682,6 +761,7 @@ export function AppProvider({ children }) {
     deleteTransaction,
     
     // Stats and reports
+    stats,
     calculateStats,
     generateReport,
     exportToCSV

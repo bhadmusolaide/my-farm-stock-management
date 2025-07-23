@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -15,6 +15,9 @@ const Reports = () => {
   
   // State for report data
   const [reportData, setReportData] = useState(null)
+  
+  // State for time period selection
+  const [timePeriod, setTimePeriod] = useState('monthly')
   
   // Generate report
   const handleGenerateReport = () => {
@@ -53,40 +56,68 @@ const Reports = () => {
     }
   }
   
-  // Get monthly data for charts
-  const getMonthlyData = () => {
-    const monthlyData = {}
+  // Memoized time-based data calculation for better performance
+  const timeBasedData = useMemo(() => {
+    const timeData = {}
     
     chickens.forEach(chicken => {
       const date = new Date(chicken.date)
-      const monthYear = `${date.toLocaleString('default', { month: 'short' })} ${date.getFullYear()}`
+      let timeKey
       
-      if (!monthlyData[monthYear]) {
-        monthlyData[monthYear] = {
-          name: monthYear,
+      if (timePeriod === 'weekly') {
+        // Get week start (Monday)
+        const weekStart = new Date(date)
+        const day = weekStart.getDay()
+        const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1)
+        weekStart.setDate(diff)
+        timeKey = `Week of ${weekStart.toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
+      } else if (timePeriod === 'monthly') {
+        timeKey = `${date.toLocaleString('default', { month: 'short' })} ${date.getFullYear()}`
+      } else if (timePeriod === 'quarterly') {
+        const quarter = Math.floor(date.getMonth() / 3) + 1
+        timeKey = `Q${quarter} ${date.getFullYear()}`
+      }
+      
+      if (!timeData[timeKey]) {
+        timeData[timeKey] = {
+          name: timeKey,
           revenue: 0,
           count: 0,
           orders: 0
         }
       }
       
-      monthlyData[monthYear].revenue += chicken.count * chicken.size * chicken.price
-      monthlyData[monthYear].count += chicken.count
-      monthlyData[monthYear].orders += 1
+      timeData[timeKey].revenue += chicken.count * chicken.size * chicken.price
+      timeData[timeKey].count += chicken.count
+      timeData[timeKey].orders += 1
     })
     
     // Convert to array and sort by date
-    return Object.values(monthlyData).sort((a, b) => {
-      const dateA = new Date(a.name)
-      const dateB = new Date(b.name)
-      return dateA - dateB
-    }).slice(-6) // Get last 6 months
-  }
+    const sortedData = Object.values(timeData).sort((a, b) => {
+      if (timePeriod === 'weekly') {
+        const dateA = new Date(a.name.replace('Week of ', ''))
+        const dateB = new Date(b.name.replace('Week of ', ''))
+        return dateA - dateB
+      } else if (timePeriod === 'monthly') {
+        const dateA = new Date(a.name)
+        const dateB = new Date(b.name)
+        return dateA - dateB
+      } else if (timePeriod === 'quarterly') {
+        const [qA, yearA] = a.name.split(' ')
+        const [qB, yearB] = b.name.split(' ')
+        if (yearA !== yearB) return parseInt(yearA) - parseInt(yearB)
+        return parseInt(qA.replace('Q', '')) - parseInt(qB.replace('Q', ''))
+      }
+      return 0
+    })
+    
+    // Return appropriate number of periods
+    const periodCount = timePeriod === 'weekly' ? 12 : timePeriod === 'monthly' ? 6 : 4
+    return sortedData.slice(-periodCount)
+  }, [chickens, timePeriod])
   
-  const monthlyData = getMonthlyData()
-  
-  // Get status distribution data
-  const getStatusData = () => {
+  // Memoized status distribution data for better performance
+  const statusData = useMemo(() => {
     const statusCounts = {
       paid: 0,
       partial: 0,
@@ -102,9 +133,7 @@ const Reports = () => {
       { name: 'Partial', value: statusCounts.partial, color: '#ff9800' },
       { name: 'Pending', value: statusCounts.pending, color: '#f44336' }
     ].filter(item => item.value > 0)
-  }
-  
-  const statusData = getStatusData()
+  }, [chickens])
   
   // Get status badge class
   const getStatusBadgeClass = (status) => {
@@ -125,11 +154,25 @@ const Reports = () => {
       <h1>Reports</h1>
       
       <div className="reports-overview">
+        <div className="time-period-selector">
+          <label htmlFor="timePeriod">View by:</label>
+          <select 
+            id="timePeriod" 
+            value={timePeriod} 
+            onChange={(e) => setTimePeriod(e.target.value)}
+            className="time-period-dropdown"
+          >
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+          </select>
+        </div>
+        
         <div className="overview-charts">
           <div className="chart-container">
-            <h3>Monthly Revenue</h3>
+            <h3>{timePeriod.charAt(0).toUpperCase() + timePeriod.slice(1)} Revenue</h3>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthlyData}>
+              <BarChart data={timeBasedData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
@@ -141,9 +184,9 @@ const Reports = () => {
           </div>
           
           <div className="chart-container">
-            <h3>Monthly Chicken Count</h3>
+            <h3>{timePeriod.charAt(0).toUpperCase() + timePeriod.slice(1)} Chicken Count</h3>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={monthlyData}>
+              <LineChart data={timeBasedData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
@@ -209,13 +252,16 @@ const Reports = () => {
             />
           </div>
           
-          <button 
-            className="btn-primary" 
-            onClick={handleGenerateReport}
-            disabled={!startDate || !endDate}
-          >
-            Generate Report
-          </button>
+          <div className="form-group">
+            <label>&nbsp;</label>
+            <button 
+              className="btn-primary" 
+              onClick={handleGenerateReport}
+              disabled={!startDate || !endDate}
+            >
+              Generate Report
+            </button>
+          </div>
         </div>
         
         {reportData && (

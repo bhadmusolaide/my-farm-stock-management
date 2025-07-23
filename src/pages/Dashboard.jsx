@@ -1,15 +1,14 @@
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+
 import './Dashboard.css'
 
 const Dashboard = () => {
-  const { calculateStats, chickens, transactions, addFunds, addExpense, withdrawFunds, clearBalance } = useAppContext()
-  const [activeModal, setActiveModal] = useState(null)
-  const [amount, setAmount] = useState('')
-  const [description, setDescription] = useState('')
-  
-  const stats = calculateStats()
+  const { stats, chickens, transactions } = useAppContext()
+  const [currentCarouselIndex, setCurrentCarouselIndex] = useState(0)
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true)
+  const [itemsPerView, setItemsPerView] = useState(1)
   
   // Data for status pie chart
   const statusData = [
@@ -18,11 +17,66 @@ const Dashboard = () => {
     { name: 'Pending', value: stats.pendingCount, color: '#f44336' }
   ].filter(item => item.value > 0)
   
-  // Data for recent transactions
-  const recentTransactions = transactions.slice(0, 5)
+  // Memoized data for recent transactions
+  const recentTransactions = useMemo(() => transactions.slice(0, 5), [transactions])
   
-  // Data for monthly revenue chart (last 6 months)
-  const getMonthlyRevenueData = () => {
+  // Get pending and partial orders for carousel
+  const pendingPartialOrders = useMemo(() => {
+    return chickens.filter(chicken => chicken.status === 'pending' || chicken.status === 'partial')
+  }, [chickens])
+  
+  // Calculate responsive items per view
+  useEffect(() => {
+    const updateItemsPerView = () => {
+      if (window.innerWidth >= 1024) {
+        setItemsPerView(3)
+      } else if (window.innerWidth >= 768) {
+        setItemsPerView(2)
+      } else {
+        setItemsPerView(1)
+      }
+    }
+    
+    updateItemsPerView()
+    window.addEventListener('resize', updateItemsPerView)
+    return () => window.removeEventListener('resize', updateItemsPerView)
+  }, [])
+  
+  // Calculate max index based on items per view
+  const maxIndex = Math.max(0, pendingPartialOrders.length - itemsPerView)
+  
+  // Carousel navigation functions
+  const goToPrevious = () => {
+    setCurrentCarouselIndex(prev => Math.max(0, prev - 1))
+    setIsAutoPlaying(false)
+  }
+  
+  const goToNext = () => {
+    setCurrentCarouselIndex(prev => Math.min(maxIndex, prev + 1))
+    setIsAutoPlaying(false)
+  }
+  
+  const goToSlide = (index) => {
+    setCurrentCarouselIndex(Math.min(index, maxIndex))
+    setIsAutoPlaying(false)
+  }
+  
+  // Carousel auto-rotation
+  useEffect(() => {
+    if (pendingPartialOrders.length > itemsPerView && isAutoPlaying) {
+      const interval = setInterval(() => {
+        setCurrentCarouselIndex(prev => {
+          const nextIndex = prev + 1
+          return nextIndex > maxIndex ? 0 : nextIndex
+        })
+      }, 4000) // Change every 4 seconds
+      
+      return () => clearInterval(interval)
+    }
+  }, [pendingPartialOrders.length, itemsPerView, isAutoPlaying, maxIndex])
+  
+  // Memoized monthly revenue data calculation for better performance
+  const monthlyRevenueData = useMemo(() => {
     const today = new Date()
     const monthlyData = []
     
@@ -48,70 +102,109 @@ const Dashboard = () => {
     }
     
     return monthlyData
-  }
+  }, [chickens])
   
-  const monthlyRevenueData = getMonthlyRevenueData()
-  
-  // Handle modal actions
-  const openModal = (modalName) => {
-    setActiveModal(modalName)
-    setAmount('')
-    setDescription('')
-  }
-  
-  const closeModal = () => {
-    setActiveModal(null)
-  }
-  
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    
-    const parsedAmount = parseFloat(amount)
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      alert('Please enter a valid amount')
-      return
-    }
-    
-    try {
-      if (activeModal === 'addFunds') {
-        await addFunds(parsedAmount, description)
-      } else if (activeModal === 'addExpense') {
-        await addExpense(parsedAmount, description)
-      } else if (activeModal === 'withdrawFunds') {
-        await withdrawFunds(parsedAmount, description)
-      }
-      
-      closeModal()
-    } catch (error) {
-      alert(error.message)
-    }
-  }
+
   
   return (
     <div className="dashboard-container">
       <h1>Dashboard</h1>
       
-      <div className="dashboard-actions">
-        <button className="action-button add-funds" onClick={() => openModal('addFunds')}>
-          Add Funds
-        </button>
-        <button className="action-button add-expense" onClick={() => openModal('addExpense')}>
-          Add Expense
-        </button>
-        <button className="action-button withdraw" onClick={() => openModal('withdrawFunds')}>
-          Withdraw
-        </button>
-        <button className="action-button clear" onClick={async () => {
-          if (window.confirm('Are you sure you want to clear the balance to zero?')) {
-            try {
-              await clearBalance()
-            } catch (error) {
-              alert(`Error: ${error.message}`)
-            }
-          }
-        }}>
-          Clear
-        </button>
+      <div className="orders-carousel">
+        <div className="carousel-header">
+          <h3 className="carousel-title">Pending & Partial Orders</h3>
+          {pendingPartialOrders.length > 0 && (
+            <span className="carousel-count">
+              {pendingPartialOrders.length} order{pendingPartialOrders.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        
+        {pendingPartialOrders.length > 0 ? (
+          <div className="carousel-container">
+            <div 
+              className="carousel-track"
+              style={{
+                transform: `translateX(-${(currentCarouselIndex * 100) / itemsPerView}%)`
+              }}
+            >
+              {pendingPartialOrders.map((order, index) => (
+                <div key={order.id || index} className="carousel-item">
+                  <div className="order-info">
+                    <span className="customer-name">{order.customer}</span>
+                    <span className={`order-status ${order.status}`}>
+                      {order.status.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="order-details">
+                    <span className="order-quantity">
+                      {order.count} chicken{order.count !== 1 ? 's' : ''}
+                    </span>
+                    <span className="order-balance">
+                      ₦{order.balance.toFixed(2)} balance
+                    </span>
+                  </div>
+                  <div className="order-meta">
+                    <span className="order-date">
+                      {new Date(order.date).toLocaleDateString()}
+                    </span>
+                    <span className="order-size">
+                      Size: {order.size}kg
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {pendingPartialOrders.length > itemsPerView && (
+              <div className="carousel-navigation">
+                <button 
+                  className="carousel-nav-btn"
+                  onClick={goToPrevious}
+                  disabled={currentCarouselIndex === 0}
+                  aria-label="Previous orders"
+                >
+                  ‹
+                </button>
+                
+                <div className="carousel-indicators">
+                  {Array.from({ length: maxIndex + 1 }, (_, index) => (
+                    <span 
+                      key={index} 
+                      className={`indicator ${index === currentCarouselIndex ? 'active' : ''}`}
+                      onClick={() => goToSlide(index)}
+                      aria-label={`Go to slide ${index + 1}`}
+                    />
+                  ))}
+                </div>
+                
+                <button 
+                  className="carousel-nav-btn"
+                  onClick={goToNext}
+                  disabled={currentCarouselIndex >= maxIndex}
+                  aria-label="Next orders"
+                >
+                  ›
+                </button>
+              </div>
+            )}
+            
+            {isAutoPlaying && pendingPartialOrders.length > itemsPerView && (
+              <div className="carousel-progress">
+                <div className="progress-bar">
+                  <div 
+                    className="progress-fill"
+                    style={{
+                      width: `${((currentCarouselIndex + 1) / (maxIndex + 1)) * 100}%`
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="no-data">No pending or partial orders</p>
+        )}
       </div>
       
       <div className="stats-grid">
@@ -198,57 +291,7 @@ const Dashboard = () => {
         )}
       </div>
       
-      {/* Modals */}
-      {activeModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h3>
-              {activeModal === 'addFunds' && 'Add Funds'}
-              {activeModal === 'addExpense' && 'Add Expense'}
-              {activeModal === 'withdrawFunds' && 'Withdraw Funds'}
-            </h3>
-            
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label htmlFor="amount">Amount ($)</label>
-                <input
-                  type="number"
-                  id="amount"
-                  value={amount}
-                  onChange={e => setAmount(e.target.value)}
-                  min="0.01"
-                  step="0.01"
-                  required
-                />
-              </div>
-              
-              <div className="form-group">
-                <label htmlFor="description">
-                  {activeModal === 'withdrawFunds' ? 'Purpose' : 'Description'}
-                </label>
-                <input
-                  type="text"
-                  id="description"
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder={activeModal === 'withdrawFunds' ? 'Purpose of withdrawal' : 'Description (optional)'}
-                />
-              </div>
-              
-              <div className="form-actions">
-                <button type="button" className="btn-secondary" onClick={closeModal}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary">
-                  {activeModal === 'addFunds' && 'Add Funds'}
-                  {activeModal === 'addExpense' && 'Add Expense'}
-                  {activeModal === 'withdrawFunds' && 'Withdraw'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+
     </div>
   )
 }

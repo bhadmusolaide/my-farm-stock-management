@@ -46,7 +46,9 @@ export async function migrateFromLocalStorage() {
     
     // Set balance
     console.log(`Setting initial balance: ₦${balance.toFixed(2)}`)
-    const { error: balanceError } = await supabase.from('balance').insert({ amount: balance })
+    const { error: balanceError } = await supabase
+      .from('balance')
+      .upsert({ id: 1, amount: balance }, { onConflict: 'id' })
     if (balanceError) {
       console.error('Error migrating balance:', balanceError)
       throw balanceError

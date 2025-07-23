@@ -93,7 +93,33 @@ const ChickenOrders = () => {
   // Handle form input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    
+    setFormData(prev => {
+      const newFormData = { ...prev, [name]: value }
+      
+      // Auto-populate amount paid when status is 'paid' or when calculation fields change while status is 'paid'
+      if ((name === 'status' && value === 'paid') || 
+          (prev.status === 'paid' && ['count', 'size', 'price', 'calculationMode'].includes(name))) {
+        
+        const count = parseFloat(name === 'count' ? value : newFormData.count || 0)
+        const size = parseFloat(name === 'size' ? value : newFormData.size || 0)
+        const price = parseFloat(name === 'price' ? value : newFormData.price || 0)
+        const calculationMode = name === 'calculationMode' ? value : newFormData.calculationMode
+        
+        let total = 0
+        if (calculationMode === 'count_cost') {
+          total = count * price
+        } else if (calculationMode === 'size_cost') {
+          total = size * price
+        } else {
+          total = count * size * price
+        }
+        
+        newFormData.amountPaid = total.toFixed(2)
+      }
+      
+      return newFormData
+    })
   }
   
   // Open modal for adding new chicken
@@ -153,7 +179,7 @@ const ChickenOrders = () => {
         showError('Please enter a valid count')
         return
       }
-      if (isNaN(price) || price <= 0) {
+      if (isNaN(price) || price < 0) {
         showError('Please enter a valid price')
         return
       }
@@ -162,7 +188,7 @@ const ChickenOrders = () => {
         showError('Please enter a valid size')
         return
       }
-      if (isNaN(price) || price <= 0) {
+      if (isNaN(price) || price < 0) {
         showError('Please enter a valid price')
         return
       }
@@ -175,7 +201,7 @@ const ChickenOrders = () => {
         showError('Please enter a valid size')
         return
       }
-      if (isNaN(price) || price <= 0) {
+      if (isNaN(price) || price < 0) {
         showError('Please enter a valid price')
         return
       }
@@ -467,14 +493,13 @@ const ChickenOrders = () => {
                   </div>
                   
                   <div className="form-group">
-                    <label htmlFor="location">Location*</label>
+                    <label htmlFor="location">Location</label>
                     <input
                       type="text"
                       id="location"
                       name="location"
                       value={formData.location}
                       onChange={handleInputChange}
-                      required
                     />
                   </div>
                 </div>
@@ -538,7 +563,7 @@ const ChickenOrders = () => {
                       name="price"
                       value={formData.price}
                       onChange={handleInputChange}
-                      min="0.01"
+                      min="0"
                       step="0.01"
                       required
                     />
