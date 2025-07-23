@@ -74,3 +74,116 @@ table tbody tr:hover {
 .user-info {
   background: transparent !important;
 }
+
+/* User Menu Dropdown Light Mode Fixes */
+.menu-item {
+  color: #1f2937 !important; /* Darker text for better visibility in light mode */
+}
+
+.menu-item:hover {
+  color: #4caf50 !important;
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.08) 0%, rgba(76, 175, 80, 0.04) 100%) !important;
+}
+
+.user-full-name {
+  color: #111827 !important;
+}
+
+.user-email {
+  color: #6b7280 !important;
+}
+
+.user-role {
+  color: #4caf50 !important;
+}
+
+/* Audit Trail Light Mode Fixes */
+[data-theme="light"] .audit-trail {
+  background-color: transparent !important;
+  color: #1f2937 !important;
+}
+
+[data-theme="light"] .audit-trail .header-content h1 {
+  color: #1f2937 !important;
+}
+
+[data-theme="light"] .audit-trail .header-content p {
+  color: #6b7280 !important;
+}
+
+[data-theme="light"] .audit-trail .filters-container,
+[data-theme="light"] .audit-trail .audit-table-container {
+  background: white !important;
+  border-color: #e5e7eb !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] .audit-trail .audit-table thead {
+  background-color: #f9fafb !important;
+}
+
+[data-theme="light"] .audit-trail .audit-table th {
+  color: #374151 !important;
+  border-color: #e5e7eb !important;
+}
+
+[data-theme="light"] .audit-trail .audit-table td {
+  color: #1f2937 !important;
+  border-color: #f3f4f6 !important;
+}
+
+[data-theme="light"] .audit-trail .audit-table tbody tr:hover {
+  background-color: #f9fafb !important;
+}
+
+[data-theme="light"] .audit-trail .filter-group label {
+  color: #374151 !important;
+}
+
+[data-theme="light"] .audit-trail .filter-group select,
+[data-theme="light"] .audit-trail .filter-group input {
+  background-color: white !important;
+  border-color: #d1d5db !important;
+  color: #1f2937 !important;
+  -webkit-text-fill-color: #1f2937 !important;
+}
+
+[data-theme="light"] .audit-trail .clear-filters-btn,
+[data-theme="light"] .audit-trail .page-btn {
+  background-color: white !important;
+  border-color: #d1d5db !important;
+  color: #374151 !important;
+}
+
+[data-theme="light"] .audit-trail .clear-filters-btn:hover:not(:disabled),
+[data-theme="light"] .audit-trail .page-btn:hover:not(:disabled) {
+  background-color: #f9fafb !important;
+  border-color: #9ca3af !important;
+}
+
+[data-theme="light"] .audit-trail .table-cell code,
+[data-theme="light"] .audit-trail .record-id-cell code {
+  background-color: #f3f4f6 !important;
+  color: #1f2937 !important;
+}
+
+[data-theme="light"] .audit-trail .timestamp-cell,
+[data-theme="light"] .audit-trail .ip-cell {
+  color: #6b7280 !important;
+}
+
+[data-theme="light"] .audit-trail .user-name {
+  color: #1f2937 !important;
+}
+
+[data-theme="light"] .audit-trail .user-email {
+  color: #6b7280 !important;
+}
+
+[data-theme="light"] .audit-trail .loading-container {
+  color: #6b7280 !important;
+}
+
+[data-theme="light"] .audit-trail .no-data {
+  color: #6b7280 !important;
+}

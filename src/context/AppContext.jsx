@@ -137,13 +137,14 @@ export function AppProvider({ children }) {
   const addChicken = async (chickenData) => {
     try {
       // Convert amountPaid to amount_paid to match database schema
-      const { amountPaid, ...otherData } = chickenData;
+      const { amountPaid, calculationMode, ...otherData } = chickenData;
       
       const chicken = {
         id: Date.now().toString(),
         date: new Date().toISOString().split('T')[0],
         ...otherData,
         amount_paid: amountPaid || 0,
+        calculation_mode: calculationMode || 'count_size_cost',
         balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0)
       }
 
@@ -165,11 +166,12 @@ export function AppProvider({ children }) {
   const updateChicken = async (id, chickenData) => {
     try {
       // Convert amountPaid to amount_paid to match database schema
-      const { amountPaid, ...otherData } = chickenData;
+      const { amountPaid, calculationMode, ...otherData } = chickenData;
       
       const updatedChicken = {
         ...otherData,
         amount_paid: amountPaid || 0,
+        calculation_mode: calculationMode || 'count_size_cost',
         balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0)
       }
 
@@ -272,7 +274,8 @@ export function AppProvider({ children }) {
         description: stockData.description,
         count: stockData.count,
         size: stockData.size,
-        cost_per_kg: stockData.costPerKg  // Map frontend field to database column name
+        cost_per_kg: stockData.costPerKg,  // Map frontend field to database column name
+        calculation_mode: stockData.calculationMode || 'count_size_cost'
       }
 
       // Create expense transaction for stock purchase

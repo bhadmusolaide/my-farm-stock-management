@@ -20,7 +20,8 @@ const StockInventory = () => {
     description: '',
     count: '',
     size: '',
-    costPerKg: ''
+    costPerKg: '',
+    calculationMode: 'count_size_cost' // 'count_size_cost', 'count_cost', 'size_cost'
   })
   
   // Get filtered stock
@@ -77,7 +78,8 @@ const StockInventory = () => {
       description: '',
       count: '',
       size: '',
-      costPerKg: ''
+      costPerKg: '',
+      calculationMode: 'count_size_cost'
     })
     setShowModal(true)
   }
@@ -91,32 +93,52 @@ const StockInventory = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // Validate form
+    // Validate form based on calculation mode
     const count = parseInt(formData.count)
     const size = parseFloat(formData.size)
     const costPerKg = parseFloat(formData.costPerKg)
     
-    if (isNaN(count) || count <= 0) {
-      alert('Please enter a valid count')
-      return
-    }
-    
-    if (isNaN(size) || size <= 0) {
-      alert('Please enter a valid size')
-      return
-    }
-    
-    if (isNaN(costPerKg) || costPerKg <= 0) {
-      alert('Please enter a valid cost per kg')
-      return
+    // Validate required fields based on calculation mode
+    if (formData.calculationMode === 'count_cost') {
+      if (isNaN(count) || count <= 0) {
+        alert('Please enter a valid count')
+        return
+      }
+      if (isNaN(costPerKg) || costPerKg <= 0) {
+        alert('Please enter a valid cost')
+        return
+      }
+    } else if (formData.calculationMode === 'size_cost') {
+      if (isNaN(size) || size <= 0) {
+        alert('Please enter a valid size')
+        return
+      }
+      if (isNaN(costPerKg) || costPerKg <= 0) {
+        alert('Please enter a valid cost')
+        return
+      }
+    } else { // count_size_cost
+      if (isNaN(count) || count <= 0) {
+        alert('Please enter a valid count')
+        return
+      }
+      if (isNaN(size) || size <= 0) {
+        alert('Please enter a valid size')
+        return
+      }
+      if (isNaN(costPerKg) || costPerKg <= 0) {
+        alert('Please enter a valid cost per kg')
+        return
+      }
     }
     
     try {
       await addStock({
         description: formData.description,
-        count,
-        size,
-        costPerKg
+        count: formData.calculationMode === 'size_cost' ? 1 : count,
+        size: formData.calculationMode === 'count_cost' ? 1 : size,
+        costPerKg,
+        calculationMode: formData.calculationMode
       })
       
       closeModal()
@@ -273,55 +295,86 @@ const StockInventory = () => {
               
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="count">Count*</label>
-                  <input
-                    type="number"
-                    id="count"
-                    name="count"
-                    value={formData.count}
+                  <label htmlFor="calculationMode">Calculation Mode*</label>
+                  <select
+                    id="calculationMode"
+                    name="calculationMode"
+                    value={formData.calculationMode}
                     onChange={handleInputChange}
-                    min="1"
                     required
-                  />
+                  >
+                    <option value="count_size_cost">Count × Size × Cost per kg</option>
+                    <option value="count_cost">Count × Cost per item</option>
+                    <option value="size_cost">Size × Cost per kg</option>
+                  </select>
                 </div>
                 
+                {formData.calculationMode !== 'size_cost' && (
+                  <div className="form-group">
+                    <label htmlFor="count">Count*</label>
+                    <input
+                      type="number"
+                      id="count"
+                      name="count"
+                      value={formData.count}
+                      onChange={handleInputChange}
+                      min="1"
+                      required={formData.calculationMode !== 'size_cost'}
+                    />
+                  </div>
+                )}
+              </div>
+              
+              <div className="form-row">
+                {formData.calculationMode !== 'count_cost' && (
+                  <div className="form-group">
+                    <label htmlFor="size">Size (kg)*</label>
+                    <input
+                      type="number"
+                      id="size"
+                      name="size"
+                      value={formData.size}
+                      onChange={handleInputChange}
+                      min="0.1"
+                      step="0.1"
+                      required={formData.calculationMode !== 'count_cost'}
+                    />
+                  </div>
+                )}
+                
                 <div className="form-group">
-                  <label htmlFor="size">Size (kg)*</label>
+                  <label htmlFor="costPerKg">
+                    {formData.calculationMode === 'count_cost' ? 'Cost per item*' : 'Cost per kg*'}
+                  </label>
                   <input
                     type="number"
-                    id="size"
-                    name="size"
-                    value={formData.size}
+                    id="costPerKg"
+                    name="costPerKg"
+                    value={formData.costPerKg}
                     onChange={handleInputChange}
-                    min="0.1"
-                    step="0.1"
+                    min="0.01"
+                    step="0.01"
                     required
                   />
                 </div>
-              </div>
-              
-              <div className="form-group">
-                <label htmlFor="costPerKg">Cost per kg*</label>
-                <input
-                  type="number"
-                  id="costPerKg"
-                  name="costPerKg"
-                  value={formData.costPerKg}
-                  onChange={handleInputChange}
-                  min="0.01"
-                  step="0.01"
-                  required
-                />
               </div>
               
               <div className="form-group total-preview">
                 <label>Total Cost:</label>
                 <span className="total-cost">
-                  ₦{(
-                    parseFloat(formData.count || 0) * 
-                    parseFloat(formData.size || 0) * 
-                    parseFloat(formData.costPerKg || 0)
-                  ).toFixed(2)}
+                  ₦{(() => {
+                    const count = parseFloat(formData.count || 0)
+                    const size = parseFloat(formData.size || 0)
+                    const cost = parseFloat(formData.costPerKg || 0)
+                    
+                    if (formData.calculationMode === 'count_cost') {
+                      return (count * cost).toFixed(2)
+                    } else if (formData.calculationMode === 'size_cost') {
+                      return (size * cost).toFixed(2)
+                    } else {
+                      return (count * size * cost).toFixed(2)
+                    }
+                  })()}
                 </span>
               </div>
               

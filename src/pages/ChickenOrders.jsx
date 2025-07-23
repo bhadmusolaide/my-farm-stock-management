@@ -36,7 +36,8 @@ const ChickenOrders = () => {
     size: '',
     price: '',
     amountPaid: '',
-    status: 'pending'
+    status: 'pending',
+    calculationMode: 'count_size_cost' // 'count_size_cost', 'count_cost', 'size_cost'
   })
   
   // Apply filters when chickens or filters change
@@ -105,7 +106,8 @@ const ChickenOrders = () => {
       size: '',
       price: '',
       amountPaid: '',
-      status: 'pending'
+      status: 'pending',
+      calculationMode: 'count_size_cost'
     })
     setEditMode(false)
     setShowModal(true)
@@ -122,7 +124,8 @@ const ChickenOrders = () => {
       size: chicken.size,
       price: chicken.price,
       amountPaid: chicken.amount_paid || 0, // Use amount_paid from database
-      status: chicken.status
+      status: chicken.status,
+      calculationMode: chicken.calculationMode || 'count_size_cost'
     })
     setEditMode(true)
     setShowModal(true)
@@ -138,25 +141,44 @@ const ChickenOrders = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // Validate form
+    // Validate form based on calculation mode
     const count = parseInt(formData.count)
     const size = parseFloat(formData.size)
     const price = parseFloat(formData.price)
     const amountPaid = parseFloat(formData.amountPaid) || 0
     
-    if (isNaN(count) || count <= 0) {
-      showError('Please enter a valid count')
-      return
-    }
-    
-    if (isNaN(size) || size <= 0) {
-      showError('Please enter a valid size')
-      return
-    }
-    
-    if (isNaN(price) || price <= 0) {
-      showError('Please enter a valid price')
-      return
+    // Validate required fields based on calculation mode
+    if (formData.calculationMode === 'count_cost') {
+      if (isNaN(count) || count <= 0) {
+        showError('Please enter a valid count')
+        return
+      }
+      if (isNaN(price) || price <= 0) {
+        showError('Please enter a valid price')
+        return
+      }
+    } else if (formData.calculationMode === 'size_cost') {
+      if (isNaN(size) || size <= 0) {
+        showError('Please enter a valid size')
+        return
+      }
+      if (isNaN(price) || price <= 0) {
+        showError('Please enter a valid price')
+        return
+      }
+    } else { // count_size_cost
+      if (isNaN(count) || count <= 0) {
+        showError('Please enter a valid count')
+        return
+      }
+      if (isNaN(size) || size <= 0) {
+        showError('Please enter a valid size')
+        return
+      }
+      if (isNaN(price) || price <= 0) {
+        showError('Please enter a valid price')
+        return
+      }
     }
     
     if (isNaN(amountPaid) || amountPaid < 0) {
@@ -164,8 +186,16 @@ const ChickenOrders = () => {
       return
     }
     
-    // Calculate total and use the selected status
-    const total = count * size * price
+    // Calculate total based on calculation mode
+    let total
+    if (formData.calculationMode === 'count_cost') {
+      total = count * price
+    } else if (formData.calculationMode === 'size_cost') {
+      total = size * price
+    } else {
+      total = count * size * price
+    }
+    
     const status = formData.status
     
     try {
@@ -175,11 +205,12 @@ const ChickenOrders = () => {
         customer: formData.customer,
         phone: formData.phone,
         location: formData.location,
-        count,
-        size,
+        count: formData.calculationMode === 'size_cost' ? 1 : count,
+        size: formData.calculationMode === 'count_cost' ? 1 : size,
         price,
         amountPaid,
-        status
+        status,
+        calculationMode: formData.calculationMode
       }
       
       if (editMode && currentChicken) {
@@ -216,19 +247,31 @@ const ChickenOrders = () => {
   // Export orders to CSV
   const handleExport = () => {
     try {
-      const dataToExport = filteredChickens.map(chicken => ({
-        Date: chicken.date,
-        Customer: chicken.customer,
-        Location: chicken.location || '',
-        Phone: chicken.phone || '',
-        Count: chicken.count,
-        Size: chicken.size,
-        Price: chicken.price,
-        Total: chicken.count * chicken.size * chicken.price,
-        'Amount Paid': chicken.amount_paid || 0,
-        Balance: chicken.balance,
-        Status: chicken.status
-      }))
+      const dataToExport = filteredChickens.map(chicken => {
+        let total
+        if (chicken.calculationMode === 'count_cost') {
+          total = chicken.count * chicken.price
+        } else if (chicken.calculationMode === 'size_cost') {
+          total = chicken.size * chicken.price
+        } else {
+          total = chicken.count * chicken.size * chicken.price
+        }
+        
+        return {
+          Date: chicken.date,
+          Customer: chicken.customer,
+          Location: chicken.location || '',
+          Phone: chicken.phone || '',
+          Count: chicken.count,
+          Size: chicken.size,
+          Price: chicken.price,
+          'Calculation Mode': chicken.calculationMode || 'count_size_cost',
+          Total: total,
+          'Amount Paid': chicken.amount_paid || 0,
+          Balance: chicken.balance,
+          Status: chicken.status
+        }
+      })
       
       exportToCSV(dataToExport, 'chicken-orders.csv')
     } catch (error) {
@@ -355,7 +398,15 @@ const ChickenOrders = () => {
                   <td>{chicken.count}</td>
                   <td>{chicken.size}</td>
                   <td>₦{chicken.price.toFixed(2)}</td>
-                  <td>₦{(chicken.count * chicken.size * chicken.price).toFixed(2)}</td>
+                  <td>₦{(() => {
+                    if (chicken.calculationMode === 'count_cost') {
+                      return (chicken.count * chicken.price).toFixed(2)
+                    } else if (chicken.calculationMode === 'size_cost') {
+                      return (chicken.size * chicken.price).toFixed(2)
+                    } else {
+                      return (chicken.count * chicken.size * chicken.price).toFixed(2)
+                    }
+                  })()}</td>
                   <td>₦{(chicken.amount_paid || 0).toFixed(2)}</td>
                   <td>₦{chicken.balance.toFixed(2)}</td>
                   <td>
@@ -402,54 +453,27 @@ const ChickenOrders = () => {
             
             <form onSubmit={handleSubmit}>
               <div className="form-container">
-                <div className="form-group">
-                  <label htmlFor="customer">Customer Name*</label>
-                  <input
-                    type="text"
-                    id="customer"
-                    name="customer"
-                    value={formData.customer}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label htmlFor="location">Location*</label>
-                  <input
-                    type="text"
-                    id="location"
-                    name="location"
-                    value={formData.location}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-                
                 <div className="form-row">
                   <div className="form-group">
-                    <label htmlFor="count">Count*</label>
+                    <label htmlFor="customer">Customer Name*</label>
                     <input
-                      type="number"
-                      id="count"
-                      name="count"
-                      value={formData.count}
+                      type="text"
+                      id="customer"
+                      name="customer"
+                      value={formData.customer}
                       onChange={handleInputChange}
-                      min="1"
                       required
                     />
                   </div>
                   
                   <div className="form-group">
-                    <label htmlFor="size">Size (kg)*</label>
+                    <label htmlFor="location">Location*</label>
                     <input
-                      type="number"
-                      id="size"
-                      name="size"
-                      value={formData.size}
+                      type="text"
+                      id="location"
+                      name="location"
+                      value={formData.location}
                       onChange={handleInputChange}
-                      min="0.1"
-                      step="0.1"
                       required
                     />
                   </div>
@@ -457,7 +481,57 @@ const ChickenOrders = () => {
                 
                 <div className="form-row">
                   <div className="form-group">
-                    <label htmlFor="price">Price per kg*</label>
+                    <label htmlFor="calculationMode">Calculation Mode*</label>
+                    <select
+                      id="calculationMode"
+                      name="calculationMode"
+                      value={formData.calculationMode}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="count_size_cost">Count × Size × Price per kg</option>
+                      <option value="count_cost">Count × Price per item</option>
+                      <option value="size_cost">Size × Price per kg</option>
+                    </select>
+                  </div>
+                  
+                  {formData.calculationMode !== 'size_cost' && (
+                    <div className="form-group">
+                      <label htmlFor="count">Count*</label>
+                      <input
+                        type="number"
+                        id="count"
+                        name="count"
+                        value={formData.count}
+                        onChange={handleInputChange}
+                        min="1"
+                        required={formData.calculationMode !== 'size_cost'}
+                      />
+                    </div>
+                  )}
+                </div>
+                
+                <div className="form-row">
+                  {formData.calculationMode !== 'count_cost' && (
+                    <div className="form-group">
+                      <label htmlFor="size">Size (kg)*</label>
+                      <input
+                        type="number"
+                        id="size"
+                        name="size"
+                        value={formData.size}
+                        onChange={handleInputChange}
+                        min="0.1"
+                        step="0.1"
+                        required={formData.calculationMode !== 'count_cost'}
+                      />
+                    </div>
+                  )}
+                  
+                  <div className="form-group">
+                    <label htmlFor="price">
+                      {formData.calculationMode === 'count_cost' ? 'Price per item*' : 'Price per kg*'}
+                    </label>
                     <input
                       type="number"
                       id="price"
@@ -469,7 +543,9 @@ const ChickenOrders = () => {
                       required
                     />
                   </div>
-                  
+                </div>
+                
+                <div className="form-row">
                   <div className="form-group">
                     <label htmlFor="status">Status*</label>
                     <select
@@ -510,6 +586,25 @@ const ChickenOrders = () => {
                       step="0.01"
                     />
                   </div>
+                </div>
+                
+                <div className="form-group total-preview">
+                  <label>Total Cost:</label>
+                  <span className="total-cost">
+                    ₦{(() => {
+                      const count = parseFloat(formData.count || 0)
+                      const size = parseFloat(formData.size || 0)
+                      const price = parseFloat(formData.price || 0)
+                      
+                      if (formData.calculationMode === 'count_cost') {
+                        return (count * price).toFixed(2)
+                      } else if (formData.calculationMode === 'size_cost') {
+                        return (size * price).toFixed(2)
+                      } else {
+                        return (count * size * price).toFixed(2)
+                      }
+                    })()}
+                  </span>
                 </div>
               </div>
               

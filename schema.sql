@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.chickens (
     amount_paid DECIMAL(10,2) DEFAULT 0,
     balance DECIMAL(10,2) NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
+    calculation_mode TEXT DEFAULT 'count_size_cost',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS public.stock (
     count INTEGER NOT NULL,
     size DECIMAL(10,2) NOT NULL,
     cost_per_kg DECIMAL(10,2) NOT NULL,
+    calculation_mode TEXT DEFAULT 'count_size_cost',
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -80,6 +82,10 @@ INSERT INTO public.balance (amount) VALUES (0) ON CONFLICT DO NOTHING;
 
 -- Add location column to existing chickens table (if it doesn't exist)
 ALTER TABLE public.chickens ADD COLUMN IF NOT EXISTS location TEXT;
+
+-- Add calculation_mode column to existing tables (if they don't exist)
+ALTER TABLE public.chickens ADD COLUMN IF NOT EXISTS calculation_mode TEXT DEFAULT 'count_size_cost';
+ALTER TABLE public.stock ADD COLUMN IF NOT EXISTS calculation_mode TEXT DEFAULT 'count_size_cost';
 
 -- Note: Admin users should be created through the application interface
 
