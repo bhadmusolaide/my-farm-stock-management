@@ -546,8 +546,8 @@ const ChickenOrders = () => {
                         name="size"
                         value={formData.size}
                         onChange={handleInputChange}
-                        min="0.1"
-                        step="0.1"
+                        min="0.01"
+                        step="0.01"
                         required={formData.calculationMode !== 'count_cost'}
                       />
                     </div>
