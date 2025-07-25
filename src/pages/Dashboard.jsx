@@ -75,6 +75,13 @@ const Dashboard = () => {
     }
   }, [pendingPartialOrders.length, itemsPerView, isAutoPlaying, maxIndex])
   
+  // Calculate total weight in KG
+  const totalWeight = useMemo(() => {
+    return chickens.reduce((sum, chicken) => {
+      return sum + (chicken.count * chicken.size)
+    }, 0)
+  }, [chickens])
+
   // Memoized monthly revenue data calculation for better performance
   const monthlyRevenueData = useMemo(() => {
     const today = new Date()
@@ -211,6 +218,11 @@ const Dashboard = () => {
         <div className="stat-card">
           <h3>Current Balance</h3>
           <p className="stat-value">₦{stats.balance.toFixed(2)}</p>
+        </div>
+        
+        <div className="stat-card">
+          <h3>Total Weight</h3>
+          <p className="stat-value">{totalWeight.toFixed(2)} kg</p>
         </div>
         
         <div className="stat-card">
