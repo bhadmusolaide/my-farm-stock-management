@@ -5,6 +5,21 @@ import './StockInventory.css'
 const StockInventory = () => {
   const { stock, addStock, deleteStock } = useAppContext()
   
+  // Format number with thousand separators
+  const formatNumber = (num, decimals = null) => {
+    const number = typeof num === 'string' ? parseFloat(num) : num
+    if (isNaN(number)) return '0'
+    
+    if (decimals !== null) {
+      return number.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      })
+    }
+    
+    return number.toLocaleString('en-US')
+  }
+  
   // State for filters
   const [filters, setFilters] = useState({
     description: '',
@@ -220,12 +235,12 @@ const StockInventory = () => {
       <div className="stock-summary">
         <div className="summary-item">
           <span className="summary-label">Total Items:</span>
-          <span className="summary-value">{filteredStock.length}</span>
+          <span className="summary-value">{formatNumber(filteredStock.length)}</span>
         </div>
         
         <div className="summary-item">
           <span className="summary-label">Total Value:</span>
-          <span className="summary-value">₦{calculateTotalValue().toFixed(2)}</span>
+          <span className="summary-value">₦{formatNumber(calculateTotalValue(), 2)}</span>
         </div>
       </div>
       
@@ -248,10 +263,10 @@ const StockInventory = () => {
                 <tr key={item.id}>
                   <td>{new Date(item.date).toLocaleDateString()}</td>
                   <td>{item.description}</td>
-                  <td>{item.count}</td>
-                  <td>{item.size}</td>
-                  <td>₦{item.cost_per_kg ? item.cost_per_kg.toFixed(2) : '0.00'}</td>
-                  <td>₦{item.totalCost ? item.totalCost.toFixed(2) : '0.00'}</td>
+                  <td>{formatNumber(item.count)}</td>
+                  <td>{formatNumber(item.size)}</td>
+                  <td>₦{formatNumber(item.cost_per_kg || 0, 2)}</td>
+                  <td>₦{formatNumber(item.totalCost || 0, 2)}</td>
                   <td>
                     <button 
                       className="delete-btn" 
@@ -362,19 +377,19 @@ const StockInventory = () => {
               <div className="form-group total-preview">
                 <label>Total Cost:</label>
                 <span className="total-cost">
-                  ₦{(() => {
+                  ₦{formatNumber((() => {
                     const count = parseFloat(formData.count || 0)
                     const size = parseFloat(formData.size || 0)
                     const cost = parseFloat(formData.costPerKg || 0)
                     
                     if (formData.calculationMode === 'count_cost') {
-                      return (count * cost).toFixed(2)
+                      return count * cost
                     } else if (formData.calculationMode === 'size_cost') {
-                      return (size * cost).toFixed(2)
+                      return size * cost
                     } else {
-                      return (count * size * cost).toFixed(2)
+                      return count * size * cost
                     }
-                  })()}
+                  })(), 2)}
                 </span>
               </div>
               

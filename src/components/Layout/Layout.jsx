@@ -13,15 +13,20 @@ const Layout = ({ children }) => {
   const { theme } = useTheme()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showInventoryDropdown, setShowInventoryDropdown] = useState(false)
   const userMenuRef = useRef(null)
+  const inventoryDropdownRef = useRef(null)
   
   const stats = calculateStats()
   
-  // Close user menu when clicking outside
+  // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setShowUserMenu(false)
+      }
+      if (inventoryDropdownRef.current && !inventoryDropdownRef.current.contains(event.target)) {
+        setShowInventoryDropdown(false)
       }
     }
     
@@ -37,10 +42,10 @@ const Layout = ({ children }) => {
   
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false)
+    setShowInventoryDropdown(false)
   }
   
   const toggleUserMenu = () => {
-    console.log('Toggling user menu, current state:', showUserMenu)
     setShowUserMenu(!showUserMenu)
   }
   
@@ -81,14 +86,52 @@ const Layout = ({ children }) => {
                   Orders
                 </Link>
               </li>
-              <li>
-                <Link 
-                  to="/stock" 
-                  className={location.pathname === '/stock' ? 'active' : ''}
-                  onClick={closeMobileMenu}
+              <li className="nav-dropdown" ref={inventoryDropdownRef}>
+                <button 
+                  className={`nav-dropdown-trigger ${
+                    location.pathname.startsWith('/stock') || 
+                    location.pathname.startsWith('/live-chickens') || 
+                    location.pathname.startsWith('/feed') ? 'active' : ''
+                  }`}
+                  onClick={() => setShowInventoryDropdown(!showInventoryDropdown)}
                 >
                   Inventory
-                </Link>
+                  <svg 
+                    width="16" 
+                    height="16" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`dropdown-chevron ${showInventoryDropdown ? 'open' : ''}`}
+                  >
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                {showInventoryDropdown && (
+                  <div className="nav-dropdown-menu">
+                    <Link 
+                      to="/stock" 
+                      className={location.pathname === '/stock' ? 'active' : ''}
+                      onClick={closeMobileMenu}
+                    >
+                      General Stock
+                    </Link>
+                    <Link 
+                      to="/live-chickens" 
+                      className={location.pathname === '/live-chickens' ? 'active' : ''}
+                      onClick={closeMobileMenu}
+                    >
+                      Live Chicken Stock
+                    </Link>
+                    <Link 
+                      to="/feed" 
+                      className={location.pathname === '/feed' ? 'active' : ''}
+                      onClick={closeMobileMenu}
+                    >
+                      Feed Management
+                    </Link>
+                  </div>
+                )}
               </li>
               <li>
                 <Link 

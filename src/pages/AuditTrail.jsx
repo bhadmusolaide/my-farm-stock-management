@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner';
 import './AuditTrail.css';
 
 const AuditTrail = () => {
@@ -246,8 +247,7 @@ const AuditTrail = () => {
     return (
       <div className="audit-trail">
         <div className="loading-container">
-          <div className="spinner-large"></div>
-          <p>Loading audit logs...</p>
+          <LoadingSpinner size="large" text="Loading audit logs..." />
         </div>
       </div>
     );

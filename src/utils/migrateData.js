@@ -12,11 +12,11 @@ export async function migrateFromLocalStorage() {
     const transactions = JSON.parse(localStorage.getItem('transactions')) || []
     const balance = parseFloat(localStorage.getItem('balance')) || 0
     
-    console.log('Starting migration from localStorage to Supabase...')
+    // Starting migration from localStorage to Supabase
     
     // Insert chickens data
     if (chickens.length > 0) {
-      console.log(`Migrating ${chickens.length} chicken orders...`)
+      // Migrating chicken orders
       const { error: chickensError } = await supabase.from('chickens').insert(chickens)
       if (chickensError) {
         console.error('Error migrating chickens:', chickensError)
@@ -26,7 +26,7 @@ export async function migrateFromLocalStorage() {
     
     // Insert stock data
     if (stock.length > 0) {
-      console.log(`Migrating ${stock.length} stock items...`)
+      // Migrating stock items
       const { error: stockError } = await supabase.from('stock').insert(stock)
       if (stockError) {
         console.error('Error migrating stock:', stockError)
@@ -36,7 +36,7 @@ export async function migrateFromLocalStorage() {
     
     // Insert transactions data
     if (transactions.length > 0) {
-      console.log(`Migrating ${transactions.length} transactions...`)
+      // Migrating transactions
       const { error: transactionsError } = await supabase.from('transactions').insert(transactions)
       if (transactionsError) {
         console.error('Error migrating transactions:', transactionsError)
@@ -45,7 +45,7 @@ export async function migrateFromLocalStorage() {
     }
     
     // Set balance
-    console.log(`Setting initial balance: ₦${balance.toFixed(2)}`)
+    // Setting initial balance
     const { error: balanceError } = await supabase
       .from('balance')
       .upsert({ id: 1, amount: balance }, { onConflict: 'id' })
@@ -54,7 +54,7 @@ export async function migrateFromLocalStorage() {
       throw balanceError
     }
     
-    console.log('Migration completed successfully!')
+    // Migration completed successfully
     return { chickens, stock, transactions, balance }
   } catch (error) {
     console.error('Migration failed:', error)
@@ -74,7 +74,7 @@ export async function isMigrationNeeded() {
                          !!localStorage.getItem('transactions')
     
     if (!hasLocalData) {
-      console.log('No local data found, migration not needed')
+      // No local data found, migration not needed
       return false
     }
     
@@ -88,7 +88,7 @@ export async function isMigrationNeeded() {
     
     // If there's no data in Supabase but there is in localStorage, migration is needed
     const migrationNeeded = hasLocalData && (!chickensData || chickensData.length === 0)
-    console.log(`Migration needed: ${migrationNeeded}`)
+    // Checking migration status
     return migrationNeeded
   } catch (error) {
     console.error('Error checking migration status:', error)

@@ -8,6 +8,21 @@ const ChickenOrders = () => {
   const { chickens, addChicken, updateChicken, deleteChicken, exportToCSV } = useAppContext()
   const { showError, showSuccess, showWarning } = useNotification()
   
+  // Format number with thousand separators
+  const formatNumber = (num, decimals = null) => {
+    const number = typeof num === 'string' ? parseFloat(num) : num
+    if (isNaN(number)) return '0'
+    
+    if (decimals !== null) {
+      return number.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      })
+    }
+    
+    return number.toLocaleString('en-US')
+  }
+  
   // Loading state
   const [isLoading, setIsLoading] = useState(false)
   
@@ -421,20 +436,20 @@ const ChickenOrders = () => {
                     </div>
                   </td>
                   <td>{chicken.location || '-'}</td>
-                  <td>{chicken.count}</td>
-                  <td>{chicken.size}</td>
-                  <td>₦{chicken.price.toFixed(2)}</td>
-                  <td>₦{(() => {
+                  <td>{formatNumber(chicken.count)}</td>
+                  <td>{formatNumber(chicken.size)}</td>
+                  <td>₦{formatNumber(chicken.price, 2)}</td>
+                  <td>₦{formatNumber((() => {
                     if (chicken.calculationMode === 'count_cost') {
-                      return (chicken.count * chicken.price).toFixed(2)
+                      return chicken.count * chicken.price
                     } else if (chicken.calculationMode === 'size_cost') {
-                      return (chicken.size * chicken.price).toFixed(2)
+                      return chicken.size * chicken.price
                     } else {
-                      return (chicken.count * chicken.size * chicken.price).toFixed(2)
+                      return chicken.count * chicken.size * chicken.price
                     }
-                  })()}</td>
-                  <td>₦{(chicken.amount_paid || 0).toFixed(2)}</td>
-                  <td>₦{chicken.balance.toFixed(2)}</td>
+                  })(), 2)}</td>
+                  <td>₦{formatNumber(chicken.amount_paid || 0, 2)}</td>
+                  <td>₦{formatNumber(chicken.balance, 2)}</td>
                   <td>
                     <span className={getStatusBadgeClass(chicken.status)}>
                       {chicken.status.charAt(0).toUpperCase() + chicken.status.slice(1)}
@@ -616,19 +631,19 @@ const ChickenOrders = () => {
                 <div className="form-group total-preview">
                   <label>Total Cost:</label>
                   <span className="total-cost">
-                    ₦{(() => {
+                    ₦{formatNumber((() => {
                       const count = parseFloat(formData.count || 0)
                       const size = parseFloat(formData.size || 0)
                       const price = parseFloat(formData.price || 0)
                       
                       if (formData.calculationMode === 'count_cost') {
-                        return (count * price).toFixed(2)
+                        return count * price
                       } else if (formData.calculationMode === 'size_cost') {
-                        return (size * price).toFixed(2)
+                        return size * price
                       } else {
-                        return (count * size * price).toFixed(2)
+                        return count * size * price
                       }
-                    })()}
+                    })(), 2)}
                   </span>
                 </div>
               </div>

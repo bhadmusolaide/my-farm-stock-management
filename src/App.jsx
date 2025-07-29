@@ -8,6 +8,8 @@ import Layout from './components/Layout/Layout'
 import Dashboard from './pages/Dashboard'
 import ChickenOrders from './pages/ChickenOrders'
 import StockInventory from './pages/StockInventory'
+import LiveChickenStock from './pages/LiveChickenStock'
+import FeedManagement from './pages/FeedManagement'
 import Transactions from './pages/Transactions'
 import Reports from './pages/Reports'
 import Login from './pages/Login'
@@ -79,6 +81,20 @@ function AppContent() {
         <ProtectedRoute>
           <Layout>
             <StockInventory />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/live-chickens" element={
+        <ProtectedRoute>
+          <Layout>
+            <LiveChickenStock />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/feed" element={
+        <ProtectedRoute>
+          <Layout>
+            <FeedManagement />
           </Layout>
         </ProtectedRoute>
       } />

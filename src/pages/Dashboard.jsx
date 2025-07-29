@@ -1,6 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useAppContext } from '../context/AppContext'
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { 
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, Area, AreaChart, ComposedChart
+} from 'recharts'
 
 import './Dashboard.css'
 
@@ -10,12 +13,65 @@ const Dashboard = () => {
   const [isAutoPlaying, setIsAutoPlaying] = useState(true)
   const [itemsPerView, setItemsPerView] = useState(1)
   
-  // Data for status pie chart
-  const statusData = [
-    { name: 'Paid', value: stats.paidCount, color: '#4caf50' },
-    { name: 'Partial', value: stats.partialCount, color: '#ff9800' },
-    { name: 'Pending', value: stats.pendingCount, color: '#f44336' }
-  ].filter(item => item.value > 0)
+  // Enhanced dashboard state
+  const [selectedTimeRange, setSelectedTimeRange] = useState('6months')
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState('all')
+  const [revenueViewType, setRevenueViewType] = useState('monthly')
+  const [showRevenueComparison, setShowRevenueComparison] = useState(false)
+  
+  // Enhanced status data with filtering and trends - optimized for performance
+  const enhancedStatusData = useMemo(() => {
+    const filteredChickens = selectedStatusFilter === 'all' 
+      ? chickens 
+      : chickens.filter(chicken => chicken.status === selectedStatusFilter)
+    
+    // Single pass through data for better performance
+    const statusData = filteredChickens.reduce((acc, chicken) => {
+      const status = chicken.status
+      const revenue = chicken.count * chicken.size * chicken.price
+      
+      if (!acc[status]) {
+        acc[status] = { count: 0, revenue: 0, balance: 0 }
+      }
+      
+      acc[status].count += 1
+      acc[status].revenue += revenue
+      acc[status].balance += chicken.balance
+      
+      return acc
+    }, {})
+    
+    // Ensure all status types exist
+    const statusCounts = {
+      paid: statusData.paid?.count || 0,
+      partial: statusData.partial?.count || 0,
+      pending: statusData.pending?.count || 0
+    }
+    
+    const statusRevenue = {
+      paid: statusData.paid?.revenue || 0,
+      partial: statusData.partial?.revenue || 0,
+      pending: statusData.pending?.revenue || 0
+    }
+    
+    const statusBalance = {
+      paid: 0, // Paid orders have no balance
+      partial: statusData.partial?.balance || 0,
+      pending: statusData.pending?.balance || 0
+    }
+    
+    return {
+      pieData: [
+        { name: 'Paid', value: statusCounts.paid, color: '#4caf50', revenue: statusRevenue.paid, balance: statusBalance.paid },
+        { name: 'Partial', value: statusCounts.partial, color: '#ff9800', revenue: statusRevenue.partial, balance: statusBalance.partial },
+        { name: 'Pending', value: statusCounts.pending, color: '#f44336', revenue: statusRevenue.pending, balance: statusBalance.pending }
+      ].filter(item => item.value > 0),
+      counts: statusCounts,
+      revenue: statusRevenue,
+      balance: statusBalance,
+      total: statusCounts.paid + statusCounts.partial + statusCounts.pending
+    }
+  }, [chickens, selectedStatusFilter])
   
   // Memoized data for recent transactions
   const recentTransactions = useMemo(() => transactions.slice(0, 5), [transactions])
@@ -24,6 +80,21 @@ const Dashboard = () => {
   const pendingPartialOrders = useMemo(() => {
     return chickens.filter(chicken => chicken.status === 'pending' || chicken.status === 'partial')
   }, [chickens])
+
+  // Format number with thousand separators
+  const formatNumber = (num, decimals = null) => {
+    const number = typeof num === 'string' ? parseFloat(num) : num
+    if (isNaN(number)) return '0'
+    
+    if (decimals !== null) {
+      return number.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      })
+    }
+    
+    return number.toLocaleString('en-US')
+  }
   
   // Calculate responsive items per view
   useEffect(() => {
@@ -82,34 +153,72 @@ const Dashboard = () => {
     }, 0)
   }, [chickens])
 
-  // Memoized monthly revenue data calculation for better performance
-  const monthlyRevenueData = useMemo(() => {
+  // Enhanced revenue data calculation with multiple time ranges
+  const revenueData = useMemo(() => {
     const today = new Date()
-    const monthlyData = []
+    const data = []
     
-    for (let i = 5; i >= 0; i--) {
-      const month = new Date(today.getFullYear(), today.getMonth() - i, 1)
-      const monthName = month.toLocaleString('default', { month: 'short' })
-      const monthYear = `${monthName} ${month.getFullYear()}`
+    // Determine periods based on view type and time range
+    const getPeriodsCount = () => {
+      if (revenueViewType === 'weekly') return selectedTimeRange === '3months' ? 12 : 24
+      if (revenueViewType === 'monthly') return selectedTimeRange === '3months' ? 3 : selectedTimeRange === '6months' ? 6 : 12
+      if (revenueViewType === 'quarterly') return selectedTimeRange === '6months' ? 2 : 4
+      return 6
+    }
+    
+    const periodsCount = getPeriodsCount()
+    
+    for (let i = periodsCount - 1; i >= 0; i--) {
+      let periodStart, periodEnd, periodName
       
-      // Filter chickens for this month
-      const monthRevenue = chickens.reduce((sum, chicken) => {
+      if (revenueViewType === 'weekly') {
+        periodStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (i * 7) - today.getDay())
+        periodEnd = new Date(periodStart.getTime() + 6 * 24 * 60 * 60 * 1000)
+        periodName = `Week ${periodStart.toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
+      } else if (revenueViewType === 'monthly') {
+        periodStart = new Date(today.getFullYear(), today.getMonth() - i, 1)
+        periodEnd = new Date(today.getFullYear(), today.getMonth() - i + 1, 0)
+        periodName = periodStart.toLocaleString('default', { month: 'short', year: '2-digit' })
+      } else if (revenueViewType === 'quarterly') {
+        const quarterStart = Math.floor(today.getMonth() / 3) * 3 - (i * 3)
+        periodStart = new Date(today.getFullYear(), quarterStart, 1)
+        periodEnd = new Date(today.getFullYear(), quarterStart + 3, 0)
+        periodName = `Q${Math.floor(quarterStart / 3) + 1} ${periodStart.getFullYear().toString().slice(-2)}`
+      }
+      
+      // Calculate revenue and other metrics for this period
+      const periodRevenue = chickens.reduce((sum, chicken) => {
         const chickenDate = new Date(chicken.date)
-        if (chickenDate.getMonth() === month.getMonth() && 
-            chickenDate.getFullYear() === month.getFullYear()) {
+        if (chickenDate >= periodStart && chickenDate <= periodEnd) {
           return sum + (chicken.count * chicken.size * chicken.price)
         }
         return sum
       }, 0)
       
-      monthlyData.push({
-        name: monthName,
-        revenue: monthRevenue
+      const periodOrders = chickens.filter(chicken => {
+        const chickenDate = new Date(chicken.date)
+        return chickenDate >= periodStart && chickenDate <= periodEnd
+      }).length
+      
+      const periodChickens = chickens.reduce((sum, chicken) => {
+        const chickenDate = new Date(chicken.date)
+        if (chickenDate >= periodStart && chickenDate <= periodEnd) {
+          return sum + chicken.count
+        }
+        return sum
+      }, 0)
+      
+      data.push({
+        name: periodName,
+        revenue: periodRevenue,
+        orders: periodOrders,
+        chickens: periodChickens,
+        avgOrderValue: periodOrders > 0 ? periodRevenue / periodOrders : 0
       })
     }
     
-    return monthlyData
-  }, [chickens])
+    return data
+  }, [chickens, revenueViewType, selectedTimeRange])
   
 
   
@@ -117,17 +226,15 @@ const Dashboard = () => {
     <div className="dashboard-container">
       <h1>Dashboard</h1>
       
-      <div className="orders-carousel">
-        <div className="carousel-header">
-          <h3 className="carousel-title">Pending & Partial Orders</h3>
-          {pendingPartialOrders.length > 0 && (
+      {pendingPartialOrders.length > 0 && (
+        <div className="orders-carousel">
+          <div className="carousel-header">
+            <h3 className="carousel-title">Pending & Partial Orders</h3>
             <span className="carousel-count">
               {pendingPartialOrders.length} order{pendingPartialOrders.length !== 1 ? 's' : ''}
             </span>
-          )}
-        </div>
-        
-        {pendingPartialOrders.length > 0 ? (
+          </div>
+          
           <div className="carousel-container">
             <div 
               className="carousel-track"
@@ -145,10 +252,10 @@ const Dashboard = () => {
                   </div>
                   <div className="order-details">
                     <span className="order-quantity">
-                      {order.count} chicken{order.count !== 1 ? 's' : ''}
+                      {formatNumber(order.count)} chicken{order.count !== 1 ? 's' : ''}
                     </span>
                     <span className="order-balance">
-                      ₦{order.balance.toFixed(2)} balance
+                      ₦{formatNumber(order.balance, 2)} balance
                     </span>
                   </div>
                   <div className="order-meta">
@@ -156,7 +263,7 @@ const Dashboard = () => {
                       {new Date(order.date).toLocaleDateString()}
                     </span>
                     <span className="order-size">
-                      Size: {order.size}kg
+                      Size: {formatNumber(order.size)}kg
                     </span>
                   </div>
                 </div>
@@ -209,76 +316,194 @@ const Dashboard = () => {
               </div>
             )}
           </div>
-        ) : (
-          <p className="no-data">No pending or partial orders</p>
-        )}
-      </div>
+        </div>
+      )}
       
       <div className="stats-grid">
         <div className="stat-card">
           <h3>Current Balance</h3>
-          <p className="stat-value">₦{stats.balance.toFixed(2)}</p>
+          <p className="stat-value">₦{formatNumber(stats.balance, 2)}</p>
         </div>
         
         <div className="stat-card">
           <h3>Total Weight</h3>
-          <p className="stat-value">{totalWeight.toFixed(2)} kg</p>
+          <p className="stat-value">{formatNumber(totalWeight, 2)} kg</p>
         </div>
         
         <div className="stat-card">
           <h3>Total Chickens</h3>
-          <p className="stat-value">{stats.totalChickens}</p>
+          <p className="stat-value">{formatNumber(stats.totalChickens)}</p>
         </div>
         
         <div className="stat-card">
           <h3>Total Revenue</h3>
-          <p className="stat-value">₦{stats.totalRevenue.toFixed(2)}</p>
+          <p className="stat-value">₦{formatNumber(stats.totalRevenue, 2)}</p>
         </div>
         
         <div className="stat-card">
           <h3>Outstanding Balance</h3>
-          <p className="stat-value">₦{stats.outstandingBalance.toFixed(2)}</p>
+          <p className="stat-value">₦{formatNumber(stats.outstandingBalance, 2)}</p>
         </div>
       </div>
       
       <div className="dashboard-charts">
-        <div className="chart-container status-chart">
-          <h3>Order Status</h3>
-          {statusData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                >
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => [`${value} orders`, 'Count']} />
-              </PieChart>
-            </ResponsiveContainer>
+        {/* Enhanced Order Status Chart */}
+        <div className="chart-container status-chart enhanced">
+          <div className="chart-header">
+            <h3>Order Status Analytics</h3>
+            <div className="chart-controls">
+              <select 
+                value={selectedStatusFilter} 
+                onChange={(e) => setSelectedStatusFilter(e.target.value)}
+                className="filter-select"
+              >
+                <option value="all">All Orders</option>
+                <option value="paid">Paid Only</option>
+                <option value="partial">Partial Only</option>
+                <option value="pending">Pending Only</option>
+              </select>
+            </div>
+          </div>
+          
+          {enhancedStatusData.pieData.length > 0 ? (
+            <div className="status-analytics">
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={enhancedStatusData.pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    animationBegin={0}
+                    animationDuration={800}
+                    isAnimationActive={true}
+                  >
+                    {enhancedStatusData.pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(value, name, props) => [
+                      `${value} orders`,
+                      name,
+                      `Revenue: ₦${formatNumber(props.payload.revenue, 2)}`,
+                      `Balance: ₦${formatNumber(props.payload.balance, 2)}`
+                    ]}
+                    animationDuration={200}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              
+              <div className="status-breakdown">
+                {enhancedStatusData.pieData.map((status, index) => (
+                  <div key={index} className="status-item">
+                    <div className="status-indicator" style={{ backgroundColor: status.color }}></div>
+                    <div className="status-details">
+                      <span className="status-name">{status.name}</span>
+                      <span className="status-count">{status.value} orders</span>
+                      <span className="status-revenue">₦{formatNumber(status.revenue, 2)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : (
             <p className="no-data">No order data available</p>
           )}
         </div>
         
-        <div className="chart-container revenue-chart">
-          <h3>Monthly Revenue</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={monthlyRevenueData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip formatter={(value) => [`₦${value.toFixed(2)}`, 'Revenue']} />
-              <Bar dataKey="revenue" fill="#4caf50" />
-            </BarChart>
+        {/* Enhanced Revenue Chart */}
+        <div className="chart-container revenue-chart enhanced">
+          <div className="chart-header">
+            <h3>Revenue Analytics</h3>
+            <div className="chart-controls">
+              <div className="control-group">
+                <select 
+                  value={revenueViewType} 
+                  onChange={(e) => setRevenueViewType(e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                </select>
+                <select 
+                  value={selectedTimeRange} 
+                  onChange={(e) => setSelectedTimeRange(e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="3months">3 Months</option>
+                  <option value="6months">6 Months</option>
+                  <option value="12months">12 Months</option>
+                </select>
+              </div>
+              <button 
+                className={`toggle-btn ${showRevenueComparison ? 'active' : ''}`}
+                onClick={() => setShowRevenueComparison(!showRevenueComparison)}
+              >
+                {showRevenueComparison ? 'Simple View' : 'Detailed View'}
+              </button>
+            </div>
+          </div>
+          
+          <ResponsiveContainer width="100%" height={300}>
+            {showRevenueComparison ? (
+              <ComposedChart data={revenueData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" fontSize={12} />
+                <YAxis yAxisId="left" orientation="left" fontSize={12} />
+                <YAxis yAxisId="right" orientation="right" fontSize={12} />
+                <Tooltip 
+                  formatter={(value, name) => {
+                    if (name === 'revenue') return [`₦${formatNumber(value, 2)}`, 'Revenue']
+                    if (name === 'orders') return [formatNumber(value), 'Orders']
+                    if (name === 'avgOrderValue') return [`₦${formatNumber(value, 2)}`, 'Avg Order Value']
+                    return [formatNumber(value), name]
+                  }}
+                  labelStyle={{ color: '#333' }}
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '4px' }}
+                />
+                <Bar yAxisId="left" dataKey="revenue" fill="#4caf50" name="revenue" />
+                <Line yAxisId="right" type="monotone" dataKey="orders" stroke="#2196f3" strokeWidth={2} name="orders" />
+                <Line yAxisId="right" type="monotone" dataKey="avgOrderValue" stroke="#ff9800" strokeWidth={2} name="avgOrderValue" />
+              </ComposedChart>
+            ) : (
+              <AreaChart data={revenueData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="name" fontSize={12} />
+                <YAxis fontSize={12} />
+                <Tooltip 
+                  formatter={(value) => [`₦${formatNumber(value, 2)}`, 'Revenue']}
+                  labelStyle={{ color: '#333' }}
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '4px' }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  stroke="#4caf50" 
+                  fill="url(#revenueGradient)" 
+                  strokeWidth={2}
+                />
+                <defs>
+                  <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#4caf50" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#4caf50" stopOpacity={0.1}/>
+                  </linearGradient>
+                </defs>
+              </AreaChart>
+            )}
           </ResponsiveContainer>
+          
+          <div className="revenue-summary">
+            <div className="summary-item">
+              <span className="summary-label">Avg per Period</span>
+              <span className="summary-value">₦{formatNumber(revenueData.reduce((sum, item) => sum + item.revenue, 0) / revenueData.length || 0, 2)}</span>
+            </div>
+          </div>
         </div>
       </div>
       
@@ -293,7 +518,7 @@ const Dashboard = () => {
                   <span className="transaction-description">{transaction.description}</span>
                 </div>
                 <span className="transaction-amount">
-                  {transaction.type === 'fund' ? '+' : '-'}₦{transaction.amount.toFixed(2)}
+                  {transaction.type === 'fund' ? '+' : '-'}₦{formatNumber(transaction.amount, 2)}
                 </span>
               </div>
             ))}

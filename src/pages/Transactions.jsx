@@ -5,6 +5,21 @@ import './Transactions.css'
 const Transactions = () => {
   const { transactions, addFunds, addExpense, withdrawFunds } = useAppContext()
   
+  // Format number with thousand separators
+  const formatNumber = (num, decimals = null) => {
+    const number = typeof num === 'string' ? parseFloat(num) : num
+    if (isNaN(number)) return '0'
+    
+    if (decimals !== null) {
+      return number.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      })
+    }
+    
+    return number.toLocaleString('en-US')
+  }
+  
   // State for filters
   const [filters, setFilters] = useState({
     type: '',
@@ -213,17 +228,17 @@ const Transactions = () => {
       <div className="transactions-summary">
         <div className="summary-card income">
           <h3>Income</h3>
-          <p className="amount">₦{totals.income.toFixed(2)}</p>
+          <p className="amount">₦{formatNumber(totals.income, 2)}</p>
         </div>
         
         <div className="summary-card expenses">
           <h3>Expenses</h3>
-          <p className="amount">₦{totals.expenses.toFixed(2)}</p>
+          <p className="amount">₦{formatNumber(totals.expenses, 2)}</p>
         </div>
         
         <div className="summary-card net">
           <h3>Net</h3>
-          <p className="amount">₦{totals.net.toFixed(2)}</p>
+          <p className="amount">₦{formatNumber(totals.net, 2)}</p>
         </div>
       </div>
       
@@ -253,7 +268,7 @@ const Transactions = () => {
                   <td>{transaction.description}</td>
                   <td className="amount">
                     {transaction.type === 'fund' ? '+' : '-'}
-                    ₦{transaction.amount.toFixed(2)}
+                    ₦{formatNumber(transaction.amount, 2)}
                   </td>
                 </tr>
               ))

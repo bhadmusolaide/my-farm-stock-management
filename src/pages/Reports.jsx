@@ -9,6 +9,21 @@ import './Reports.css'
 const Reports = () => {
   const { chickens, generateReport, exportToCSV } = useAppContext()
   
+  // Format number with thousand separators
+  const formatNumber = (num, decimals = null) => {
+    const number = typeof num === 'string' ? parseFloat(num) : num
+    if (isNaN(number)) return '0'
+    
+    if (decimals !== null) {
+      return number.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      })
+    }
+    
+    return number.toLocaleString('en-US')
+  }
+  
   // State for date range
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -330,12 +345,12 @@ const Reports = () => {
                               )}
                             </div>
                           </td>
-                          <td>{order.count}</td>
-                          <td>{order.size}</td>
-                          <td>₦{order.price.toFixed(2)}</td>
-                          <td>₦{(order.count * order.size * order.price).toFixed(2)}</td>
-                          <td>₦{(order.amount_paid || 0).toFixed(2)}</td>
-                          <td>₦{order.balance.toFixed(2)}</td>
+                          <td>{formatNumber(order.count)}</td>
+                          <td>{formatNumber(order.size)}</td>
+                          <td>₦{formatNumber(order.price, 2)}</td>
+                          <td>₦{formatNumber(order.count * order.size * order.price, 2)}</td>
+                          <td>₦{formatNumber(order.amount_paid || 0, 2)}</td>
+                          <td>₦{formatNumber(order.balance, 2)}</td>
                           <td>
                             <span className={getStatusBadgeClass(order.status)}>
                               {order.status.charAt(0).toUpperCase() + order.status.slice(1)}

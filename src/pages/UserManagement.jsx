@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
+import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner';
 import './UserManagement.css';
 
 const UserManagement = () => {
@@ -133,8 +134,7 @@ const UserManagement = () => {
     return (
       <div className="user-management">
         <div className="loading-container">
-          <div className="spinner-large"></div>
-          <p>Loading users...</p>
+          <LoadingSpinner size="large" text="Loading users..." />
         </div>
       </div>
     );
@@ -293,7 +293,7 @@ const UserManagement = () => {
                 <button type="submit" className="submit-btn" disabled={formLoading}>
                   {formLoading ? (
                     <>
-                      <div className="spinner"></div>
+                      <LoadingSpinner size="small" color="white" />
                       Creating...
                     </>
                   ) : (

@@ -15,6 +15,9 @@ export function AppProvider({ children }) {
   const [stock, setStock] = useState([])
   const [transactions, setTransactions] = useState([])
   const [balance, setBalance] = useState(0)
+  const [liveChickens, setLiveChickens] = useState([])
+  const [feedInventory, setFeedInventory] = useState([])
+  const [feedConsumption, setFeedConsumption] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [migrationStatus, setMigrationStatus] = useState({
@@ -68,6 +71,39 @@ export function AppProvider({ children }) {
           if (stockError) throw stockError
           setStock(stockData || [])
           
+          // Load live chickens
+          const { data: liveChickensData, error: liveChickensError } = await supabase
+            .from('live_chickens')
+            .select('*')
+            .order('hatchDate', { ascending: false })
+          
+          if (liveChickensError && !liveChickensError.message.includes('relation "live_chickens" does not exist')) {
+            throw liveChickensError
+          }
+          setLiveChickens(liveChickensData || [])
+          
+          // Load feed inventory
+          const { data: feedInventoryData, error: feedInventoryError } = await supabase
+            .from('feed_inventory')
+            .select('*')
+            .order('date', { ascending: false })
+          
+          if (feedInventoryError && !feedInventoryError.message.includes('relation "feed_inventory" does not exist')) {
+            throw feedInventoryError
+          }
+          setFeedInventory(feedInventoryData || [])
+          
+          // Load feed consumption
+          const { data: feedConsumptionData, error: feedConsumptionError } = await supabase
+            .from('feed_consumption')
+            .select('*')
+            .order('date', { ascending: false })
+          
+          if (feedConsumptionError && !feedConsumptionError.message.includes('relation "feed_consumption" does not exist')) {
+            throw feedConsumptionError
+          }
+          setFeedConsumption(feedConsumptionData || [])
+          
           // Load transactions
           const { data: transactionsData, error: transactionsError } = await supabase
             .from('transactions')
@@ -86,14 +122,14 @@ export function AppProvider({ children }) {
           
           if (balanceError) throw balanceError
           const currentBalance = balanceData && balanceData.length > 0 ? balanceData[0].amount : 0
-          console.log('Loaded balance from database:', currentBalance)
+          // Balance loaded successfully
           setBalance(currentBalance)
         } catch (fetchError) {
           // If we get a fetch error and we're using the placeholder URL, it's expected
           // Just log it but don't set the error state
           console.error('Error fetching from Supabase:', fetchError)
           if (supabaseUrl.includes('placeholder') || supabaseUrl.includes('your-supabase-project-url')) {
-            console.log('Using placeholder Supabase URL, errors are expected')
+            // Using placeholder Supabase URL
           } else {
             throw fetchError
           }
@@ -735,12 +771,168 @@ export function AppProvider({ children }) {
     }
   }
 
+  // Live Chicken CRUD operations
+  const addLiveChicken = async (chickenData) => {
+    try {
+      const chicken = {
+        ...chickenData,
+        createdAt: new Date().toISOString()
+      }
+      
+      // For now, store in local state (can be extended to Supabase later)
+      setLiveChickens(prev => [chicken, ...prev])
+      
+      // Log audit action
+      await logAuditAction('CREATE', 'live_chickens', chicken.id, null, chicken)
+      
+    } catch (err) {
+      console.error('Error adding live chicken:', err)
+      throw err
+    }
+  }
+
+  const updateLiveChicken = async (id, updates) => {
+    try {
+      const oldChicken = liveChickens.find(chicken => chicken.id === id)
+      if (!oldChicken) throw new Error('Live chicken not found')
+      
+      const updatedChicken = { ...oldChicken, ...updates }
+      
+      // Update local state
+      setLiveChickens(prev => prev.map(chicken => 
+        chicken.id === id ? updatedChicken : chicken
+      ))
+      
+      // Log audit action
+      await logAuditAction('UPDATE', 'live_chickens', id, oldChicken, updatedChicken)
+      
+    } catch (err) {
+      console.error('Error updating live chicken:', err)
+      throw err
+    }
+  }
+
+  const deleteLiveChicken = async (id) => {
+    try {
+      const chickenToDelete = liveChickens.find(chicken => chicken.id === id)
+      if (!chickenToDelete) throw new Error('Live chicken not found')
+      
+      // Update local state
+      setLiveChickens(prev => prev.filter(chicken => chicken.id !== id))
+      
+      // Log audit action
+      await logAuditAction('DELETE', 'live_chickens', id, chickenToDelete, null)
+      
+    } catch (err) {
+      console.error('Error deleting live chicken:', err)
+      throw err
+    }
+  }
+
+  // Feed Management CRUD operations
+  const addFeedInventory = async (feedData) => {
+    try {
+      const feed = {
+        ...feedData,
+        id: Date.now().toString(),
+        date: new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString()
+      }
+      
+      // Store in local state
+      setFeedInventory(prev => [feed, ...prev])
+      
+      // Log audit action
+      await logAuditAction('CREATE', 'feed_inventory', feed.id, null, feed)
+      
+    } catch (err) {
+      console.error('Error adding feed inventory:', err)
+      throw err
+    }
+  }
+
+  const deleteFeedInventory = async (id) => {
+    try {
+      const feedToDelete = feedInventory.find(feed => feed.id === id)
+      if (!feedToDelete) throw new Error('Feed inventory not found')
+      
+      // Update local state
+      setFeedInventory(prev => prev.filter(feed => feed.id !== id))
+      
+      // Log audit action
+      await logAuditAction('DELETE', 'feed_inventory', id, feedToDelete, null)
+      
+    } catch (err) {
+      console.error('Error deleting feed inventory:', err)
+      throw err
+    }
+  }
+
+  const addFeedConsumption = async (consumptionData) => {
+    try {
+      const consumption = {
+        ...consumptionData,
+        id: Date.now().toString(),
+        date: new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString()
+      }
+      
+      // Store in local state
+      setFeedConsumption(prev => [consumption, ...prev])
+      
+      // Update feed inventory quantities
+      setFeedInventory(prev => prev.map(feed => {
+        if (feed.id === consumption.feedId) {
+          const newQuantity = feed.quantityKg - consumption.quantityConsumed
+          return { ...feed, quantityKg: Math.max(0, newQuantity) }
+        }
+        return feed
+      }))
+      
+      // Log audit action
+      await logAuditAction('CREATE', 'feed_consumption', consumption.id, null, consumption)
+      
+    } catch (err) {
+      console.error('Error adding feed consumption:', err)
+      throw err
+    }
+  }
+
+  const deleteFeedConsumption = async (id) => {
+    try {
+      const consumptionToDelete = feedConsumption.find(consumption => consumption.id === id)
+      if (!consumptionToDelete) throw new Error('Feed consumption record not found')
+      
+      // Restore feed inventory quantities
+      setFeedInventory(prev => prev.map(feed => {
+        if (feed.id === consumptionToDelete.feedId) {
+          const restoredQuantity = feed.quantityKg + consumptionToDelete.quantityConsumed
+          return { ...feed, quantityKg: restoredQuantity }
+        }
+        return feed
+      }))
+      
+      // Remove from local state
+      setFeedConsumption(prev => prev.filter(consumption => consumption.id !== id))
+      
+      // Log audit action
+      await logAuditAction('DELETE', 'feed_consumption', id, consumptionToDelete, null)
+      
+    } catch (err) {
+      console.error('Error deleting feed consumption:', err)
+      throw err
+    }
+  }
+
   const value = {
     // State
     chickens,
     stock,
     transactions,
     balance,
+    liveChickens,
+    feedInventory,
+    feedConsumption,
     loading,
     error,
     migrationStatus,
@@ -760,6 +952,17 @@ export function AppProvider({ children }) {
     clearBalance,
     deleteTransaction,
     
+    // Live Chicken operations
+    addLiveChicken,
+    updateLiveChicken,
+    deleteLiveChicken,
+    
+    // Feed Management operations
+    addFeedInventory,
+    deleteFeedInventory,
+    addFeedConsumption,
+    deleteFeedConsumption,
+    
     // Stats and reports
     stats,
     calculateStats,
@@ -773,3 +976,5 @@ export function AppProvider({ children }) {
     </AppContext.Provider>
   )
 }
+
+export { AppContext }
