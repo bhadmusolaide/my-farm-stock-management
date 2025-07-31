@@ -15,23 +15,23 @@ const LiveChickenStock = () => {
   });
   
   const [formData, setFormData] = useState({
-    batchId: '',
+    batch_id: '',
     breed: '',
-    initialCount: '',
-    currentCount: '',
-    hatchDate: '',
-    expectedWeight: '',
-    currentWeight: '',
-    feedType: '',
+    initial_count: '',
+    current_count: '',
+    hatch_date: '',
+    expected_weight: '',
+    current_weight: '',
+    feed_type: '',
     status: 'healthy',
     mortality: '0',
     notes: ''
   });
 
   // Calculate age in weeks
-  const calculateAge = (hatchDate) => {
+  const calculateAge = (hatch_date) => {
     const today = new Date();
-    const hatch = new Date(hatchDate);
+    const hatch = new Date(hatch_date);
     const diffTime = Math.abs(today - hatch);
     const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
     return diffWeeks;
@@ -44,15 +44,15 @@ const LiveChickenStock = () => {
     return liveChickens
       .map(chicken => ({
         ...chicken,
-        age: calculateAge(chicken.hatchDate),
-        mortalityRate: ((chicken.initialCount - chicken.currentCount) / chicken.initialCount * 100).toFixed(1),
-        weightGain: chicken.currentWeight - (chicken.expectedWeight || 0)
+        age: calculateAge(chicken.hatch_date),
+        mortalityRate: ((chicken.initial_count - chicken.current_count) / chicken.initial_count * 100).toFixed(1),
+        weightGain: chicken.current_weight - (chicken.expected_weight || 0)
       }))
       .filter(chicken => {
         const matchesBreed = !filters.breed || chicken.breed.toLowerCase().includes(filters.breed.toLowerCase());
         const matchesStatus = !filters.status || chicken.status === filters.status;
         const matchesSearch = !filters.searchTerm || 
-          chicken.batchId.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+          chicken.batch_id.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
           chicken.breed.toLowerCase().includes(filters.searchTerm.toLowerCase());
         
         let matchesAge = true;
@@ -84,8 +84,8 @@ const LiveChickenStock = () => {
       };
     }
 
-    const totalChickens = processedChickens.reduce((sum, batch) => sum + batch.currentCount, 0);
-    const totalMortality = processedChickens.reduce((sum, batch) => sum + (batch.initialCount - batch.currentCount), 0);
+    const totalChickens = processedChickens.reduce((sum, batch) => sum + batch.current_count, 0);
+    const totalMortality = processedChickens.reduce((sum, batch) => sum + (batch.initial_count - batch.current_count), 0);
     const averageAge = processedChickens.reduce((sum, batch) => sum + batch.age, 0) / processedChickens.length;
     const averageMortalityRate = processedChickens.reduce((sum, batch) => sum + parseFloat(batch.mortalityRate), 0) / processedChickens.length;
     const healthyBatches = processedChickens.filter(batch => batch.status === 'healthy').length;
@@ -116,7 +116,7 @@ const LiveChickenStock = () => {
 
     // Calculate growth rate (average weight gain per week)
     const totalWeightGain = processedChickens.reduce((sum, batch) => {
-      const weightGain = batch.currentWeight - (batch.expectedWeight || 0);
+      const weightGain = batch.current_weight - (batch.expected_weight || 0);
       return sum + (weightGain > 0 ? weightGain : 0);
     }, 0);
     const growthRate = (totalWeightGain / processedChickens.length).toFixed(2);
@@ -126,7 +126,7 @@ const LiveChickenStock = () => {
     const feedConversionRatio = avgFeedConversion;
 
     // Calculate production efficiency
-    const avgWeight = processedChickens.reduce((sum, batch) => sum + batch.currentWeight, 0) / processedChickens.length;
+    const avgWeight = processedChickens.reduce((sum, batch) => sum + batch.current_weight, 0) / processedChickens.length;
     const avgMortality = parseFloat(summaryStats.averageMortalityRate);
     const productionEfficiency = ((avgWeight * (100 - avgMortality)) / 100).toFixed(1);
 
@@ -141,8 +141,8 @@ const LiveChickenStock = () => {
           batches: 0
         };
       }
-      breedStats[batch.breed].count += batch.currentCount;
-      breedStats[batch.breed].totalWeight += batch.currentWeight;
+      breedStats[batch.breed].count += batch.current_count;
+      breedStats[batch.breed].totalWeight += batch.current_weight;
       breedStats[batch.breed].totalMortality += parseFloat(batch.mortalityRate);
       breedStats[batch.breed].batches += 1;
     });
@@ -159,10 +159,10 @@ const LiveChickenStock = () => {
     const ageGroups = { 'Chick (0-4w)': 0, 'Grower (5-8w)': 0, 'Finisher (9-12w)': 0, 'Mature (13w+)': 0 };
     processedChickens.forEach(batch => {
       const category = getAgeCategory(batch.age);
-      if (category === 'Chick') ageGroups['Chick (0-4w)'] += batch.currentCount;
-      else if (category === 'Grower') ageGroups['Grower (5-8w)'] += batch.currentCount;
-      else if (category === 'Finisher') ageGroups['Finisher (9-12w)'] += batch.currentCount;
-      else ageGroups['Mature (13w+)'] += batch.currentCount;
+      if (category === 'Chick') ageGroups['Chick (0-4w)'] += batch.current_count;
+      else if (category === 'Grower') ageGroups['Grower (5-8w)'] += batch.current_count;
+      else if (category === 'Finisher') ageGroups['Finisher (9-12w)'] += batch.current_count;
+      else ageGroups['Mature (13w+)'] += batch.current_count;
     });
 
     const ageDistribution = Object.entries(ageGroups).map(([age, count]) => ({ age, count }));
@@ -190,7 +190,7 @@ const LiveChickenStock = () => {
     // Health status distribution
     const statusCounts = { healthy: 0, sick: 0, quarantine: 0, processing: 0 };
     processedChickens.forEach(batch => {
-      statusCounts[batch.status] = (statusCounts[batch.status] || 0) + batch.currentCount;
+      statusCounts[batch.status] = (statusCounts[batch.status] || 0) + batch.current_count;
     });
 
     const healthStatus = Object.entries(statusCounts).map(([status, count]) => ({ status, count }));
@@ -451,7 +451,7 @@ const LiveChickenStock = () => {
                 {processedChickens.length > 0 ? (
                   processedChickens.map((chicken) => (
                     <tr key={chicken.id} className={chicken.status === 'sick' ? 'sick-batch' : ''}>
-                      <td>{chicken.batchId}</td>
+                      <td>{chicken.batch_id}</td>
                       <td>{chicken.breed}</td>
                       <td>
                         {chicken.age} weeks
@@ -459,24 +459,24 @@ const LiveChickenStock = () => {
                         <small className="age-category">({getAgeCategory(chicken.age)})</small>
                       </td>
                       <td>
-                        {chicken.currentCount}/{chicken.initialCount}
+                        {chicken.current_count}/{chicken.initial_count}
                         <br />
                         <small>({chicken.mortalityRate}% loss)</small>
                       </td>
                       <td>
-                        {chicken.currentWeight}
+                        {chicken.current_weight}
                         <br />
-                        <small>Target: {chicken.expectedWeight}</small>
+                        <small>Target: {chicken.expected_weight}</small>
                       </td>
                       <td className={chicken.mortalityRate > 10 ? 'high-mortality' : ''}>
-                        {chicken.initialCount - chicken.currentCount}
+                        {chicken.initial_count - chicken.current_count}
                       </td>
                       <td>
                         <span className={getStatusBadge(chicken.status)}>
                           {chicken.status}
                         </span>
                       </td>
-                      <td>{chicken.feedType}</td>
+                      <td>{chicken.feed_type}</td>
                       <td>
                         <button
                           className="delete-btn"
@@ -726,7 +726,7 @@ const LiveChickenStock = () => {
                   {healthData.riskBatches.length > 0 ? (
                     healthData.riskBatches.map((batch, index) => (
                       <tr key={index} className="risk-row">
-                        <td>{batch.batchId}</td>
+                        <td>{batch.batch_id}</td>
                         <td>{batch.breed}</td>
                         <td>
                           <span className={getStatusBadge(batch.status)}>
@@ -736,7 +736,7 @@ const LiveChickenStock = () => {
                         <td className={parseFloat(batch.mortalityRate) > 15 ? 'critical-mortality' : 'high-mortality'}>
                           {batch.mortalityRate}%
                         </td>
-                        <td>{batch.currentCount}</td>
+                        <td>{batch.current_count}</td>
                         <td>
                           <span className={`risk-badge ${
                             parseFloat(batch.mortalityRate) > 15 ? 'critical' :
@@ -820,8 +820,8 @@ const LiveChickenStock = () => {
                   <label>Batch ID *</label>
                   <input
                     type="text"
-                    name="batchId"
-                    value={formData.batchId}
+                    name="batch_id"
+                    value={formData.batch_id}
                     onChange={handleInputChange}
                     required
                     placeholder="e.g., BCH-2024-001"
@@ -849,8 +849,8 @@ const LiveChickenStock = () => {
                   <label>Initial Count *</label>
                   <input
                     type="number"
-                    name="initialCount"
-                    value={formData.initialCount}
+                    name="initial_count"
+                    value={formData.initial_count}
                     onChange={handleInputChange}
                     required
                     min="1"
@@ -860,8 +860,8 @@ const LiveChickenStock = () => {
                   <label>Current Count *</label>
                   <input
                     type="number"
-                    name="currentCount"
-                    value={formData.currentCount}
+                    name="current_count"
+                    value={formData.current_count}
                     onChange={handleInputChange}
                     required
                     min="0"
@@ -874,8 +874,8 @@ const LiveChickenStock = () => {
                   <label>Hatch Date *</label>
                   <input
                     type="date"
-                    name="hatchDate"
-                    value={formData.hatchDate}
+                    name="hatch_date"
+                    value={formData.hatch_date}
                     onChange={handleInputChange}
                     required
                   />
@@ -900,8 +900,8 @@ const LiveChickenStock = () => {
                   <label>Expected Weight (kg)</label>
                   <input
                     type="number"
-                    name="expectedWeight"
-                    value={formData.expectedWeight}
+                    name="expected_weight"
+                    value={formData.expected_weight}
                     onChange={handleInputChange}
                     step="0.1"
                     min="0"
@@ -911,8 +911,8 @@ const LiveChickenStock = () => {
                   <label>Current Weight (kg)</label>
                   <input
                     type="number"
-                    name="currentWeight"
-                    value={formData.currentWeight}
+                    name="current_weight"
+                    value={formData.current_weight}
                     onChange={handleInputChange}
                     step="0.1"
                     min="0"
@@ -923,8 +923,8 @@ const LiveChickenStock = () => {
               <div className="form-group">
                 <label>Feed Type</label>
                 <select
-                  name="feedType"
-                  value={formData.feedType}
+                  name="feed_type"
+              value={formData.feed_type}
                   onChange={handleInputChange}
                 >
                   <option value="">Select Feed Type</option>

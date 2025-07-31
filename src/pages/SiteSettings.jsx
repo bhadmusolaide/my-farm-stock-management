@@ -4,16 +4,20 @@ import { useNotification } from '../context/NotificationContext'
 import './SiteSettings.css'
 
 const SiteSettings = () => {
-  const { settings, updateSettings, updateNavigationItems, resetToDefaults, uploadImage } = useSiteSettings()
+  const { settings, updateSettings, updateNavigationItems, resetToDefaults, uploadImage, loading } = useSiteSettings()
   const { showSuccess, showError } = useNotification()
   const [activeTab, setActiveTab] = useState('general')
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef(null)
   const loginFileInputRef = useRef(null)
 
-  const handleSiteSettingsUpdate = (field, value) => {
-    updateSettings({ [field]: value })
-    showSuccess('Settings updated successfully')
+  const handleSiteSettingsUpdate = async (field, value) => {
+    try {
+      await updateSettings({ [field]: value })
+      showSuccess('Settings updated successfully')
+    } catch (error) {
+      showError('Failed to update settings')
+    }
   }
 
   const handleImageUpload = async (file, type) => {
@@ -23,9 +27,9 @@ const SiteSettings = () => {
     try {
       const imageDataUrl = await uploadImage(file)
       if (type === 'logo') {
-        updateSettings({ logoUrl: imageDataUrl, logoType: 'image' })
+        await updateSettings({ logoUrl: imageDataUrl, logoType: 'image' })
       } else if (type === 'loginLogo') {
-        updateSettings({ loginLogoUrl: imageDataUrl, loginLogoType: 'image' })
+        await updateSettings({ loginLogoUrl: imageDataUrl, loginLogoType: 'image' })
       }
       showSuccess('Image uploaded successfully')
     } catch (error) {
@@ -35,63 +39,100 @@ const SiteSettings = () => {
     }
   }
 
-  const handleUrlLogo = (url, type) => {
-    if (type === 'logo') {
-      updateSettings({ logoUrl: url, logoType: 'url' })
-    } else if (type === 'loginLogo') {
-      updateSettings({ loginLogoUrl: url, loginLogoType: 'url' })
+  const handleUrlLogo = async (url, type) => {
+    try {
+      if (type === 'logo') {
+        await updateSettings({ logoUrl: url, logoType: 'url' })
+      } else if (type === 'loginLogo') {
+        await updateSettings({ loginLogoUrl: url, loginLogoType: 'url' })
+      }
+      showSuccess('Logo URL updated successfully')
+    } catch (error) {
+      showError('Failed to update logo URL')
     }
-    showSuccess('Logo URL updated successfully')
   }
 
-  const handleNavigationReorder = (dragIndex, hoverIndex) => {
-    const dragItem = settings.navigationItems[dragIndex]
-    const newItems = [...settings.navigationItems]
-    newItems.splice(dragIndex, 1)
-    newItems.splice(hoverIndex, 0, dragItem)
-    
-    // Update order values
-    const reorderedItems = newItems.map((item, index) => ({
-      ...item,
-      order: index + 1
-    }))
-    
-    updateNavigationItems(reorderedItems)
+  const handleNavigationReorder = async (dragIndex, hoverIndex) => {
+    try {
+      const dragItem = settings.navigationItems[dragIndex]
+      const newItems = [...settings.navigationItems]
+      newItems.splice(dragIndex, 1)
+      newItems.splice(hoverIndex, 0, dragItem)
+      
+      // Update order values
+      const reorderedItems = newItems.map((item, index) => ({
+        ...item,
+        order: index + 1
+      }))
+      
+      await updateNavigationItems(reorderedItems)
+    } catch (error) {
+      showError('Failed to reorder navigation items')
+    }
   }
 
-  const handleNavigationToggle = (itemId) => {
-    const updatedItems = settings.navigationItems.map(item => 
-      item.id === itemId ? { ...item, enabled: !item.enabled } : item
-    )
-    updateNavigationItems(updatedItems)
-    showSuccess('Navigation updated successfully')
+  const handleNavigationToggle = async (itemId) => {
+    try {
+      const updatedItems = settings.navigationItems.map(item => 
+        item.id === itemId ? { ...item, enabled: !item.enabled } : item
+      )
+      await updateNavigationItems(updatedItems)
+      showSuccess('Navigation updated successfully')
+    } catch (error) {
+      showError('Failed to update navigation')
+    }
   }
 
-  const handleNavigationLabelChange = (itemId, newLabel) => {
-    const updatedItems = settings.navigationItems.map(item => 
-      item.id === itemId ? { ...item, label: newLabel } : item
-    )
-    updateNavigationItems(updatedItems)
+  const handleNavigationLabelChange = async (itemId, newLabel) => {
+    try {
+      const updatedItems = settings.navigationItems.map(item => 
+        item.id === itemId ? { ...item, label: newLabel } : item
+      )
+      await updateNavigationItems(updatedItems)
+    } catch (error) {
+      showError('Failed to update navigation label')
+    }
   }
 
-  const handleResetSettings = () => {
+  const handleResetSettings = async () => {
     if (window.confirm('Are you sure you want to reset all settings to defaults? This action cannot be undone.')) {
-      resetToDefaults()
-      showSuccess('Settings reset to defaults')
+      try {
+        await resetToDefaults()
+        showSuccess('Settings reset to defaults')
+      } catch (error) {
+        showError('Failed to reset settings')
+      }
     }
   }
 
-  const moveItem = (fromIndex, toIndex) => {
-    const newItems = [...settings.navigationItems]
-    const [movedItem] = newItems.splice(fromIndex, 1)
-    newItems.splice(toIndex, 0, movedItem)
-    
-    const reorderedItems = newItems.map((item, index) => ({
-      ...item,
-      order: index + 1
-    }))
-    
-    updateNavigationItems(reorderedItems)
+  const moveItem = async (fromIndex, toIndex) => {
+    try {
+      const newItems = [...settings.navigationItems]
+      const [movedItem] = newItems.splice(fromIndex, 1)
+      newItems.splice(toIndex, 0, movedItem)
+      
+      const reorderedItems = newItems.map((item, index) => ({
+        ...item,
+        order: index + 1
+      }))
+      
+      await updateNavigationItems(reorderedItems)
+    } catch (error) {
+      showError('Failed to move navigation item')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="site-settings">
+        <div className="page-header">
+          <h1>Site Settings</h1>
+        </div>
+        <div className="loading-container">
+          <p>Loading settings...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -312,7 +353,13 @@ const SiteSettings = () => {
                                         }
                                       : navItem
                                   )
-                                  updateNavigationItems(updatedItems)
+                                  ;(async () => {
+                                    try {
+                                      await updateNavigationItems(updatedItems)
+                                    } catch (error) {
+                                      showError('Failed to update child navigation item')
+                                    }
+                                  })()
                                 }}
                               />
                               <span className="slider"></span>

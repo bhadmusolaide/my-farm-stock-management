@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react'
+import { supabase } from '../utils/supabaseClient'
 
 const SiteSettingsContext = createContext()
 
@@ -27,27 +28,71 @@ const defaultSettings = {
 }
 
 export const SiteSettingsProvider = ({ children }) => {
-  const [settings, setSettings] = useState(() => {
-    const savedSettings = localStorage.getItem('siteSettings')
-    return savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings
-  })
+  const [settings, setSettings] = useState(defaultSettings)
+  const [loading, setLoading] = useState(true)
 
-  // Save settings to localStorage whenever they change
+  // Load settings from Supabase on mount
   useEffect(() => {
-    localStorage.setItem('siteSettings', JSON.stringify(settings))
-  }, [settings])
+    loadSettings()
+  }, [])
 
-  const updateSettings = (newSettings) => {
-    setSettings(prev => ({ ...prev, ...newSettings }))
+  const loadSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('settings_data')
+        .order('id', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading settings:', error)
+        return
+      }
+
+      if (data?.settings_data) {
+        setSettings({ ...defaultSettings, ...data.settings_data })
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const updateNavigationItems = (items) => {
-    setSettings(prev => ({ ...prev, navigationItems: items }))
+  const saveSettingsToSupabase = async (newSettings) => {
+    try {
+      const { error } = await supabase
+        .from('site_settings')
+        .upsert({
+          id: 1,
+          settings_data: newSettings,
+          updated_at: new Date().toISOString()
+        })
+
+      if (error) {
+        console.error('Error saving settings:', error)
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error)
+    }
   }
 
-  const resetToDefaults = () => {
+  const updateSettings = async (newSettings) => {
+    const updatedSettings = { ...settings, ...newSettings }
+    setSettings(updatedSettings)
+    await saveSettingsToSupabase(updatedSettings)
+  }
+
+  const updateNavigationItems = async (items) => {
+    const updatedSettings = { ...settings, navigationItems: items }
+    setSettings(updatedSettings)
+    await saveSettingsToSupabase(updatedSettings)
+  }
+
+  const resetToDefaults = async () => {
     setSettings(defaultSettings)
-    localStorage.removeItem('siteSettings')
+    await saveSettingsToSupabase(defaultSettings)
   }
 
   const uploadImage = async (file) => {
@@ -86,7 +131,8 @@ export const SiteSettingsProvider = ({ children }) => {
     updateNavigationItems,
     resetToDefaults,
     uploadImage,
-    defaultSettings
+    defaultSettings,
+    loading
   }
 
   return (

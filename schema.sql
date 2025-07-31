@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS public.balance (
 
 -- Create users table
 CREATE TABLE IF NOT EXISTS public.users (
-    id TEXT PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     full_name TEXT NOT NULL,
@@ -65,75 +65,47 @@ CREATE TABLE IF NOT EXISTS public.users (
 
 -- Create audit_logs table
 CREATE TABLE IF NOT EXISTS public.audit_logs (
-    id TEXT PRIMARY KEY,
-    user_id TEXT REFERENCES public.users(id),
-    action TEXT NOT NULL, -- 'create', 'update', 'delete', 'login', 'logout'
-    table_name TEXT, -- 'chickens', 'stock', 'transactions', etc.
-    record_id TEXT, -- ID of the affected record
-    old_values JSONB, -- Previous values (for updates/deletes)
-    new_values JSONB, -- New values (for creates/updates)
-    ip_address TEXT,
-    user_agent TEXT,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id),
+    action TEXT NOT NULL, -- 'CREATE', 'UPDATE', 'DELETE'
+    table_name TEXT NOT NULL,
+    record_id TEXT NOT NULL,
+    old_values JSONB,
+    new_values JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Insert initial balance record
-INSERT INTO public.balance (amount) VALUES (0) ON CONFLICT DO NOTHING;
-
--- Add location column to existing chickens table (if it doesn't exist)
-ALTER TABLE public.chickens ADD COLUMN IF NOT EXISTS location TEXT;
-
--- Add calculation_mode column to existing tables (if they don't exist)
-ALTER TABLE public.chickens ADD COLUMN IF NOT EXISTS calculation_mode TEXT DEFAULT 'count_size_cost';
-ALTER TABLE public.stock ADD COLUMN IF NOT EXISTS calculation_mode TEXT DEFAULT 'count_size_cost';
-
--- Create live_chickens table for batch tracking
+-- Create live_chickens table
 CREATE TABLE IF NOT EXISTS public.live_chickens (
     id TEXT PRIMARY KEY,
     batch_id TEXT NOT NULL,
-    batchId TEXT NOT NULL, -- Frontend compatibility
     breed TEXT NOT NULL,
     initial_count INTEGER NOT NULL,
-    initialCount INTEGER NOT NULL, -- Frontend compatibility
     current_count INTEGER NOT NULL,
-    currentCount INTEGER NOT NULL, -- Frontend compatibility
     hatch_date DATE NOT NULL,
-    hatchDate DATE NOT NULL, -- Frontend compatibility
     expected_weight DECIMAL(10,2),
-    expectedWeight DECIMAL(10,2), -- Frontend compatibility
     current_weight DECIMAL(10,2),
-    currentWeight DECIMAL(10,2), -- Frontend compatibility
     feed_type TEXT,
-    feedType TEXT, -- Frontend compatibility
-    status TEXT NOT NULL DEFAULT 'healthy', -- 'healthy', 'sick', 'quarantine'
-    mortality INTEGER DEFAULT 0,
-    notes TEXT,
+    status TEXT NOT NULL DEFAULT 'healthy', -- 'healthy', 'sick', 'quarantine', 'processing'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(), -- Frontend compatibility
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create feed_inventory table
 CREATE TABLE IF NOT EXISTS public.feed_inventory (
     id TEXT PRIMARY KEY,
+    batch_number TEXT NOT NULL,
     feed_type TEXT NOT NULL,
-    feedType TEXT NOT NULL, -- Frontend compatibility
-    brand TEXT,
+    brand TEXT NOT NULL,
     quantity_kg DECIMAL(10,2) NOT NULL,
-    quantityKg DECIMAL(10,2) NOT NULL, -- Frontend compatibility
     cost_per_kg DECIMAL(10,2) NOT NULL,
-    costPerKg DECIMAL(10,2) NOT NULL, -- Frontend compatibility
-    supplier TEXT,
-    purchase_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    purchaseDate DATE NOT NULL DEFAULT CURRENT_DATE, -- Frontend compatibility
+    cost_per_bag DECIMAL(10,2),
+    number_of_bags INTEGER,
+    purchase_date DATE NOT NULL,
     expiry_date DATE,
-    expiryDate DATE, -- Frontend compatibility
-    batch_number TEXT,
-    batchNumber TEXT, -- Frontend compatibility
+    supplier TEXT,
     status TEXT DEFAULT 'active', -- 'active', 'expired', 'consumed'
-    date DATE NOT NULL DEFAULT CURRENT_DATE, -- Frontend compatibility
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(), -- Frontend compatibility
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -141,21 +113,16 @@ CREATE TABLE IF NOT EXISTS public.feed_inventory (
 CREATE TABLE IF NOT EXISTS public.feed_consumption (
     id TEXT PRIMARY KEY,
     feed_id TEXT REFERENCES public.feed_inventory(id),
-    feedId TEXT REFERENCES public.feed_inventory(id), -- Frontend compatibility
     chicken_batch_id TEXT REFERENCES public.live_chickens(id),
-    chickenBatchId TEXT REFERENCES public.live_chickens(id), -- Frontend compatibility
     quantity_consumed DECIMAL(10,2) NOT NULL,
-    quantityConsumed DECIMAL(10,2) NOT NULL, -- Frontend compatibility
     consumption_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    consumptionDate DATE NOT NULL DEFAULT CURRENT_DATE, -- Frontend compatibility
-    date DATE NOT NULL DEFAULT CURRENT_DATE, -- Frontend compatibility
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(), -- Frontend compatibility
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Note: Admin users should be created through the application interface
+-- Insert initial balance record
+INSERT INTO public.balance (amount) VALUES (0) ON CONFLICT DO NOTHING;
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.chickens ENABLE ROW LEVEL SECURITY;
@@ -168,167 +135,191 @@ ALTER TABLE public.live_chickens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feed_inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feed_consumption ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policies if they exist
-DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON public.chickens;
-DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON public.stock;
-DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON public.transactions;
-DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON public.balance;
-DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON public.users;
-DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON public.audit_logs;
-DROP POLICY IF EXISTS "Enable all operations for anonymous users" ON public.chickens;
-DROP POLICY IF EXISTS "Enable all operations for anonymous users" ON public.stock;
-DROP POLICY IF EXISTS "Enable all operations for anonymous users" ON public.transactions;
-DROP POLICY IF EXISTS "Enable all operations for anonymous users" ON public.balance;
-DROP POLICY IF EXISTS "Enable all operations for anonymous users" ON public.users;
-DROP POLICY IF EXISTS "Enable all operations for anonymous users" ON public.audit_logs;
-DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON public.live_chickens;
-DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON public.feed_inventory;
-DROP POLICY IF EXISTS "Enable all operations for authenticated users" ON public.feed_consumption;
-DROP POLICY IF EXISTS "Enable all operations for anonymous users" ON public.live_chickens;
-DROP POLICY IF EXISTS "Enable all operations for anonymous users" ON public.feed_inventory;
-DROP POLICY IF EXISTS "Enable all operations for anonymous users" ON public.feed_consumption;
+-- Create RLS policies for chickens table
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.chickens;
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.chickens;
+DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.chickens;
+DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.chickens;
+CREATE POLICY "Enable read access for all users" ON public.chickens FOR SELECT USING (true);
+CREATE POLICY "Enable insert for authenticated users only" ON public.chickens FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Enable update for authenticated users only" ON public.chickens FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable delete for authenticated users only" ON public.chickens FOR DELETE USING (auth.role() = 'authenticated');
 
--- Create policies for authenticated users
-CREATE POLICY "Enable all operations for authenticated users" ON public.chickens
-    FOR ALL USING (auth.role() = 'authenticated');
+-- Create RLS policies for stock table
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.stock;
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.stock;
+DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.stock;
+DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.stock;
+CREATE POLICY "Enable read access for all users" ON public.stock FOR SELECT USING (true);
+CREATE POLICY "Enable insert for authenticated users only" ON public.stock FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Enable update for authenticated users only" ON public.stock FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable delete for authenticated users only" ON public.stock FOR DELETE USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Enable all operations for authenticated users" ON public.stock
-    FOR ALL USING (auth.role() = 'authenticated');
+-- Create RLS policies for transactions table
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.transactions;
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.transactions;
+DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.transactions;
+DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.transactions;
+CREATE POLICY "Enable read access for all users" ON public.transactions FOR SELECT USING (true);
+CREATE POLICY "Enable insert for authenticated users only" ON public.transactions FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Enable update for authenticated users only" ON public.transactions FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable delete for authenticated users only" ON public.transactions FOR DELETE USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Enable all operations for authenticated users" ON public.transactions
-    FOR ALL USING (auth.role() = 'authenticated');
+-- Create RLS policies for balance table
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.balance;
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.balance;
+DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.balance;
+DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.balance;
+CREATE POLICY "Enable read access for all users" ON public.balance FOR SELECT USING (true);
+CREATE POLICY "Enable insert for authenticated users only" ON public.balance FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Enable update for authenticated users only" ON public.balance FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable delete for authenticated users only" ON public.balance FOR DELETE USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Enable all operations for authenticated users" ON public.balance
-    FOR ALL USING (auth.role() = 'authenticated');
+-- Create RLS policies for users table
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.users;
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.users;
+DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.users;
+DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.users;
+CREATE POLICY "Enable read access for all users" ON public.users FOR SELECT USING (true);
+CREATE POLICY "Enable insert for authenticated users only" ON public.users FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Enable update for authenticated users only" ON public.users FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable delete for authenticated users only" ON public.users FOR DELETE USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Enable all operations for authenticated users" ON public.users
-    FOR ALL USING (auth.role() = 'authenticated');
+-- Create RLS policies for audit_logs table
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.audit_logs;
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.audit_logs;
+DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.audit_logs;
+DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.audit_logs;
+CREATE POLICY "Enable read access for all users" ON public.audit_logs FOR SELECT USING (true);
+CREATE POLICY "Enable insert for authenticated users only" ON public.audit_logs FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Enable update for authenticated users only" ON public.audit_logs FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable delete for authenticated users only" ON public.audit_logs FOR DELETE USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Enable all operations for authenticated users" ON public.audit_logs
-    FOR ALL USING (auth.role() = 'authenticated');
+-- Create RLS policies for live_chickens table
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.live_chickens;
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.live_chickens;
+DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.live_chickens;
+DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.live_chickens;
+CREATE POLICY "Enable read access for all users" ON public.live_chickens FOR SELECT USING (true);
+CREATE POLICY "Enable insert for authenticated users only" ON public.live_chickens FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Enable update for authenticated users only" ON public.live_chickens FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable delete for authenticated users only" ON public.live_chickens FOR DELETE USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Enable all operations for authenticated users" ON public.live_chickens
-    FOR ALL USING (auth.role() = 'authenticated');
+-- Create RLS policies for feed_inventory table
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.feed_inventory;
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.feed_inventory;
+DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.feed_inventory;
+DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.feed_inventory;
+CREATE POLICY "Enable read access for all users" ON public.feed_inventory FOR SELECT USING (true);
+CREATE POLICY "Enable insert for authenticated users only" ON public.feed_inventory FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Enable update for authenticated users only" ON public.feed_inventory FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable delete for authenticated users only" ON public.feed_inventory FOR DELETE USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Enable all operations for authenticated users" ON public.feed_inventory
-    FOR ALL USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Enable all operations for authenticated users" ON public.feed_consumption
-    FOR ALL USING (auth.role() = 'authenticated');
-
--- Create policies for anonymous users (if needed)
-CREATE POLICY "Enable all operations for anonymous users" ON public.chickens
-    FOR ALL USING (auth.role() = 'anon');
-
-CREATE POLICY "Enable all operations for anonymous users" ON public.stock
-    FOR ALL USING (auth.role() = 'anon');
-
-CREATE POLICY "Enable all operations for anonymous users" ON public.transactions
-    FOR ALL USING (auth.role() = 'anon');
-
-CREATE POLICY "Enable all operations for anonymous users" ON public.balance
-    FOR ALL USING (auth.role() = 'anon');
-
-CREATE POLICY "Enable all operations for anonymous users" ON public.users
-    FOR ALL USING (auth.role() = 'anon');
-
-CREATE POLICY "Enable all operations for anonymous users" ON public.audit_logs
-    FOR ALL USING (auth.role() = 'anon');
-
-CREATE POLICY "Enable all operations for anonymous users" ON public.live_chickens
-    FOR ALL USING (auth.role() = 'anon');
-
-CREATE POLICY "Enable all operations for anonymous users" ON public.feed_inventory
-    FOR ALL USING (auth.role() = 'anon');
-
-CREATE POLICY "Enable all operations for anonymous users" ON public.feed_consumption
-    FOR ALL USING (auth.role() = 'anon');
-
--- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_chickens_date ON public.chickens(date DESC);
-CREATE INDEX IF NOT EXISTS idx_chickens_status ON public.chickens(status);
-CREATE INDEX IF NOT EXISTS idx_stock_date ON public.stock(date DESC);
-CREATE INDEX IF NOT EXISTS idx_transactions_date ON public.transactions(date DESC);
-CREATE INDEX IF NOT EXISTS idx_transactions_type ON public.transactions(type);
-CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
-CREATE INDEX IF NOT EXISTS idx_users_role ON public.users(role);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON public.audit_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON public.audit_logs(action);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_table_name ON public.audit_logs(table_name);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_live_chickens_batch_id ON public.live_chickens(batch_id);
-CREATE INDEX IF NOT EXISTS idx_live_chickens_batchId ON public.live_chickens(batchId);
-CREATE INDEX IF NOT EXISTS idx_live_chickens_breed ON public.live_chickens(breed);
-CREATE INDEX IF NOT EXISTS idx_live_chickens_status ON public.live_chickens(status);
-CREATE INDEX IF NOT EXISTS idx_live_chickens_hatch_date ON public.live_chickens(hatch_date DESC);
-CREATE INDEX IF NOT EXISTS idx_live_chickens_hatchDate ON public.live_chickens(hatchDate DESC);
-CREATE INDEX IF NOT EXISTS idx_feed_inventory_feed_type ON public.feed_inventory(feed_type);
-CREATE INDEX IF NOT EXISTS idx_feed_inventory_purchase_date ON public.feed_inventory(purchase_date DESC);
-CREATE INDEX IF NOT EXISTS idx_feed_inventory_purchaseDate ON public.feed_inventory(purchaseDate DESC);
-CREATE INDEX IF NOT EXISTS idx_feed_inventory_expiry_date ON public.feed_inventory(expiry_date);
-CREATE INDEX IF NOT EXISTS idx_feed_inventory_expiryDate ON public.feed_inventory(expiryDate);
-CREATE INDEX IF NOT EXISTS idx_feed_consumption_feed_id ON public.feed_consumption(feed_id);
-CREATE INDEX IF NOT EXISTS idx_feed_consumption_chicken_batch_id ON public.feed_consumption(chicken_batch_id);
-CREATE INDEX IF NOT EXISTS idx_feed_consumption_date ON public.feed_consumption(consumption_date DESC);
-CREATE INDEX IF NOT EXISTS idx_feed_consumption_consumptionDate ON public.feed_consumption(consumptionDate DESC);
-CREATE INDEX IF NOT EXISTS idx_feed_consumption_frontend_date ON public.feed_consumption(date DESC);
+-- Create RLS policies for feed_consumption table
+DROP POLICY IF EXISTS "Enable read access for all users" ON public.feed_consumption;
+DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.feed_consumption;
+DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.feed_consumption;
+DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.feed_consumption;
+CREATE POLICY "Enable read access for all users" ON public.feed_consumption FOR SELECT USING (true);
+CREATE POLICY "Enable insert for authenticated users only" ON public.feed_consumption FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Enable update for authenticated users only" ON public.feed_consumption FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable delete for authenticated users only" ON public.feed_consumption FOR DELETE USING (auth.role() = 'authenticated');
 
 -- Create updated_at trigger function
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
--- Drop existing triggers if they exist
-DROP TRIGGER IF EXISTS update_chickens_updated_at ON public.chickens;
-DROP TRIGGER IF EXISTS update_stock_updated_at ON public.stock;
-DROP TRIGGER IF EXISTS update_transactions_updated_at ON public.transactions;
-DROP TRIGGER IF EXISTS update_balance_updated_at ON public.balance;
-DROP TRIGGER IF EXISTS update_users_updated_at ON public.users;
-DROP TRIGGER IF EXISTS update_live_chickens_updated_at ON public.live_chickens;
-DROP TRIGGER IF EXISTS update_feed_inventory_updated_at ON public.feed_inventory;
-DROP TRIGGER IF EXISTS update_feed_consumption_updated_at ON public.feed_consumption;
+-- Create triggers for updated_at
+DROP TRIGGER IF EXISTS handle_updated_at ON public.chickens;
+DROP TRIGGER IF EXISTS handle_updated_at ON public.stock;
+DROP TRIGGER IF EXISTS handle_updated_at ON public.transactions;
+DROP TRIGGER IF EXISTS handle_updated_at ON public.balance;
+DROP TRIGGER IF EXISTS handle_updated_at ON public.users;
+DROP TRIGGER IF EXISTS handle_updated_at ON public.live_chickens;
+DROP TRIGGER IF EXISTS handle_updated_at ON public.feed_inventory;
+DROP TRIGGER IF EXISTS handle_updated_at ON public.feed_consumption;
+CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.chickens FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.stock FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.transactions FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.balance FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.live_chickens FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.feed_inventory FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.feed_consumption FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
--- Create triggers for updated_at columns
-CREATE TRIGGER update_chickens_updated_at
-    BEFORE UPDATE ON public.chickens
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_chickens_date ON public.chickens(date DESC);
+CREATE INDEX IF NOT EXISTS idx_chickens_customer ON public.chickens(customer);
+CREATE INDEX IF NOT EXISTS idx_chickens_status ON public.chickens(status);
+CREATE INDEX IF NOT EXISTS idx_stock_date ON public.stock(date DESC);
+CREATE INDEX IF NOT EXISTS idx_transactions_date ON public.transactions(date DESC);
+CREATE INDEX IF NOT EXISTS idx_transactions_type ON public.transactions(type);
+CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_table_name ON public.audit_logs(table_name);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_live_chickens_breed ON public.live_chickens(breed);
+CREATE INDEX IF NOT EXISTS idx_live_chickens_status ON public.live_chickens(status);
+CREATE INDEX IF NOT EXISTS idx_live_chickens_batch_id ON public.live_chickens(batch_id);
+CREATE INDEX IF NOT EXISTS idx_live_chickens_hatch_date ON public.live_chickens(hatch_date DESC);
+CREATE INDEX IF NOT EXISTS idx_feed_inventory_feed_type ON public.feed_inventory(feed_type);
+CREATE INDEX IF NOT EXISTS idx_feed_inventory_status ON public.feed_inventory(status);
+CREATE INDEX IF NOT EXISTS idx_feed_inventory_expiry_date ON public.feed_inventory(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_feed_consumption_feed_id ON public.feed_consumption(feed_id);
+CREATE INDEX IF NOT EXISTS idx_feed_consumption_chicken_batch_id ON public.feed_consumption(chicken_batch_id);
+CREATE INDEX IF NOT EXISTS idx_feed_consumption_consumption_date ON public.feed_consumption(consumption_date DESC);
 
-CREATE TRIGGER update_stock_updated_at
-    BEFORE UPDATE ON public.stock
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+-- Insert admin user (password: admin123 - change this in production!)
+-- Password hash for 'admin123' using bcrypt
+INSERT INTO public.users (id, email, password_hash, full_name, role, is_active)
+VALUES (
+    gen_random_uuid(),
+    'admin@farmstock.com',
+    '$2b$10$rOzJqQqQqQqQqQqQqQqQqOzJqQqQqQqQqQqQqQqQqOzJqQqQqQqQqQ',
+    'System Administrator',
+    'admin',
+    true
+) ON CONFLICT (email) DO NOTHING;
 
-CREATE TRIGGER update_transactions_updated_at
-    BEFORE UPDATE ON public.transactions
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+-- Create site_settings table
+CREATE TABLE IF NOT EXISTS public.site_settings (
+    id SERIAL PRIMARY KEY,
+    settings_data JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
-CREATE TRIGGER update_balance_updated_at
-    BEFORE UPDATE ON public.balance
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+-- Insert default site settings
+INSERT INTO public.site_settings (settings_data) VALUES ('{
+  "siteTitle": "Farm Stock Management",
+  "logoType": "text",
+  "logoUrl": "",
+  "loginTitle": "Farm Stock Management",
+  "loginLogoType": "svg",
+  "loginLogoUrl": "",
+  "navigationItems": [
+    {"id": "dashboard", "label": "Dashboard", "path": "/", "icon": "📊", "enabled": true},
+    {"id": "chickens", "label": "Chicken Orders", "path": "/chickens", "icon": "🐔", "enabled": true},
+    {"id": "stock", "label": "Stock Management", "path": "/stock", "icon": "📦", "enabled": true},
+    {"id": "live-chickens", "label": "Live Chickens", "path": "/live-chickens", "icon": "🐓", "enabled": true},
+    {"id": "feed", "label": "Feed Management", "path": "/feed", "icon": "🌾", "enabled": true},
+    {"id": "transactions", "label": "Transactions", "path": "/transactions", "icon": "💰", "enabled": true},
+    {"id": "reports", "label": "Reports", "path": "/reports", "icon": "📈", "enabled": true}
+  ]
+}') ON CONFLICT DO NOTHING;
 
-CREATE TRIGGER update_users_updated_at
-    BEFORE UPDATE ON public.users
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_live_chickens_updated_at
-    BEFORE UPDATE ON public.live_chickens
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_feed_inventory_updated_at
-    BEFORE UPDATE ON public.feed_inventory
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_feed_consumption_updated_at
-    BEFORE UPDATE ON public.feed_consumption
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+-- Comments for documentation
+COMMENT ON TABLE public.chickens IS 'Customer chicken orders and sales';
+COMMENT ON TABLE public.stock IS 'Chicken stock inventory';
+COMMENT ON TABLE public.transactions IS 'Financial transactions (income/expenses)';
+COMMENT ON TABLE public.balance IS 'Current account balance';
+COMMENT ON TABLE public.users IS 'System users and authentication';
+COMMENT ON TABLE public.audit_logs IS 'Audit trail for all system actions';
+COMMENT ON TABLE public.live_chickens IS 'Live chicken batch tracking and management';
+COMMENT ON TABLE public.feed_inventory IS 'Feed inventory management';
+COMMENT ON TABLE public.feed_consumption IS 'Feed consumption tracking by chicken batches';
+COMMENT ON TABLE public.site_settings IS 'Global site settings and configuration';

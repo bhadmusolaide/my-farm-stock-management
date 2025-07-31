@@ -25,8 +25,8 @@ const StockInventory = () => {
     description: '',
     count: '',
     size: '',
-    costPerKg: '',
-    calculationMode: 'count_size_cost' // 'count_size_cost', 'count_cost', 'size_cost'
+    cost_per_kg: '',
+    calculation_mode: 'count_size_cost' // 'count_size_cost', 'count_cost', 'size_cost'
   })
 
   // Column configuration
@@ -35,8 +35,8 @@ const StockInventory = () => {
     { key: 'description', label: 'Description' },
     { key: 'count', label: 'Count' },
     { key: 'size', label: 'Size (kg)' },
-    { key: 'costPerKg', label: 'Cost per kg' },
-    { key: 'totalCost', label: 'Total Cost' },
+    { key: 'cost_per_kg', label: 'Cost per kg' },
+    { key: 'total_cost', label: 'Total Cost' },
     { key: 'actions', label: 'Actions' }
   ]
 
@@ -97,8 +97,8 @@ const StockInventory = () => {
       description: '',
       count: '',
       size: '',
-      costPerKg: '',
-      calculationMode: 'count_size_cost'
+      cost_per_kg: '',
+      calculation_mode: 'count_size_cost'
     })
     setShowModal(true)
   }
@@ -115,10 +115,10 @@ const StockInventory = () => {
     // Validate form based on calculation mode
     const count = parseInt(formData.count)
     const size = parseFloat(formData.size)
-    const costPerKg = parseFloat(formData.costPerKg)
+    const costPerKg = parseFloat(formData.cost_per_kg)
     
     // Validate required fields based on calculation mode
-    if (formData.calculationMode === 'count_cost') {
+    if (formData.calculation_mode === 'count_cost') {
       if (isNaN(count) || count <= 0) {
         alert('Please enter a valid count')
         return
@@ -127,7 +127,7 @@ const StockInventory = () => {
         alert('Please enter a valid cost')
         return
       }
-    } else if (formData.calculationMode === 'size_cost') {
+    } else if (formData.calculation_mode === 'size_cost') {
       if (isNaN(size) || size <= 0) {
         alert('Please enter a valid size')
         return
@@ -154,10 +154,10 @@ const StockInventory = () => {
     try {
       await addStock({
         description: formData.description,
-        count: formData.calculationMode === 'size_cost' ? 1 : count,
-        size: formData.calculationMode === 'count_cost' ? 1 : size,
-        costPerKg,
-        calculationMode: formData.calculationMode
+        count: formData.calculation_mode === 'size_cost' ? 1 : count,
+        size: formData.calculation_mode === 'count_cost' ? 1 : size,
+        cost_per_kg: costPerKg,
+        calculation_mode: formData.calculation_mode
       })
       
       closeModal()
@@ -264,8 +264,8 @@ const StockInventory = () => {
               {columnConfig.isColumnVisible('description') && <th>Description</th>}
               {columnConfig.isColumnVisible('count') && <th>Count</th>}
               {columnConfig.isColumnVisible('size') && <th>Size (kg)</th>}
-              {columnConfig.isColumnVisible('costPerKg') && <th>Cost per kg</th>}
-              {columnConfig.isColumnVisible('totalCost') && <th>Total Cost</th>}
+              {columnConfig.isColumnVisible('cost_per_kg') && <th>Cost per kg</th>}
+              {columnConfig.isColumnVisible('total_cost') && <th>Total Cost</th>}
               {columnConfig.isColumnVisible('actions') && <th>Actions</th>}
             </tr>
           </thead>
@@ -277,8 +277,8 @@ const StockInventory = () => {
                   {columnConfig.isColumnVisible('description') && <td>{item.description}</td>}
                   {columnConfig.isColumnVisible('count') && <td>{formatNumber(item.count)}</td>}
                   {columnConfig.isColumnVisible('size') && <td>{formatNumber(item.size)}</td>}
-                  {columnConfig.isColumnVisible('costPerKg') && <td>₦{formatNumber(item.cost_per_kg || 0, 2)}</td>}
-                  {columnConfig.isColumnVisible('totalCost') && <td>₦{formatNumber(item.totalCost || 0, 2)}</td>}
+                  {columnConfig.isColumnVisible('cost_per_kg') && <td>₦{formatNumber(item.cost_per_kg || 0, 2)}</td>}
+                  {columnConfig.isColumnVisible('total_cost') && <td>₦{formatNumber(item.total_cost || 0, 2)}</td>}
                   {columnConfig.isColumnVisible('actions') && (
                     <td>
                       <button 
@@ -324,11 +324,11 @@ const StockInventory = () => {
               
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="calculationMode">Calculation Mode*</label>
+                  <label htmlFor="calculation_mode">Calculation Mode*</label>
                   <select
-                    id="calculationMode"
-                    name="calculationMode"
-                    value={formData.calculationMode}
+                    id="calculation_mode"
+                    name="calculation_mode"
+                    value={formData.calculation_mode}
                     onChange={handleInputChange}
                     required
                   >
@@ -338,7 +338,7 @@ const StockInventory = () => {
                   </select>
                 </div>
                 
-                {formData.calculationMode !== 'size_cost' && (
+                {formData.calculation_mode !== 'size_cost' && (
                   <div className="form-group">
                     <label htmlFor="count">Count*</label>
                     <input
@@ -348,14 +348,14 @@ const StockInventory = () => {
                       value={formData.count}
                       onChange={handleInputChange}
                       min="1"
-                      required={formData.calculationMode !== 'size_cost'}
+                      required={formData.calculation_mode !== 'size_cost'}
                     />
                   </div>
                 )}
               </div>
               
               <div className="form-row">
-                {formData.calculationMode !== 'count_cost' && (
+                {formData.calculation_mode !== 'count_cost' && (
                   <div className="form-group">
                     <label htmlFor="size">Size (kg)*</label>
                     <input
@@ -366,20 +366,20 @@ const StockInventory = () => {
                       onChange={handleInputChange}
                       min="0.01"
                       step="0.01"
-                      required={formData.calculationMode !== 'count_cost'}
+                      required={formData.calculation_mode !== 'count_cost'}
                     />
                   </div>
                 )}
                 
                 <div className="form-group">
-                  <label htmlFor="costPerKg">
-                    {formData.calculationMode === 'count_cost' ? 'Cost per item*' : 'Cost per kg*'}
+                  <label htmlFor="cost_per_kg">
+                    {formData.calculation_mode === 'count_cost' ? 'Cost per item*' : 'Cost per kg*'}
                   </label>
                   <input
                     type="number"
-                    id="costPerKg"
-                    name="costPerKg"
-                    value={formData.costPerKg}
+                    id="cost_per_kg"
+                    name="cost_per_kg"
+                    value={formData.cost_per_kg}
                     onChange={handleInputChange}
                     min="0"
                     step="0.01"
@@ -394,11 +394,11 @@ const StockInventory = () => {
                   ₦{formatNumber((() => {
                     const count = parseFloat(formData.count || 0)
                     const size = parseFloat(formData.size || 0)
-                    const cost = parseFloat(formData.costPerKg || 0)
+                    const cost = parseFloat(formData.cost_per_kg || 0)
                     
-                    if (formData.calculationMode === 'count_cost') {
+                    if (formData.calculation_mode === 'count_cost') {
                       return count * cost
-                    } else if (formData.calculationMode === 'size_cost') {
+                    } else if (formData.calculation_mode === 'size_cost') {
                       return size * cost
                     } else {
                       return count * size * cost

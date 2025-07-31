@@ -102,7 +102,7 @@ export function AppProvider({ children }) {
           const { data: liveChickensData, error: liveChickensError } = await supabase
             .from('live_chickens')
             .select('*')
-            .order('hatchdate', { ascending: false })
+            .order('hatch_date', { ascending: false })
           
           if (liveChickensError && !liveChickensError.message.includes('relation "live_chickens" does not exist')) {
             throw liveChickensError
@@ -124,7 +124,7 @@ export function AppProvider({ children }) {
           const { data: feedConsumptionData, error: feedConsumptionError } = await supabase
             .from('feed_consumption')
             .select('*')
-            .order('date', { ascending: false })
+            .order('consumption_date', { ascending: false })
           
           if (feedConsumptionError && !feedConsumptionError.message.includes('relation "feed_consumption" does not exist')) {
             throw feedConsumptionError
@@ -420,7 +420,7 @@ export function AppProvider({ children }) {
   const addStock = async (stockData) => {
     try {
       // Calculate total cost separately
-      const totalCost = stockData.count * stockData.size * stockData.costPerKg
+      const totalCost = stockData.count * stockData.size * stockData.costperkg
       
       // Create stock item without totalCost field (not in database schema)
       const stockItem = {
@@ -429,7 +429,7 @@ export function AppProvider({ children }) {
         description: stockData.description,
         count: stockData.count,
         size: stockData.size,
-        cost_per_kg: stockData.costPerKg,  // Map frontend field to database column name
+        cost_per_kg: stockData.costperkg,  // Map frontend field to database column name
         calculation_mode: stockData.calculationMode || 'count_size_cost'
       }
 
@@ -886,13 +886,15 @@ export function AppProvider({ children }) {
   const addFeedInventory = async (feedData) => {
     try {
       // Calculate total cost (number of bags * cost per bag)
-      const totalCost = feedData.numberOfBags * feedData.costPerBag
+      const totalCost = feedData.number_of_bags * feedData.cost_per_bag
       
       const feed = {
         ...feedData,
         id: Date.now().toString(),
         date: new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        // Convert empty date strings to null for database compatibility
+        expiry_date: feedData.expiry_date === '' ? null : feedData.expiry_date
       }
       
       // Create expense transaction for feed purchase
@@ -900,7 +902,7 @@ export function AppProvider({ children }) {
         id: (Date.now() + 1).toString(),
         type: 'expense',
         amount: totalCost,
-        description: `Feed Purchase: ${feed.feedType} - ${feed.brand}`,
+        description: `Feed Purchase: ${feed.feed_type} - ${feed.brand}`,
         date: feed.date
       }
       
@@ -940,8 +942,43 @@ export function AppProvider({ children }) {
       const feedToDelete = feedInventory.find(feed => feed.id === id)
       if (!feedToDelete) throw new Error('Feed inventory not found')
       
+      // Calculate refund amount (number of bags * cost per bag)
+      const refundAmount = feedToDelete.number_of_bags * feedToDelete.cost_per_bag
+      
+      // Create refund transaction for feed deletion
+      const refundTransaction = {
+        id: Date.now().toString(),
+        type: 'income',
+        amount: refundAmount,
+        description: `Feed Refund: ${feedToDelete.feed_type} - ${feedToDelete.brand}`,
+        date: new Date().toISOString().split('T')[0]
+      }
+      
+      // Update balance
+      const newBalance = balance + refundAmount
+      
+      // Delete from Supabase database
+      const { error } = await supabase
+        .from('feed_inventory')
+        .delete()
+        .eq('id', id)
+      
+      if (error) throw error
+      
+      // Add refund transaction to database
+      const { error: transactionError } = await supabase.from('transactions').insert(refundTransaction)
+      if (transactionError) throw transactionError
+      
+      // Update balance in database
+      const { error: balanceError } = await supabase
+        .from('balance')
+        .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
+      if (balanceError) throw balanceError
+      
       // Update local state
       setFeedInventory(prev => prev.filter(feed => feed.id !== id))
+      setTransactions(prev => [refundTransaction, ...prev])
+      setBalance(newBalance)
       
       // Log audit action
       await logAuditAction('DELETE', 'feed_inventory', id, feedToDelete, null)
@@ -952,13 +989,43 @@ export function AppProvider({ children }) {
     }
   }
 
+  const updateFeedInventory = async (id, updatedData) => {
+    try {
+      const feedToUpdate = feedInventory.find(feed => feed.id === id)
+      if (!feedToUpdate) throw new Error('Feed inventory not found')
+      
+      const updatedFeed = { ...feedToUpdate, ...updatedData }
+      
+      // Update in Supabase database
+      const { error } = await supabase
+        .from('feed_inventory')
+        .update(updatedData)
+        .eq('id', id)
+      
+      if (error) throw error
+      
+      // Update local state
+      setFeedInventory(prev => prev.map(feed => 
+        feed.id === id ? updatedFeed : feed
+      ))
+      
+      // Log audit action
+      await logAuditAction('UPDATE', 'feed_inventory', id, feedToUpdate, updatedFeed)
+      
+      return updatedFeed
+    } catch (err) {
+      console.error('Error updating feed inventory:', err)
+      throw err
+    }
+  }
+
   const addFeedConsumption = async (consumptionData) => {
     try {
       const consumption = {
         ...consumptionData,
         id: Date.now().toString(),
-        date: new Date().toISOString().split('T')[0],
-        createdAt: new Date().toISOString()
+        consumption_date: new Date().toISOString().split('T')[0],
+        created_at: new Date().toISOString()
       }
       
       // Store in local state
@@ -966,9 +1033,9 @@ export function AppProvider({ children }) {
       
       // Update feed inventory quantities
       setFeedInventory(prev => prev.map(feed => {
-        if (feed.id === consumption.feedId) {
-          const newQuantity = feed.quantityKg - consumption.quantityConsumed
-          return { ...feed, quantityKg: Math.max(0, newQuantity) }
+        if (feed.id === consumption.feed_id) {
+          const newQuantity = feed.quantity_kg - consumption.quantity_consumed
+      return { ...feed, quantity_kg: Math.max(0, newQuantity) }
         }
         return feed
       }))
@@ -989,9 +1056,9 @@ export function AppProvider({ children }) {
       
       // Restore feed inventory quantities
       setFeedInventory(prev => prev.map(feed => {
-        if (feed.id === consumptionToDelete.feedId) {
-          const restoredQuantity = feed.quantityKg + consumptionToDelete.quantityConsumed
-          return { ...feed, quantityKg: restoredQuantity }
+        if (feed.id === consumptionToDelete.feed_id) {
+          const restoredQuantity = feed.quantity_kg + consumptionToDelete.quantity_consumed
+      return { ...feed, quantity_kg: restoredQuantity }
         }
         return feed
       }))
@@ -1043,6 +1110,7 @@ export function AppProvider({ children }) {
     
     // Feed Management operations
     addFeedInventory,
+    updateFeedInventory,
     deleteFeedInventory,
     addFeedConsumption,
     deleteFeedConsumption,
