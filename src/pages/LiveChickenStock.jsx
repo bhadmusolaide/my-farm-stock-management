@@ -1,5 +1,6 @@
 import React, { useState, useContext, useMemo } from 'react';
 import { AppContext } from '../context/AppContext';
+import { formatDate, formatNumber } from '../utils/formatters';
 import './LiveChickenStock.css';
 
 const LiveChickenStock = () => {
@@ -352,7 +353,7 @@ const LiveChickenStock = () => {
             </div>
             <div className="summary-card">
               <h3>Live Chickens</h3>
-              <p className="summary-value">{summaryStats.totalChickens.toLocaleString()}</p>
+              <p className="summary-value">{formatNumber(summaryStats.totalChickens)}</p>
             </div>
             <div className="summary-card">
               <h3>Average Age</h3>
@@ -519,7 +520,7 @@ const LiveChickenStock = () => {
             </div>
             <div className="summary-card">
               <h3>Total Production</h3>
-              <p className="summary-value">{summaryStats.totalChickens.toLocaleString()} birds</p>
+              <p className="summary-value">{formatNumber(summaryStats.totalChickens)} birds</p>
             </div>
           </div>
 
@@ -544,7 +545,7 @@ const LiveChickenStock = () => {
                       <tr key={index}>
                         <td>{breed.breed}</td>
                         <td>{breed.batches}</td>
-                        <td>{breed.totalCount.toLocaleString()}</td>
+                        <td>{formatNumber(breed.totalCount)}</td>
                         <td>{breed.avgWeight}</td>
                         <td className={parseFloat(breed.avgMortality) > 10 ? 'high-mortality' : ''}>
                           {breed.avgMortality}%
@@ -592,7 +593,7 @@ const LiveChickenStock = () => {
                     return (
                       <tr key={index}>
                         <td>{group.age}</td>
-                        <td>{group.count.toLocaleString()}</td>
+                        <td>{formatNumber(group.count)}</td>
                         <td>{percentage}%</td>
                         <td>
                           <span className="age-status">
@@ -789,7 +790,7 @@ const LiveChickenStock = () => {
                             {status.status}
                           </span>
                         </td>
-                        <td>{status.count.toLocaleString()}</td>
+                        <td>{formatNumber(status.count)}</td>
                         <td>{percentage}%</td>
                         <td>
                           <span className="trend-indicator">

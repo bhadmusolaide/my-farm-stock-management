@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useAppContext } from '../context/AppContext'
+import { formatNumber, formatDate } from '../utils/formatters'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line
@@ -9,20 +10,7 @@ import './Reports.css'
 const Reports = () => {
   const { chickens, generateReport, exportToCSV } = useAppContext()
   
-  // Format number with thousand separators
-  const formatNumber = (num, decimals = null) => {
-    const number = typeof num === 'string' ? parseFloat(num) : num
-    if (isNaN(number)) return '0'
-    
-    if (decimals !== null) {
-      return number.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-      })
-    }
-    
-    return number.toLocaleString('en-US')
-  }
+
   
   // State for date range
   const [startDate, setStartDate] = useState('')
@@ -85,7 +73,7 @@ const Reports = () => {
         const day = weekStart.getDay()
         const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1)
         weekStart.setDate(diff)
-        timeKey = `Week of ${weekStart.toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
+        timeKey = `Week of ${formatDate(weekStart)}`
       } else if (timePeriod === 'monthly') {
         timeKey = `${date.toLocaleString('default', { month: 'short' })} ${date.getFullYear()}`
       } else if (timePeriod === 'quarterly') {
@@ -288,7 +276,7 @@ const Reports = () => {
                 <div className="report-summary">
                   <div className="summary-item">
                     <h4>Date Range</h4>
-                    <p>{new Date(reportData.startDate).toLocaleDateString()} - {new Date(reportData.endDate).toLocaleDateString()}</p>
+                    <p>{formatDate(reportData.startDate)} - {formatDate(reportData.endDate)}</p>
                   </div>
                   
                   <div className="summary-item">
@@ -336,7 +324,7 @@ const Reports = () => {
                     <tbody>
                       {reportData.orders.map(order => (
                         <tr key={order.id}>
-                          <td>{new Date(order.date).toLocaleDateString()}</td>
+                          <td>{formatDate(order.date)}</td>
                           <td>
                             <div className="customer-info">
                               <span className="customer-name">{order.customer}</span>

@@ -1,24 +1,12 @@
 import { useState } from 'react'
 import { useAppContext } from '../context/AppContext'
+import { formatNumber, formatDate } from '../utils/formatters'
 import './Transactions.css'
 
 const Transactions = () => {
   const { transactions, addFunds, addExpense, withdrawFunds } = useAppContext()
   
-  // Format number with thousand separators
-  const formatNumber = (num, decimals = null) => {
-    const number = typeof num === 'string' ? parseFloat(num) : num
-    if (isNaN(number)) return '0'
-    
-    if (decimals !== null) {
-      return number.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-      })
-    }
-    
-    return number.toLocaleString('en-US')
-  }
+
   
   // State for filters
   const [filters, setFilters] = useState({
@@ -259,7 +247,7 @@ const Transactions = () => {
                   key={transaction.id}
                   className={getTransactionTypeClass(transaction.type)}
                 >
-                  <td>{new Date(transaction.date).toLocaleDateString()}</td>
+                  <td>{formatDate(transaction.date)}</td>
                   <td>
                     <span className={`transaction-type ${transaction.type}`}>
                       {getTransactionTypeDisplay(transaction.type)}

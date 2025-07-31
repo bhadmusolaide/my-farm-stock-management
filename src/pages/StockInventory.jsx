@@ -1,24 +1,14 @@
 import { useState } from 'react'
 import { useAppContext } from '../context/AppContext'
+import { formatNumber, formatDate } from '../utils/formatters'
+import ColumnFilter from '../components/UI/ColumnFilter'
+import useColumnConfig from '../hooks/useColumnConfig'
 import './StockInventory.css'
 
 const StockInventory = () => {
   const { stock, addStock, deleteStock } = useAppContext()
   
-  // Format number with thousand separators
-  const formatNumber = (num, decimals = null) => {
-    const number = typeof num === 'string' ? parseFloat(num) : num
-    if (isNaN(number)) return '0'
-    
-    if (decimals !== null) {
-      return number.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-      })
-    }
-    
-    return number.toLocaleString('en-US')
-  }
+
   
   // State for filters
   const [filters, setFilters] = useState({
@@ -38,6 +28,20 @@ const StockInventory = () => {
     costPerKg: '',
     calculationMode: 'count_size_cost' // 'count_size_cost', 'count_cost', 'size_cost'
   })
+
+  // Column configuration
+  const stockColumns = [
+    { key: 'date', label: 'Date' },
+    { key: 'description', label: 'Description' },
+    { key: 'count', label: 'Count' },
+    { key: 'size', label: 'Size (kg)' },
+    { key: 'costPerKg', label: 'Cost per kg' },
+    { key: 'totalCost', label: 'Total Cost' },
+    { key: 'actions', label: 'Actions' }
+  ]
+
+  // Column visibility hook
+  const columnConfig = useColumnConfig('stockInventory', stockColumns)
   
   // Get filtered stock
   const getFilteredStock = () => {
@@ -244,43 +248,53 @@ const StockInventory = () => {
         </div>
       </div>
       
+      <div className="table-header-controls">
+        <h3>Stock Inventory</h3>
+        <ColumnFilter 
+          columns={stockColumns}
+          visibleColumns={columnConfig.visibleColumns}
+          onColumnToggle={columnConfig.toggleColumn}
+        />
+      </div>
       <div className="table-container">
         <table className="stock-table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Description</th>
-              <th>Count</th>
-              <th>Size (kg)</th>
-              <th>Cost per kg</th>
-              <th>Total Cost</th>
-              <th>Actions</th>
+              {columnConfig.isColumnVisible('date') && <th>Date</th>}
+              {columnConfig.isColumnVisible('description') && <th>Description</th>}
+              {columnConfig.isColumnVisible('count') && <th>Count</th>}
+              {columnConfig.isColumnVisible('size') && <th>Size (kg)</th>}
+              {columnConfig.isColumnVisible('costPerKg') && <th>Cost per kg</th>}
+              {columnConfig.isColumnVisible('totalCost') && <th>Total Cost</th>}
+              {columnConfig.isColumnVisible('actions') && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {filteredStock.length > 0 ? (
               filteredStock.map(item => (
                 <tr key={item.id}>
-                  <td>{new Date(item.date).toLocaleDateString()}</td>
-                  <td>{item.description}</td>
-                  <td>{formatNumber(item.count)}</td>
-                  <td>{formatNumber(item.size)}</td>
-                  <td>₦{formatNumber(item.cost_per_kg || 0, 2)}</td>
-                  <td>₦{formatNumber(item.totalCost || 0, 2)}</td>
-                  <td>
-                    <button 
-                      className="delete-btn" 
-                      onClick={() => handleDelete(item.id)}
-                      aria-label="Delete"
-                    >
-                      Delete
-                    </button>
-                  </td>
+                  {columnConfig.isColumnVisible('date') && <td>{formatDate(item.date)}</td>}
+                  {columnConfig.isColumnVisible('description') && <td>{item.description}</td>}
+                  {columnConfig.isColumnVisible('count') && <td>{formatNumber(item.count)}</td>}
+                  {columnConfig.isColumnVisible('size') && <td>{formatNumber(item.size)}</td>}
+                  {columnConfig.isColumnVisible('costPerKg') && <td>₦{formatNumber(item.cost_per_kg || 0, 2)}</td>}
+                  {columnConfig.isColumnVisible('totalCost') && <td>₦{formatNumber(item.totalCost || 0, 2)}</td>}
+                  {columnConfig.isColumnVisible('actions') && (
+                    <td>
+                      <button 
+                        className="delete-btn" 
+                        onClick={() => handleDelete(item.id)}
+                        aria-label="Delete"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="7" className="no-data">
+                <td colSpan={columnConfig.visibleColumns.length} className="no-data">
                   No stock items found
                 </td>
               </tr>

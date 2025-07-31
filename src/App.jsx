@@ -22,7 +22,7 @@ import { useAppContext } from './context/AppContext'
 // Import theme styles
 import './styles/theme.css'
 import './styles/DarkModeOverride.css'
-import './pages/LightModeOverride.css'
+
 
 // Protected Route Component
 function ProtectedRoute({ children }) {

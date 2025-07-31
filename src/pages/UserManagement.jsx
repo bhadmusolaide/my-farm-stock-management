@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../utils/supabaseClient';
+import { formatDate } from '../utils/formatters';
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner';
 import './UserManagement.css';
 
@@ -109,15 +110,7 @@ const UserManagement = () => {
     setFormData({ email: '', full_name: '', role: 'user' });
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+
 
   const getRoleBadgeClass = (role) => {
     switch (role) {

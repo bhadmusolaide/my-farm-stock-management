@@ -75,7 +75,7 @@ export function AppProvider({ children }) {
           const { data: liveChickensData, error: liveChickensError } = await supabase
             .from('live_chickens')
             .select('*')
-            .order('hatchDate', { ascending: false })
+            .order('hatchdate', { ascending: false })
           
           if (liveChickensError && !liveChickensError.message.includes('relation "live_chickens" does not exist')) {
             throw liveChickensError
@@ -117,13 +117,13 @@ export function AppProvider({ children }) {
           const { data: balanceData, error: balanceError } = await supabase
             .from('balance')
             .select('amount')
-            .order('id', { ascending: false })
-            .limit(1)
+            .eq('id', 1)
+            .single()
           
           if (balanceError) throw balanceError
-          const currentBalance = balanceData && balanceData.length > 0 ? balanceData[0].amount : 0
-          // Balance loaded successfully
+          const currentBalance = balanceData?.amount || 0
           setBalance(currentBalance)
+
         } catch (fetchError) {
           // If we get a fetch error and we're using the placeholder URL, it's expected
           // Just log it but don't set the error state
@@ -832,6 +832,9 @@ export function AppProvider({ children }) {
   // Feed Management CRUD operations
   const addFeedInventory = async (feedData) => {
     try {
+      // Calculate total cost (number of bags * cost per bag)
+      const totalCost = feedData.numberOfBags * feedData.costPerBag
+      
       const feed = {
         ...feedData,
         id: Date.now().toString(),
@@ -839,12 +842,40 @@ export function AppProvider({ children }) {
         createdAt: new Date().toISOString()
       }
       
-      // Store in local state
-      setFeedInventory(prev => [feed, ...prev])
+      // Create expense transaction for feed purchase
+      const feedTransaction = {
+        id: (Date.now() + 1).toString(),
+        type: 'expense',
+        amount: totalCost,
+        description: `Feed Purchase: ${feed.feedType} - ${feed.brand}`,
+        date: feed.date
+      }
+      
+      // Update balance
+      const newBalance = balance - totalCost
+      
+      // Add feed to inventory (Note: Supabase operations will fail without connection, but local state will update)
+      const { error: feedError } = await supabase.from('feed_inventory').insert(feed)
+      if (feedError) throw feedError
+      
+      const { error: transactionError } = await supabase.from('transactions').insert(feedTransaction)
+      if (transactionError) throw transactionError
+      
+      // Update balance
+      const { error: balanceError } = await supabase
+        .from('balance')
+        .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
+      if (balanceError) throw balanceError
       
       // Log audit action
       await logAuditAction('CREATE', 'feed_inventory', feed.id, null, feed)
       
+      // Update local state
+      setFeedInventory(prev => [feed, ...prev])
+      setTransactions(prev => [feedTransaction, ...prev])
+      setBalance(newBalance)
+      
+      return feed
     } catch (err) {
       console.error('Error adding feed inventory:', err)
       throw err

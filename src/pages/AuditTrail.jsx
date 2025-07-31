@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../utils/supabaseClient';
+import { formatDate } from '../utils/formatters';
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner';
 import './AuditTrail.css';
 
@@ -100,16 +101,7 @@ const AuditTrail = () => {
     setCurrentPage(1);
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  };
+
 
   const getActionIcon = (action) => {
     switch (action) {

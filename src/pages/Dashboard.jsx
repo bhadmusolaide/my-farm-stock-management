@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useAppContext } from '../context/AppContext'
+import { formatNumber, formatDate } from '../utils/formatters'
 import { 
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, Area, AreaChart, ComposedChart
@@ -81,20 +82,7 @@ const Dashboard = () => {
     return chickens.filter(chicken => chicken.status === 'pending' || chicken.status === 'partial')
   }, [chickens])
 
-  // Format number with thousand separators
-  const formatNumber = (num, decimals = null) => {
-    const number = typeof num === 'string' ? parseFloat(num) : num
-    if (isNaN(number)) return '0'
-    
-    if (decimals !== null) {
-      return number.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-      })
-    }
-    
-    return number.toLocaleString('en-US')
-  }
+
   
   // Calculate responsive items per view
   useEffect(() => {
@@ -174,11 +162,11 @@ const Dashboard = () => {
       if (revenueViewType === 'weekly') {
         periodStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (i * 7) - today.getDay())
         periodEnd = new Date(periodStart.getTime() + 6 * 24 * 60 * 60 * 1000)
-        periodName = `Week ${periodStart.toLocaleDateString('default', { month: 'short', day: 'numeric' })}`
+        periodName = `Week ${formatDate(periodStart)}`
       } else if (revenueViewType === 'monthly') {
         periodStart = new Date(today.getFullYear(), today.getMonth() - i, 1)
         periodEnd = new Date(today.getFullYear(), today.getMonth() - i + 1, 0)
-        periodName = periodStart.toLocaleString('default', { month: 'short', year: '2-digit' })
+        periodName = `${periodStart.toLocaleString('default', { month: 'short' })} ${periodStart.getFullYear().toString().slice(-2)}`
       } else if (revenueViewType === 'quarterly') {
         const quarterStart = Math.floor(today.getMonth() / 3) * 3 - (i * 3)
         periodStart = new Date(today.getFullYear(), quarterStart, 1)
@@ -260,7 +248,7 @@ const Dashboard = () => {
                   </div>
                   <div className="order-meta">
                     <span className="order-date">
-                      {new Date(order.date).toLocaleDateString()}
+                      {formatDate(order.date)}
                     </span>
                     <span className="order-size">
                       Size: {formatNumber(order.size)}kg
@@ -514,7 +502,7 @@ const Dashboard = () => {
             {recentTransactions.map(transaction => (
               <div key={transaction.id} className={`transaction-item ${transaction.type}`}>
                 <div className="transaction-info">
-                  <span className="transaction-date">{new Date(transaction.date).toLocaleDateString()}</span>
+                  <span className="transaction-date">{formatDate(transaction.date)}</span>
                   <span className="transaction-description">{transaction.description}</span>
                 </div>
                 <span className="transaction-amount">

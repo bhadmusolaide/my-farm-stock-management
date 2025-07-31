@@ -1,27 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { useNotification } from '../context/NotificationContext'
+import { formatNumber, formatDate } from '../utils/formatters'
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner'
+import ColumnFilter from '../components/UI/ColumnFilter'
+import useColumnConfig from '../hooks/useColumnConfig'
 import './ChickenOrders.css'
 
 const ChickenOrders = () => {
   const { chickens, addChicken, updateChicken, deleteChicken, exportToCSV } = useAppContext()
   const { showError, showSuccess, showWarning } = useNotification()
   
-  // Format number with thousand separators
-  const formatNumber = (num, decimals = null) => {
-    const number = typeof num === 'string' ? parseFloat(num) : num
-    if (isNaN(number)) return '0'
-    
-    if (decimals !== null) {
-      return number.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-      })
-    }
-    
-    return number.toLocaleString('en-US')
-  }
+
   
   // Loading state
   const [isLoading, setIsLoading] = useState(false)
@@ -54,6 +44,24 @@ const ChickenOrders = () => {
     status: 'pending',
     calculationMode: 'count_size_cost' // 'count_size_cost', 'count_cost', 'size_cost'
   })
+
+  // Column configuration
+  const orderColumns = [
+    { key: 'date', label: 'Date' },
+    { key: 'customer', label: 'Customer' },
+    { key: 'location', label: 'Location' },
+    { key: 'count', label: 'Count' },
+    { key: 'size', label: 'Size (kg)' },
+    { key: 'price', label: 'Price' },
+    { key: 'total', label: 'Total' },
+    { key: 'paid', label: 'Paid' },
+    { key: 'balance', label: 'Balance' },
+    { key: 'status', label: 'Status' },
+    { key: 'actions', label: 'Actions' }
+  ]
+
+  // Column visibility hook
+  const columnConfig = useColumnConfig('chickenOrders', orderColumns)
   
   // Apply filters when chickens or filters change
   useEffect(() => {
@@ -405,79 +413,95 @@ const ChickenOrders = () => {
         </button>
       </div>
       
+      <div className="table-header-controls">
+        <h3>Orders</h3>
+        <ColumnFilter 
+          columns={orderColumns}
+          visibleColumns={columnConfig.visibleColumns}
+          onColumnToggle={columnConfig.toggleColumn}
+        />
+      </div>
       <div className="table-container">
         <table className="orders-table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Customer</th>
-              <th>Location</th>
-              <th>Count</th>
-              <th>Size (kg)</th>
-              <th>Price</th>
-              <th>Total</th>
-              <th>Paid</th>
-              <th>Balance</th>
-              <th>Status</th>
-              <th>Actions</th>
+              {columnConfig.isColumnVisible('date') && <th>Date</th>}
+              {columnConfig.isColumnVisible('customer') && <th>Customer</th>}
+              {columnConfig.isColumnVisible('location') && <th>Location</th>}
+              {columnConfig.isColumnVisible('count') && <th>Count</th>}
+              {columnConfig.isColumnVisible('size') && <th>Size (kg)</th>}
+              {columnConfig.isColumnVisible('price') && <th>Price</th>}
+              {columnConfig.isColumnVisible('total') && <th>Total</th>}
+              {columnConfig.isColumnVisible('paid') && <th>Paid</th>}
+              {columnConfig.isColumnVisible('balance') && <th>Balance</th>}
+              {columnConfig.isColumnVisible('status') && <th>Status</th>}
+              {columnConfig.isColumnVisible('actions') && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
             {filteredChickens.length > 0 ? (
               filteredChickens.map(chicken => (
                 <tr key={chicken.id}>
-                  <td>{new Date(chicken.date).toLocaleDateString()}</td>
-                  <td>
-                    <div className="customer-info">
-                      <span className="customer-name">{chicken.customer}</span>
-                      {chicken.phone && (
-                        <span className="customer-phone">{chicken.phone}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td>{chicken.location || '-'}</td>
-                  <td>{formatNumber(chicken.count)}</td>
-                  <td>{formatNumber(chicken.size)}</td>
-                  <td>₦{formatNumber(chicken.price, 2)}</td>
-                  <td>₦{formatNumber((() => {
-                    if (chicken.calculationMode === 'count_cost') {
-                      return chicken.count * chicken.price
-                    } else if (chicken.calculationMode === 'size_cost') {
-                      return chicken.size * chicken.price
-                    } else {
-                      return chicken.count * chicken.size * chicken.price
-                    }
-                  })(), 2)}</td>
-                  <td>₦{formatNumber(chicken.amount_paid || 0, 2)}</td>
-                  <td>₦{formatNumber(chicken.balance, 2)}</td>
-                  <td>
-                    <span className={getStatusBadgeClass(chicken.status)}>
-                      {chicken.status.charAt(0).toUpperCase() + chicken.status.slice(1)}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="action-buttons">
-                      <button 
-                        className="edit-btn" 
-                        onClick={() => openEditModal(chicken)}
-                        aria-label="Edit"
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        className="delete-btn" 
-                        onClick={() => handleDelete(chicken.id)}
-                        aria-label="Delete"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+                  {columnConfig.isColumnVisible('date') && <td>{formatDate(chicken.date)}</td>}
+                  {columnConfig.isColumnVisible('customer') && (
+                    <td>
+                      <div className="customer-info">
+                        <span className="customer-name">{chicken.customer}</span>
+                        {chicken.phone && (
+                          <span className="customer-phone">{chicken.phone}</span>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                  {columnConfig.isColumnVisible('location') && <td>{chicken.location || '-'}</td>}
+                  {columnConfig.isColumnVisible('count') && <td>{formatNumber(chicken.count)}</td>}
+                  {columnConfig.isColumnVisible('size') && <td>{formatNumber(chicken.size)}</td>}
+                  {columnConfig.isColumnVisible('price') && <td>₦{formatNumber(chicken.price, 2)}</td>}
+                  {columnConfig.isColumnVisible('total') && (
+                    <td>₦{formatNumber((() => {
+                      if (chicken.calculationMode === 'count_cost') {
+                        return chicken.count * chicken.price
+                      } else if (chicken.calculationMode === 'size_cost') {
+                        return chicken.size * chicken.price
+                      } else {
+                        return chicken.count * chicken.size * chicken.price
+                      }
+                    })(), 2)}</td>
+                  )}
+                  {columnConfig.isColumnVisible('paid') && <td>₦{formatNumber(chicken.amount_paid || 0, 2)}</td>}
+                  {columnConfig.isColumnVisible('balance') && <td>₦{formatNumber(chicken.balance, 2)}</td>}
+                  {columnConfig.isColumnVisible('status') && (
+                    <td>
+                      <span className={getStatusBadgeClass(chicken.status)}>
+                        {chicken.status.charAt(0).toUpperCase() + chicken.status.slice(1)}
+                      </span>
+                    </td>
+                  )}
+                  {columnConfig.isColumnVisible('actions') && (
+                    <td>
+                      <div className="action-buttons">
+                        <button 
+                          className="edit-btn" 
+                          onClick={() => openEditModal(chicken)}
+                          aria-label="Edit"
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          className="delete-btn" 
+                          onClick={() => handleDelete(chicken.id)}
+                          aria-label="Delete"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="11" className="no-data">
+                <td colSpan={columnConfig.getVisibleColumnsCount()} className="no-data">
                   No orders found
                 </td>
               </tr>

@@ -1,24 +1,14 @@
 import { useState } from 'react'
 import { useAppContext } from '../context/AppContext'
+import { formatNumber, formatDate } from '../utils/formatters'
+import ColumnFilter from '../components/UI/ColumnFilter'
+import useColumnConfig from '../hooks/useColumnConfig'
 import './FeedManagement.css'
 
 const FeedManagement = () => {
   const { feedInventory, addFeedInventory, deleteFeedInventory, feedConsumption, addFeedConsumption, deleteFeedConsumption, liveChickens } = useAppContext()
   
-  // Format number with thousand separators
-  const formatNumber = (num, decimals = null) => {
-    const number = typeof num === 'string' ? parseFloat(num) : num
-    if (isNaN(number)) return '0'
-    
-    if (decimals !== null) {
-      return number.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-      })
-    }
-    
-    return number.toLocaleString('en-US')
-  }
+
   
   // State for active tab
   const [activeTab, setActiveTab] = useState('inventory')
@@ -38,6 +28,7 @@ const FeedManagement = () => {
   const [feedFormData, setFeedFormData] = useState({
     feedType: '',
     brand: '',
+    numberOfBags: '',
     quantityKg: '',
     costPerBag: '',
     supplier: '',
@@ -52,6 +43,34 @@ const FeedManagement = () => {
     chickenBatchId: '',
     notes: ''
   })
+
+  // Column configurations
+  const inventoryColumns = [
+    { key: 'date', label: 'Purchase Date' },
+    { key: 'feedType', label: 'Feed Type' },
+    { key: 'brand', label: 'Brand' },
+    { key: 'numberOfBags', label: 'No. of Bags' },
+    { key: 'quantityKg', label: 'Quantity (kg)' },
+    { key: 'costPerBag', label: 'Cost/bag' },
+    { key: 'totalCost', label: 'Total Cost' },
+    { key: 'supplier', label: 'Supplier' },
+    { key: 'expiryDate', label: 'Expiry Date' },
+    { key: 'status', label: 'Status' },
+    { key: 'actions', label: 'Actions' }
+  ]
+
+  const consumptionColumns = [
+    { key: 'date', label: 'Date' },
+    { key: 'feedType', label: 'Feed Type' },
+    { key: 'quantityConsumed', label: 'Quantity (kg)' },
+    { key: 'chickenBatch', label: 'Chicken Batch' },
+    { key: 'notes', label: 'Notes' },
+    { key: 'actions', label: 'Actions' }
+  ]
+
+  // Column visibility hooks
+  const inventoryColumnConfig = useColumnConfig('feedInventory', inventoryColumns)
+  const consumptionColumnConfig = useColumnConfig('feedConsumption', consumptionColumns)
   
   // Get filtered feed inventory
   const getFilteredFeed = () => {
@@ -112,6 +131,7 @@ const FeedManagement = () => {
     setFeedFormData({
       feedType: '',
       brand: '',
+      numberOfBags: '',
       quantityKg: '',
       costPerBag: '',
       supplier: '',
@@ -144,6 +164,7 @@ const FeedManagement = () => {
       await addFeedInventory({
         feedType: feedFormData.feedType,
         brand: feedFormData.brand,
+        numberOfBags: parseInt(feedFormData.numberOfBags),
         quantityKg: parseFloat(feedFormData.quantityKg),
         costPerBag: parseFloat(feedFormData.costPerBag),
         supplier: feedFormData.supplier,
@@ -321,20 +342,29 @@ const FeedManagement = () => {
           </div>
           
           {/* Feed Inventory Table */}
+          <div className="table-header-controls">
+            <h3>Feed Inventory</h3>
+            <ColumnFilter 
+              columns={inventoryColumns}
+              visibleColumns={inventoryColumnConfig.visibleColumns}
+              onColumnToggle={inventoryColumnConfig.toggleColumn}
+            />
+          </div>
           <div className="table-container">
             <table className="feed-table">
               <thead>
                 <tr>
-                  <th>Purchase Date</th>
-                  <th>Feed Type</th>
-                  <th>Brand</th>
-                  <th>Quantity (kg)</th>
-                  <th>Cost/bag</th>
-                  <th>Total Cost</th>
-                  <th>Supplier</th>
-                  <th>Expiry Date</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  {inventoryColumnConfig.isColumnVisible('date') && <th>Purchase Date</th>}
+                  {inventoryColumnConfig.isColumnVisible('feedType') && <th>Feed Type</th>}
+                  {inventoryColumnConfig.isColumnVisible('brand') && <th>Brand</th>}
+                  {inventoryColumnConfig.isColumnVisible('numberOfBags') && <th>No. of Bags</th>}
+                  {inventoryColumnConfig.isColumnVisible('quantityKg') && <th>Quantity (kg)</th>}
+                  {inventoryColumnConfig.isColumnVisible('costPerBag') && <th>Cost/bag</th>}
+                  {inventoryColumnConfig.isColumnVisible('totalCost') && <th>Total Cost</th>}
+                  {inventoryColumnConfig.isColumnVisible('supplier') && <th>Supplier</th>}
+                  {inventoryColumnConfig.isColumnVisible('expiryDate') && <th>Expiry Date</th>}
+                  {inventoryColumnConfig.isColumnVisible('status') && <th>Status</th>}
+                  {inventoryColumnConfig.isColumnVisible('actions') && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -345,40 +375,47 @@ const FeedManagement = () => {
                     
                     return (
                       <tr key={item.id} className={isLowStock ? 'low-stock' : ''}>
-                        <td>{new Date(item.date).toLocaleDateString()}</td>
-                        <td>{item.feedType}</td>
-                        <td>{item.brand}</td>
-                        <td>{formatNumber(item.quantityKg)}</td>
-                        <td>₦{formatNumber(item.costPerBag, 2)}</td>
-                        <td>₦{formatNumber(item.quantityKg * item.costPerBag, 2)}</td>
-                        <td>{item.supplier}</td>
-                        <td className={isExpiringSoon ? 'expiring-soon' : ''}>
-                          {new Date(item.expiryDate).toLocaleDateString()}
-                        </td>
-                        <td>
-                          <span className={`status-badge ${
-                            isLowStock ? 'low-stock' : 
-                            isExpiringSoon ? 'expiring' : 'good'
-                          }`}>
-                            {isLowStock ? 'Low Stock' : 
-                             isExpiringSoon ? 'Expiring Soon' : 'Good'}
-                          </span>
-                        </td>
-                        <td>
-                          <button 
-                            className="delete-btn" 
-                            onClick={() => handleDeleteFeed(item.id)}
-                            aria-label="Delete"
-                          >
-                            Delete
-                          </button>
-                        </td>
+                        {inventoryColumnConfig.isColumnVisible('date') && <td>{formatDate(item.date)}</td>}
+                        {inventoryColumnConfig.isColumnVisible('feedType') && <td>{item.feedType}</td>}
+                        {inventoryColumnConfig.isColumnVisible('brand') && <td>{item.brand}</td>}
+                        {inventoryColumnConfig.isColumnVisible('numberOfBags') && <td>{item.numberOfBags || 'N/A'}</td>}
+                        {inventoryColumnConfig.isColumnVisible('quantityKg') && <td>{formatNumber(item.quantityKg)}</td>}
+                        {inventoryColumnConfig.isColumnVisible('costPerBag') && <td>₦{formatNumber(item.costPerBag, 2)}</td>}
+                        {inventoryColumnConfig.isColumnVisible('totalCost') && <td>₦{formatNumber((item.numberOfBags || 1) * item.costPerBag, 2)}</td>}
+                        {inventoryColumnConfig.isColumnVisible('supplier') && <td>{item.supplier}</td>}
+                        {inventoryColumnConfig.isColumnVisible('expiryDate') && (
+                          <td className={isExpiringSoon ? 'expiring-soon' : ''}>
+                            {formatDate(item.expiryDate)}
+                          </td>
+                        )}
+                        {inventoryColumnConfig.isColumnVisible('status') && (
+                          <td>
+                            <span className={`status-badge ${
+                              isLowStock ? 'low-stock' : 
+                              isExpiringSoon ? 'expiring' : 'good'
+                            }`}>
+                              {isLowStock ? 'Low Stock' : 
+                               isExpiringSoon ? 'Expiring Soon' : 'Good'}
+                            </span>
+                          </td>
+                        )}
+                        {inventoryColumnConfig.isColumnVisible('actions') && (
+                          <td>
+                            <button 
+                              className="delete-btn" 
+                              onClick={() => handleDeleteFeed(item.id)}
+                              aria-label="Delete"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     )
                   })
                 ) : (
                   <tr>
-                    <td colSpan="10" className="no-data">
+                    <td colSpan={inventoryColumnConfig.visibleColumns.length} className="no-data">
                       No feed items found
                     </td>
                   </tr>
@@ -441,16 +478,24 @@ const FeedManagement = () => {
           </div>
 
           {/* Consumption Table */}
+          <div className="table-header-controls">
+            <h3>Feed Consumption</h3>
+            <ColumnFilter 
+              columns={consumptionColumns}
+              visibleColumns={consumptionColumnConfig.visibleColumns}
+              onColumnToggle={consumptionColumnConfig.toggleColumn}
+            />
+          </div>
           <div className="table-container">
             <table className="feed-table">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Feed Type</th>
-                  <th>Quantity (kg)</th>
-                  <th>Chicken Batch</th>
-                  <th>Notes</th>
-                  <th>Actions</th>
+                  {consumptionColumnConfig.isColumnVisible('date') && <th>Date</th>}
+                  {consumptionColumnConfig.isColumnVisible('feedType') && <th>Feed Type</th>}
+                  {consumptionColumnConfig.isColumnVisible('quantityConsumed') && <th>Quantity (kg)</th>}
+                  {consumptionColumnConfig.isColumnVisible('chickenBatch') && <th>Chicken Batch</th>}
+                  {consumptionColumnConfig.isColumnVisible('notes') && <th>Notes</th>}
+                  {consumptionColumnConfig.isColumnVisible('actions') && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -461,26 +506,28 @@ const FeedManagement = () => {
                     
                     return (
                       <tr key={item.id}>
-                        <td>{new Date(item.date).toLocaleDateString()}</td>
-                        <td>{feedItem?.feedType || 'Unknown'}</td>
-                        <td>{formatNumber(item.quantityConsumed)}</td>
-                        <td>{chickenBatch?.batchId || 'Unknown'}</td>
-                        <td>{item.notes || '-'}</td>
-                        <td>
-                          <button 
-                            className="delete-btn" 
-                            onClick={() => handleDeleteConsumption(item.id)}
-                            aria-label="Delete"
-                          >
-                            Delete
-                          </button>
-                        </td>
+                        {consumptionColumnConfig.isColumnVisible('date') && <td>{formatDate(item.date)}</td>}
+                        {consumptionColumnConfig.isColumnVisible('feedType') && <td>{feedItem?.feedType || 'Unknown'}</td>}
+                        {consumptionColumnConfig.isColumnVisible('quantityConsumed') && <td>{formatNumber(item.quantityConsumed)}</td>}
+                        {consumptionColumnConfig.isColumnVisible('chickenBatch') && <td>{chickenBatch?.batchId || 'Unknown'}</td>}
+                        {consumptionColumnConfig.isColumnVisible('notes') && <td>{item.notes || '-'}</td>}
+                        {consumptionColumnConfig.isColumnVisible('actions') && (
+                          <td>
+                            <button 
+                              className="delete-btn" 
+                              onClick={() => handleDeleteConsumption(item.id)}
+                              aria-label="Delete"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     )
                   })
                 ) : (
                   <tr>
-                    <td colSpan="6" className="no-data">
+                    <td colSpan={consumptionColumnConfig.visibleColumns.length} className="no-data">
                       No consumption records found
                     </td>
                   </tr>
@@ -620,7 +667,7 @@ const FeedManagement = () => {
                       
                       return (
                         <tr key={date}>
-                          <td>{new Date(date).toLocaleDateString()}</td>
+                          <td>{formatDate(date)}</td>
                           <td>{formatNumber(totalConsumption)}</td>
                           <td>{batchesFed}</td>
                           <td>{avgPerBatch}</td>
@@ -670,6 +717,23 @@ const FeedManagement = () => {
                     value={feedFormData.brand}
                     onChange={handleFeedInputChange}
                     placeholder="Feed brand"
+                  />
+                </div>
+              </div>
+              
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="numberOfBags">No. of Bags*</label>
+                  <input
+                    type="number"
+                    id="numberOfBags"
+                    name="numberOfBags"
+                    value={feedFormData.numberOfBags}
+                    onChange={handleFeedInputChange}
+                    step="1"
+                    min="1"
+                    required
+                    placeholder="1"
                   />
                 </div>
               </div>
