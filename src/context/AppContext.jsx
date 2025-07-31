@@ -11,12 +11,39 @@ export function useAppContext() {
 
 export function AppProvider({ children }) {
   const { logAuditAction } = useAuth()
-  const [chickens, setChickens] = useState([])
-  const [stock, setStock] = useState([])
-  const [transactions, setTransactions] = useState([])
-  const [balance, setBalance] = useState(0)
+  const [chickens, setChickensState] = useState([])
+  const [stock, setStockState] = useState([])
+  const [transactions, setTransactionsState] = useState([])
+  
+  // Helper functions to update state and save to localStorage
+  const setChickens = (newChickens) => {
+    setChickensState(newChickens)
+    localStorage.setItem('chickens', JSON.stringify(newChickens))
+  }
+  
+  const setStock = (newStock) => {
+    setStockState(newStock)
+    localStorage.setItem('stock', JSON.stringify(newStock))
+  }
+  
+  const setTransactions = (newTransactions) => {
+    setTransactionsState(newTransactions)
+    localStorage.setItem('transactions', JSON.stringify(newTransactions))
+  }
+  const [balance, setBalanceState] = useState(0)
+  
+  // Helper function to update balance and save to localStorage
+  const setBalance = (newBalance) => {
+    setBalanceState(newBalance)
+    localStorage.setItem('balance', newBalance.toString())
+  }
   const [liveChickens, setLiveChickens] = useState([])
-  const [feedInventory, setFeedInventory] = useState([])
+  const [feedInventory, setFeedInventoryState] = useState([])
+  
+  const setFeedInventory = (newFeedInventory) => {
+    setFeedInventoryState(newFeedInventory)
+    localStorage.setItem('feedInventory', JSON.stringify(newFeedInventory))
+  }
   const [feedConsumption, setFeedConsumption] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -120,7 +147,9 @@ export function AppProvider({ children }) {
             .eq('id', 1)
             .single()
           
-          if (balanceError) throw balanceError
+          if (balanceError && !balanceError.message.includes('relation "balance" does not exist')) {
+            throw balanceError
+          }
           const currentBalance = balanceData?.amount || 0
           setBalance(currentBalance)
 
@@ -129,7 +158,31 @@ export function AppProvider({ children }) {
           // Just log it but don't set the error state
           console.error('Error fetching from Supabase:', fetchError)
           if (supabaseUrl.includes('placeholder') || supabaseUrl.includes('your-supabase-project-url')) {
-            // Using placeholder Supabase URL
+            // Using placeholder Supabase URL - load from localStorage as fallback
+            const localBalance = localStorage.getItem('balance')
+            if (localBalance) {
+              setBalance(parseFloat(localBalance))
+            }
+            
+            const localChickens = localStorage.getItem('chickens')
+            if (localChickens) {
+              setChickens(JSON.parse(localChickens))
+            }
+            
+            const localStock = localStorage.getItem('stock')
+            if (localStock) {
+              setStock(JSON.parse(localStock))
+            }
+            
+            const localTransactions = localStorage.getItem('transactions')
+            if (localTransactions) {
+              setTransactions(JSON.parse(localTransactions))
+            }
+            
+            const localFeedInventory = localStorage.getItem('feedInventory')
+            if (localFeedInventory) {
+              setFeedInventory(JSON.parse(localFeedInventory))
+            }
           } else {
             throw fetchError
           }
@@ -842,30 +895,6 @@ export function AppProvider({ children }) {
         createdAt: new Date().toISOString()
       }
       
-      // Create database-compatible feed object with both camelCase and snake_case fields
-      const dbFeed = {
-        id: feed.id,
-        feed_type: feed.feedType,
-        feedType: feed.feedType,
-        brand: feed.brand,
-        quantity_kg: feed.quantityKg,
-        quantityKg: feed.quantityKg,
-        cost_per_kg: feed.costPerBag / (feed.quantityKg / feed.numberOfBags), // Calculate cost per kg
-        costPerKg: feed.costPerBag / (feed.quantityKg / feed.numberOfBags),
-        supplier: feed.supplier,
-        purchase_date: feed.date,
-        purchaseDate: feed.date,
-        expiry_date: feed.expiryDate,
-        expiryDate: feed.expiryDate,
-        batch_number: feed.batchNumber,
-        batchNumber: feed.batchNumber,
-        status: 'active',
-        date: feed.date,
-        created_at: feed.createdAt,
-        createdAt: feed.createdAt,
-        updated_at: feed.createdAt
-      }
-      
       // Create expense transaction for feed purchase
       const feedTransaction = {
         id: (Date.now() + 1).toString(),
@@ -879,7 +908,7 @@ export function AppProvider({ children }) {
       const newBalance = balance - totalCost
       
       // Add feed to inventory (Note: Supabase operations will fail without connection, but local state will update)
-      const { error: feedError } = await supabase.from('feed_inventory').insert(dbFeed)
+      const { error: feedError } = await supabase.from('feed_inventory').insert(feed)
       if (feedError) throw feedError
       
       const { error: transactionError } = await supabase.from('transactions').insert(feedTransaction)
