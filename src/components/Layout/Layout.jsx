@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAppContext } from '../../context/AppContext'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
+import { useSiteSettings } from '../../context/SiteSettingsContext'
 import ThemeToggle from '../ThemeToggle/ThemeToggle'
 import './Layout.css'
 
@@ -11,6 +12,7 @@ const Layout = ({ children }) => {
   const { calculateStats } = useAppContext()
   const { user, logout, isAdmin } = useAuth()
   const { theme } = useTheme()
+  const { settings } = useSiteSettings()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showInventoryDropdown, setShowInventoryDropdown] = useState(false)
@@ -63,94 +65,81 @@ const Layout = ({ children }) => {
       <header className="app-header">
         <div className="header-content">
           <div className="logo-container">
-            <h1>Omzo Farmz</h1>
+            {settings.logoType === 'text' ? (
+              <h1>{settings.siteTitle}</h1>
+            ) : settings.logoType === 'image' || settings.logoType === 'url' ? (
+              <div className="logo-with-text">
+                {settings.logoUrl && (
+                  <img src={settings.logoUrl} alt={settings.siteTitle} className="site-logo" />
+                )}
+                <h1>{settings.siteTitle}</h1>
+              </div>
+            ) : (
+              <h1>{settings.siteTitle}</h1>
+            )}
           </div>
           
           <nav className={`main-nav ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
             <ul>
-              <li>
-                <Link 
-                  to="/" 
-                  className={location.pathname === '/' ? 'active' : ''}
-                  onClick={closeMobileMenu}
-                >
-                  Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  to="/chickens" 
-                  className={location.pathname === '/chickens' ? 'active' : ''}
-                  onClick={closeMobileMenu}
-                >
-                  Orders
-                </Link>
-              </li>
-              <li className="nav-dropdown" ref={inventoryDropdownRef}>
-                <button 
-                  className={`nav-dropdown-trigger ${
-                    location.pathname.startsWith('/stock') || 
-                    location.pathname.startsWith('/live-chickens') || 
-                    location.pathname.startsWith('/feed') ? 'active' : ''
-                  }`}
-                  onClick={() => setShowInventoryDropdown(!showInventoryDropdown)}
-                >
-                  Inventory
-                  <svg 
-                    width="16" 
-                    height="16" 
-                    viewBox="0 0 24 24" 
-                    fill="none" 
-                    xmlns="http://www.w3.org/2000/svg"
-                    className={`dropdown-chevron ${showInventoryDropdown ? 'open' : ''}`}
-                  >
-                    <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-                {showInventoryDropdown && (
-                  <div className="nav-dropdown-menu">
-                    <Link 
-                      to="/stock" 
-                      className={location.pathname === '/stock' ? 'active' : ''}
-                      onClick={closeMobileMenu}
-                    >
-                      General Stock
-                    </Link>
-                    <Link 
-                      to="/live-chickens" 
-                      className={location.pathname === '/live-chickens' ? 'active' : ''}
-                      onClick={closeMobileMenu}
-                    >
-                      Live Chicken Stock
-                    </Link>
-                    <Link 
-                      to="/feed" 
-                      className={location.pathname === '/feed' ? 'active' : ''}
-                      onClick={closeMobileMenu}
-                    >
-                      Feed Management
-                    </Link>
-                  </div>
-                )}
-              </li>
-              <li>
-                <Link 
-                  to="/transactions" 
-                  className={location.pathname === '/transactions' ? 'active' : ''}
-                  onClick={closeMobileMenu}
-                >
-                  Transactions
-                </Link>
-              </li>
-              <li>
-                <Link 
-                  to="/reports" 
-                  className={location.pathname === '/reports' ? 'active' : ''}
-                  onClick={closeMobileMenu}
-                >
-                  Reports
-                </Link>
-              </li>
+              {settings.navigationItems
+                .filter(item => item.enabled)
+                .sort((a, b) => a.order - b.order)
+                .map(item => {
+                  if (item.isDropdown && item.children) {
+                    return (
+                      <li key={item.id} className="nav-dropdown" ref={inventoryDropdownRef}>
+                        <button 
+                          className={`nav-dropdown-trigger ${
+                            item.children.some(child => location.pathname === child.path) ? 'active' : ''
+                          }`}
+                          onClick={() => setShowInventoryDropdown(!showInventoryDropdown)}
+                        >
+                          {item.label}
+                          <svg 
+                            width="16" 
+                            height="16" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            xmlns="http://www.w3.org/2000/svg"
+                            className={`dropdown-chevron ${showInventoryDropdown ? 'open' : ''}`}
+                          >
+                            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                        {showInventoryDropdown && (
+                          <div className="nav-dropdown-menu">
+                            {item.children
+                              .filter(child => child.enabled)
+                              .map(child => (
+                                <Link 
+                                  key={child.id}
+                                  to={child.path} 
+                                  className={location.pathname === child.path ? 'active' : ''}
+                                  onClick={closeMobileMenu}
+                                >
+                                  {child.label}
+                                </Link>
+                              ))
+                            }
+                          </div>
+                        )}
+                      </li>
+                    )
+                  } else {
+                    return (
+                      <li key={item.id}>
+                        <Link 
+                          to={item.path} 
+                          className={location.pathname === item.path ? 'active' : ''}
+                          onClick={closeMobileMenu}
+                        >
+                          {item.label}
+                        </Link>
+                      </li>
+                    )
+                  }
+                })
+              }
               
               {/* User Menu moved inline with navigation */}
               <li className="nav-user-menu">
@@ -234,6 +223,17 @@ const Layout = ({ children }) => {
                                 <polyline points="10,9 9,9 8,9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                               Audit Trail
+                            </Link>
+                            <Link 
+                              to="/settings" 
+                              className="menu-item"
+                              onClick={closeUserMenu}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                              Site Settings
                             </Link>
                           </div>
                         </>

@@ -3,6 +3,7 @@ import { AppProvider } from './context/AppContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { SiteSettingsProvider } from './context/SiteSettingsContext'
 import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary'
 import Layout from './components/Layout/Layout'
 import Dashboard from './pages/Dashboard'
@@ -15,6 +16,7 @@ import Reports from './pages/Reports'
 import Login from './pages/Login'
 import UserManagement from './pages/UserManagement'
 import AuditTrail from './pages/AuditTrail'
+import SiteSettings from './pages/SiteSettings'
 import MigrationPrompt from './components/UI/MigrationPrompt'
 import LoadingSpinner from './components/LoadingSpinner/LoadingSpinner'
 import { useAppContext } from './context/AppContext'
@@ -130,6 +132,15 @@ function AppContent() {
           </AdminRoute>
         </ProtectedRoute>
       } />
+      <Route path="/settings" element={
+        <ProtectedRoute>
+          <AdminRoute>
+            <Layout>
+              <SiteSettings />
+            </Layout>
+          </AdminRoute>
+        </ProtectedRoute>
+      } />
     </Routes>
   )
 }
@@ -139,13 +150,15 @@ function App() {
     <ErrorBoundary>
       <Router>
         <ThemeProvider>
-          <AuthProvider>
-            <AppProvider>
-              <NotificationProvider>
-                <AppContent />
-              </NotificationProvider>
-            </AppProvider>
-          </AuthProvider>
+          <SiteSettingsProvider>
+            <AuthProvider>
+              <AppProvider>
+                <NotificationProvider>
+                  <AppContent />
+                </NotificationProvider>
+              </AppProvider>
+            </AuthProvider>
+          </SiteSettingsProvider>
         </ThemeProvider>
       </Router>
     </ErrorBoundary>

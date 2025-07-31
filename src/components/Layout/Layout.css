@@ -74,6 +74,19 @@
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
 }
 
+.logo-with-text {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.site-logo {
+  height: 2.5rem;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
 .main-nav {
   flex: 1;
 }

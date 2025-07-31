@@ -40,6 +40,19 @@
   margin-bottom: 1rem;
 }
 
+.login-logo-image {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.text-logo {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #4F46E5;
+  text-align: center;
+}
+
 .login-header h1 {
   font-size: 1.875rem;
   font-weight: 700;

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 import { useNavigate } from 'react-router-dom';
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner';
 import './Login.css';
@@ -13,6 +14,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const { login, loading } = useAuth();
   const { showError, showSuccess } = useNotification();
+  const { settings } = useSiteSettings();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -47,12 +49,25 @@ const Login = () => {
       <div className="login-card">
         <div className="login-header">
           <div className="login-logo">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2L13.09 8.26L20 9L13.09 9.74L12 16L10.91 9.74L4 9L10.91 8.26L12 2Z" fill="#4F46E5"/>
-              <path d="M12 16L13.09 22.26L20 23L13.09 23.74L12 30L10.91 23.74L4 23L10.91 22.26L12 16Z" fill="#4F46E5" opacity="0.6"/>
-            </svg>
+            {settings.loginLogoType === 'text' ? (
+              <div className="text-logo">{settings.loginTitle}</div>
+            ) : settings.loginLogoType === 'image' || settings.loginLogoType === 'url' ? (
+              settings.loginLogoUrl ? (
+                <img src={settings.loginLogoUrl} alt={settings.loginTitle} className="login-logo-image" />
+              ) : (
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2L13.09 8.26L20 9L13.09 9.74L12 16L10.91 9.74L4 9L10.91 8.26L12 2Z" fill="#4F46E5"/>
+                  <path d="M12 16L13.09 22.26L20 23L13.09 23.74L12 30L10.91 23.74L4 23L10.91 22.26L12 16Z" fill="#4F46E5" opacity="0.6"/>
+                </svg>
+              )
+            ) : (
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L13.09 8.26L20 9L13.09 9.74L12 16L10.91 9.74L4 9L10.91 8.26L12 2Z" fill="#4F46E5"/>
+                <path d="M12 16L13.09 22.26L20 23L13.09 23.74L12 30L10.91 23.74L4 23L10.91 22.26L12 16Z" fill="#4F46E5" opacity="0.6"/>
+              </svg>
+            )}
           </div>
-          <h1>Omzo Farmz</h1>
+          <h1>{settings.loginTitle}</h1>
           <p>Sign in to your account</p>
         </div>
 
