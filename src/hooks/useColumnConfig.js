@@ -65,6 +65,10 @@ const useColumnConfig = (tableId, defaultColumns) => {
     return defaultColumns.filter(col => visibleColumns.includes(col.key));
   };
 
+  const getVisibleColumnsCount = () => {
+    return visibleColumns.length;
+  };
+
   return {
     visibleColumns,
     toggleColumn,
@@ -72,7 +76,8 @@ const useColumnConfig = (tableId, defaultColumns) => {
     hideAllColumns,
     resetToDefault,
     isColumnVisible,
-    getVisibleColumnsData
+    getVisibleColumnsData,
+    getVisibleColumnsCount
   };
 };
 
