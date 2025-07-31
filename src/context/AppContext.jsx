@@ -842,6 +842,30 @@ export function AppProvider({ children }) {
         createdAt: new Date().toISOString()
       }
       
+      // Create database-compatible feed object with both camelCase and snake_case fields
+      const dbFeed = {
+        id: feed.id,
+        feed_type: feed.feedType,
+        feedType: feed.feedType,
+        brand: feed.brand,
+        quantity_kg: feed.quantityKg,
+        quantityKg: feed.quantityKg,
+        cost_per_kg: feed.costPerBag / (feed.quantityKg / feed.numberOfBags), // Calculate cost per kg
+        costPerKg: feed.costPerBag / (feed.quantityKg / feed.numberOfBags),
+        supplier: feed.supplier,
+        purchase_date: feed.date,
+        purchaseDate: feed.date,
+        expiry_date: feed.expiryDate,
+        expiryDate: feed.expiryDate,
+        batch_number: feed.batchNumber,
+        batchNumber: feed.batchNumber,
+        status: 'active',
+        date: feed.date,
+        created_at: feed.createdAt,
+        createdAt: feed.createdAt,
+        updated_at: feed.createdAt
+      }
+      
       // Create expense transaction for feed purchase
       const feedTransaction = {
         id: (Date.now() + 1).toString(),
@@ -855,7 +879,7 @@ export function AppProvider({ children }) {
       const newBalance = balance - totalCost
       
       // Add feed to inventory (Note: Supabase operations will fail without connection, but local state will update)
-      const { error: feedError } = await supabase.from('feed_inventory').insert(feed)
+      const { error: feedError } = await supabase.from('feed_inventory').insert(dbFeed)
       if (feedError) throw feedError
       
       const { error: transactionError } = await supabase.from('transactions').insert(feedTransaction)
