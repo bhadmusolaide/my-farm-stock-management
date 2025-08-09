@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { formatNumber, formatDate } from '../utils/formatters'
 import Pagination from '../components/UI/Pagination'
 import usePagination from '../hooks/usePagination'
+import SortableTableHeader from '../components/UI/SortableTableHeader'
+import SortControls from '../components/UI/SortControls'
+import useTableSort from '../hooks/useTableSort'
 import './Transactions.css'
 
 const Transactions = () => {
@@ -47,8 +50,11 @@ const Transactions = () => {
   
   const filteredTransactions = getFilteredTransactions()
   
+  // Sorting hook
+  const { sortedData, sortConfig, requestSort, resetSort, getSortIcon } = useTableSort(filteredTransactions)
+  
   // Pagination for transactions
-  const transactionsPagination = usePagination(filteredTransactions, 10)
+  const transactionsPagination = usePagination(sortedData, 10)
   
   // Calculate totals
   const calculateTotals = () => {
@@ -235,14 +241,28 @@ const Transactions = () => {
         </div>
       </div>
       
+      {/* Sort Controls */}
+      <SortControls 
+        sortConfig={sortConfig}
+        onReset={resetSort}
+      />
+
       <div className="table-container">
         <table className="transactions-table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Type</th>
-              <th>Description</th>
-              <th>Amount</th>
+              <SortableTableHeader sortKey="date" onSort={requestSort} getSortIcon={getSortIcon}>
+                Date
+              </SortableTableHeader>
+              <SortableTableHeader sortKey="type" onSort={requestSort} getSortIcon={getSortIcon}>
+                Type
+              </SortableTableHeader>
+              <SortableTableHeader sortKey="description" onSort={requestSort} getSortIcon={getSortIcon}>
+                Description
+              </SortableTableHeader>
+              <SortableTableHeader sortKey="amount" onSort={requestSort} getSortIcon={getSortIcon}>
+                Amount
+              </SortableTableHeader>
             </tr>
           </thead>
           <tbody>

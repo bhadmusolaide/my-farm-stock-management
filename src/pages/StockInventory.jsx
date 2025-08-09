@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { formatNumber, formatDate } from '../utils/formatters'
 import ColumnFilter from '../components/UI/ColumnFilter'
+import SortableTableHeader from '../components/UI/SortableTableHeader'
+import SortControls from '../components/UI/SortControls'
 import useColumnConfig from '../hooks/useColumnConfig'
+import useTableSort from '../hooks/useTableSort'
 import Pagination from '../components/UI/Pagination'
 import usePagination from '../hooks/usePagination'
 import './StockInventory.css'
@@ -72,8 +75,11 @@ const StockInventory = () => {
   
   const filteredStock = getFilteredStock()
   
+  // Sorting hook
+  const { sortedData, sortConfig, requestSort, resetSort, getSortIcon } = useTableSort(filteredStock)
+  
   // Pagination for stock inventory
-  const stockPagination = usePagination(filteredStock, 10)
+  const stockPagination = usePagination(sortedData, 10)
   
   // Handle filter changes
   const handleFilterChange = (e) => {
@@ -259,19 +265,53 @@ const StockInventory = () => {
           columns={stockColumns}
           visibleColumns={columnConfig.visibleColumns}
           onColumnToggle={columnConfig.toggleColumn}
-        />
-      </div>
+        />      </div>
+      
+      {/* Sort Controls */}
+      <SortControls 
+        sortConfig={sortConfig}
+        onReset={resetSort}
+      />
+      
       <div className="table-container">
         <table className="stock-table">
           <thead>
             <tr>
-              {columnConfig.isColumnVisible('date') && <th>Date</th>}
-              {columnConfig.isColumnVisible('description') && <th>Description</th>}
-              {columnConfig.isColumnVisible('count') && <th>Count</th>}
-              {columnConfig.isColumnVisible('size') && <th>Size (kg)</th>}
-              {columnConfig.isColumnVisible('cost_per_kg') && <th>Cost per kg</th>}
-              {columnConfig.isColumnVisible('total_cost') && <th>Total Cost</th>}
-              {columnConfig.isColumnVisible('actions') && <th>Actions</th>}
+              {columnConfig.isColumnVisible('date') && (
+                <SortableTableHeader sortKey="date" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Date
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('description') && (
+                <SortableTableHeader sortKey="description" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Description
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('count') && (
+                <SortableTableHeader sortKey="count" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Count
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('size') && (
+                <SortableTableHeader sortKey="size" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Size (kg)
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('cost_per_kg') && (
+                <SortableTableHeader sortKey="cost_per_kg" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Cost per kg
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('total_cost') && (
+                <SortableTableHeader sortKey="total_cost" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Total Cost
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('actions') && (
+                <SortableTableHeader sortable={false}>
+                  Actions
+                </SortableTableHeader>
+              )}
             </tr>
           </thead>
           <tbody>

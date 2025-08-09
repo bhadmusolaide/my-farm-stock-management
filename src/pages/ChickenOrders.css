@@ -85,8 +85,10 @@
 
 .filters-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 1rem;
+  margin-bottom: 1rem;
+  align-items: end;
 }
 
 .filter-group {
@@ -118,6 +120,8 @@
   border-color: #4caf50;
   box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
+
+
 
 .table-container {
   background-color: white;
@@ -289,19 +293,62 @@
   color: #555;
 }
 
-.form-group input {
+.form-group input,
+.form-group select {
   padding: 0.75rem;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 1rem;
   color: #333; /* Explicitly set text color */
   background-color: #fff; /* Explicitly set background color */
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.form-group input:focus {
+.form-group input:focus,
+.form-group select:focus {
   outline: none;
   border-color: #4caf50;
   box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+/* Total cost display */
+.total-cost {
+  background-color: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.total-cost h3 {
+  margin: 0;
+  color: #495057;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.total-amount {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #28a745;
+  margin-top: 0.5rem;
+}
+
+/* Dark mode optimization for Total Cost */
+[data-theme="dark"] .total-cost {
+  background-color: #2d3748;
+  border-color: #4a5568;
+}
+
+[data-theme="dark"] .total-cost h3 {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .total-amount {
+  color: #68d391;
 }
 
 .form-actions {
@@ -351,9 +398,17 @@
   }
 }
 
+@media (max-width: 768px) {
+  .filters-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.75rem;
+  }
+}
+
 @media (max-width: 480px) {
   .filters-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
   }
   
   .modal-content {

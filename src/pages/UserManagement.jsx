@@ -3,6 +3,9 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
 import { formatDate } from '../utils/formatters';
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner';
+import SortableTableHeader from '../components/UI/SortableTableHeader';
+import SortControls from '../components/UI/SortControls';
+import useTableSort from '../hooks/useTableSort';
 import './UserManagement.css';
 
 const UserManagement = () => {
@@ -17,6 +20,9 @@ const UserManagement = () => {
   });
   const [formLoading, setFormLoading] = useState(false);
   const { user, logAuditAction, createUser } = useAuth();
+
+  // Sorting hook
+  const { sortedData, sortConfig, requestSort, resetSort, getSortIcon } = useTableSort(users);
 
   useEffect(() => {
     fetchUsers();
@@ -157,19 +163,35 @@ const UserManagement = () => {
         </div>
       )}
 
+      {/* Sort Controls */}
+      <SortControls 
+        sortConfig={sortConfig}
+        onReset={resetSort}
+      />
+
       <div className="users-table-container">
         <table className="users-table">
           <thead>
             <tr>
-              <th>User</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Actions</th>
+              <SortableTableHeader sortKey="full_name" onSort={requestSort} getSortIcon={getSortIcon}>
+                User
+              </SortableTableHeader>
+              <SortableTableHeader sortKey="role" onSort={requestSort} getSortIcon={getSortIcon}>
+                Role
+              </SortableTableHeader>
+              <SortableTableHeader sortKey="is_active" onSort={requestSort} getSortIcon={getSortIcon}>
+                Status
+              </SortableTableHeader>
+              <SortableTableHeader sortKey="created_at" onSort={requestSort} getSortIcon={getSortIcon}>
+                Created
+              </SortableTableHeader>
+              <SortableTableHeader sortable={false}>
+                Actions
+              </SortableTableHeader>
             </tr>
           </thead>
           <tbody>
-            {users.length === 0 ? (
+            {sortedData.length === 0 ? (
               <tr>
                 <td colSpan="5" className="no-data">
                   <div className="no-data-content">
@@ -182,7 +204,7 @@ const UserManagement = () => {
                 </td>
               </tr>
             ) : (
-              users.map((userData) => (
+              sortedData.map((userData) => (
                 <tr key={userData.id}>
                   <td>
                     <div className="user-info">

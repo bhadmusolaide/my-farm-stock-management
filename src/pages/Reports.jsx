@@ -6,6 +6,9 @@ import {
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, ComposedChart,
   ScatterChart, Scatter, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
 } from 'recharts'
+import SortableTableHeader from '../components/UI/SortableTableHeader'
+import SortControls from '../components/UI/SortControls'
+import useTableSort from '../hooks/useTableSort'
 import './Reports.css'
 
 const Reports = () => {
@@ -262,6 +265,24 @@ const Reports = () => {
       breeds: breedPerformance
     }
   }, [chickens, liveChickens, feedInventory, feedConsumption, transactions, stats])
+  
+  // Sorting hooks for customer table
+  const {
+    sortedData: sortedCustomers,
+    sortConfig: customerSortConfig,
+    requestSort: requestCustomerSort,
+    resetSort: resetCustomerSort,
+    getSortIcon: getCustomerSortIcon
+  } = useTableSort(advancedAnalytics.customers.topCustomers)
+  
+  // Sorting hooks for report data table
+  const {
+    sortedData: sortedReportData,
+    sortConfig: reportSortConfig,
+    requestSort: requestReportSort,
+    resetSort: resetReportSort,
+    getSortIcon: getReportSortIcon
+  } = useTableSort(reportData?.orders || [])
   
   // Get status badge class
   const getStatusBadgeClass = (status) => {
@@ -831,19 +852,53 @@ const Reports = () => {
             {/* Customer Details Table */}
             <div className="table-container">
               <h3>Customer Performance Details</h3>
+              <SortControls
+                onReset={resetCustomerSort}
+                sortConfig={customerSortConfig}
+              />
               <table className="report-table">
                 <thead>
                   <tr>
-                    <th>Customer</th>
-                    <th>Orders</th>
-                    <th>Chickens</th>
-                    <th>Revenue</th>
-                    <th>Balance</th>
+                    <SortableTableHeader
+                      sortKey="name"
+                      onSort={requestCustomerSort}
+                      getSortIcon={getCustomerSortIcon}
+                    >
+                      Customer
+                    </SortableTableHeader>
+                    <SortableTableHeader
+                      sortKey="orders"
+                      onSort={requestCustomerSort}
+                      getSortIcon={getCustomerSortIcon}
+                    >
+                      Orders
+                    </SortableTableHeader>
+                    <SortableTableHeader
+                      sortKey="chickens"
+                      onSort={requestCustomerSort}
+                      getSortIcon={getCustomerSortIcon}
+                    >
+                      Chickens
+                    </SortableTableHeader>
+                    <SortableTableHeader
+                      sortKey="revenue"
+                      onSort={requestCustomerSort}
+                      getSortIcon={getCustomerSortIcon}
+                    >
+                      Revenue
+                    </SortableTableHeader>
+                    <SortableTableHeader
+                      sortKey="balance"
+                      onSort={requestCustomerSort}
+                      getSortIcon={getCustomerSortIcon}
+                    >
+                      Balance
+                    </SortableTableHeader>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {advancedAnalytics.customers.topCustomers.slice(0, 10).map(customer => (
+                  {sortedCustomers.slice(0, 10).map(customer => (
                     <tr key={customer.name}>
                       <td>{customer.name}</td>
                       <td>{customer.orders}</td>
@@ -944,22 +999,74 @@ const Reports = () => {
                 </div>
                 
                 <div className="table-container">
+                  <SortControls
+                    onReset={resetReportSort}
+                    sortConfig={reportSortConfig}
+                  />
                   <table className="report-table">
                     <thead>
                       <tr>
-                        <th>Date</th>
-                        <th>Customer</th>
-                        <th>Count</th>
-                        <th>Size (kg)</th>
-                        <th>Price</th>
+                        <SortableTableHeader
+                          sortKey="date"
+                          onSort={requestReportSort}
+                          getSortIcon={getReportSortIcon}
+                        >
+                          Date
+                        </SortableTableHeader>
+                        <SortableTableHeader
+                          sortKey="customer"
+                          onSort={requestReportSort}
+                          getSortIcon={getReportSortIcon}
+                        >
+                          Customer
+                        </SortableTableHeader>
+                        <SortableTableHeader
+                          sortKey="count"
+                          onSort={requestReportSort}
+                          getSortIcon={getReportSortIcon}
+                        >
+                          Count
+                        </SortableTableHeader>
+                        <SortableTableHeader
+                          sortKey="size"
+                          onSort={requestReportSort}
+                          getSortIcon={getReportSortIcon}
+                        >
+                          Size (kg)
+                        </SortableTableHeader>
+                        <SortableTableHeader
+                          sortKey="price"
+                          onSort={requestReportSort}
+                          getSortIcon={getReportSortIcon}
+                        >
+                          Price
+                        </SortableTableHeader>
                         <th>Total</th>
-                        <th>Paid</th>
-                        <th>Balance</th>
-                        <th>Status</th>
+                        <SortableTableHeader
+                          sortKey="amount_paid"
+                          onSort={requestReportSort}
+                          getSortIcon={getReportSortIcon}
+                        >
+                          Paid
+                        </SortableTableHeader>
+                        <SortableTableHeader
+                          sortKey="balance"
+                          onSort={requestReportSort}
+                          getSortIcon={getReportSortIcon}
+                        >
+                          Balance
+                        </SortableTableHeader>
+                        <SortableTableHeader
+                          sortKey="status"
+                          onSort={requestReportSort}
+                          getSortIcon={getReportSortIcon}
+                        >
+                          Status
+                        </SortableTableHeader>
                       </tr>
                     </thead>
                     <tbody>
-                      {reportData.orders.map(order => (
+                      {sortedReportData.map(order => (
                         <tr key={order.id}>
                           <td>{formatDate(order.date)}</td>
                           <td>

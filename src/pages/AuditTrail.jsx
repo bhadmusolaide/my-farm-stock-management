@@ -4,6 +4,9 @@ import { formatDate } from '../utils/formatters';
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner';
 import Pagination from '../components/UI/Pagination';
 import usePagination from '../hooks/usePagination';
+import SortableTableHeader from '../components/UI/SortableTableHeader';
+import SortControls from '../components/UI/SortControls';
+import useTableSort from '../hooks/useTableSort';
 import './AuditTrail.css';
 
 const AuditTrail = () => {
@@ -21,6 +24,9 @@ const AuditTrail = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const logsPerPage = 20;
+
+  // Sorting hook
+  const { sortedData, sortConfig, requestSort, resetSort, getSortIcon } = useTableSort(auditLogs);
 
   useEffect(() => {
     fetchUsers();
@@ -300,21 +306,39 @@ const AuditTrail = () => {
         </div>
       </div>
 
+      {/* Sort Controls */}
+      <SortControls 
+        sortConfig={sortConfig}
+        onReset={resetSort}
+      />
+
       {/* Audit Logs Table */}
       <div className="audit-table-container">
         <table className="audit-table">
           <thead>
             <tr>
-              <th>Timestamp</th>
-              <th>User</th>
-              <th>Action</th>
-              <th>Table</th>
-              <th>Record ID</th>
-              <th>IP Address</th>
+              <SortableTableHeader sortKey="created_at" onSort={requestSort} getSortIcon={getSortIcon}>
+                Timestamp
+              </SortableTableHeader>
+              <SortableTableHeader sortKey="users.full_name" onSort={requestSort} getSortIcon={getSortIcon}>
+                User
+              </SortableTableHeader>
+              <SortableTableHeader sortKey="action" onSort={requestSort} getSortIcon={getSortIcon}>
+                Action
+              </SortableTableHeader>
+              <SortableTableHeader sortKey="table_name" onSort={requestSort} getSortIcon={getSortIcon}>
+                Table
+              </SortableTableHeader>
+              <SortableTableHeader sortKey="record_id" onSort={requestSort} getSortIcon={getSortIcon}>
+                Record ID
+              </SortableTableHeader>
+              <SortableTableHeader sortKey="ip_address" onSort={requestSort} getSortIcon={getSortIcon}>
+                IP Address
+              </SortableTableHeader>
             </tr>
           </thead>
           <tbody>
-            {auditLogs.length === 0 ? (
+            {sortedData.length === 0 ? (
               <tr>
                 <td colSpan="6" className="no-data">
                   <div className="no-data-content">
@@ -327,7 +351,7 @@ const AuditTrail = () => {
                 </td>
               </tr>
             ) : (
-              auditLogs.map((log) => (
+              sortedData.map((log) => (
                 <tr key={log.id}>
                   <td className="timestamp-cell">
                     {formatDate(log.created_at)}

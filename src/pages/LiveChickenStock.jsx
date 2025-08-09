@@ -1,6 +1,9 @@
 import { useState, useContext, useMemo } from 'react';
 import { AppContext } from '../context/AppContext';
 import { formatDate, formatNumber } from '../utils/formatters';
+import SortableTableHeader from '../components/UI/SortableTableHeader';
+import SortControls from '../components/UI/SortControls';
+import useTableSort from '../hooks/useTableSort';
 import './LiveChickenStock.css';
 
 const LiveChickenStock = () => {
@@ -174,6 +177,9 @@ const LiveChickenStock = () => {
         return matchesBreed && matchesStatus && matchesSearch && matchesAge;
       });
   }, [liveChickens, filters]);
+
+  // Sorting hooks for different tables
+  const { sortedData: sortedChickens, sortConfig: chickenSortConfig, requestSort: requestChickenSort, resetSort: resetChickenSort, getSortIcon: getChickenSortIcon } = useTableSort(processedChickens);
 
   const getAgeCategory = (age) => {
     if (age <= 1) return 'Chick';
@@ -667,24 +673,48 @@ const LiveChickenStock = () => {
             </div>
           </div>
 
+          {/* Sort Controls */}
+          <SortControls 
+            sortConfig={chickenSortConfig}
+            onReset={resetChickenSort}
+          />
+
           <div className="table-container">
             <table className="chicken-table">
               <thead>
                 <tr>
-                  <th>Batch ID</th>
-                  <th>Breed</th>
-                  <th>Age</th>
-                  <th>Count</th>
-                  <th>Weight (kg)</th>
-                  <th>Mortality</th>
-                  <th>Status</th>
-                  <th>Feed Type</th>
-                  <th>Actions</th>
+                  <SortableTableHeader sortKey="batch_id" onSort={requestChickenSort} getSortIcon={getChickenSortIcon}>
+                    Batch ID
+                  </SortableTableHeader>
+                  <SortableTableHeader sortKey="breed" onSort={requestChickenSort} getSortIcon={getChickenSortIcon}>
+                    Breed
+                  </SortableTableHeader>
+                  <SortableTableHeader sortKey="age" onSort={requestChickenSort} getSortIcon={getChickenSortIcon}>
+                    Age
+                  </SortableTableHeader>
+                  <SortableTableHeader sortKey="current_count" onSort={requestChickenSort} getSortIcon={getChickenSortIcon}>
+                    Count
+                  </SortableTableHeader>
+                  <SortableTableHeader sortKey="current_weight" onSort={requestChickenSort} getSortIcon={getChickenSortIcon}>
+                    Weight (kg)
+                  </SortableTableHeader>
+                  <SortableTableHeader sortKey="mortalityRate" onSort={requestChickenSort} getSortIcon={getChickenSortIcon}>
+                    Mortality
+                  </SortableTableHeader>
+                  <SortableTableHeader sortKey="status" onSort={requestChickenSort} getSortIcon={getChickenSortIcon}>
+                    Status
+                  </SortableTableHeader>
+                  <SortableTableHeader sortKey="feed_type" onSort={requestChickenSort} getSortIcon={getChickenSortIcon}>
+                    Feed Type
+                  </SortableTableHeader>
+                  <SortableTableHeader sortable={false}>
+                    Actions
+                  </SortableTableHeader>
                 </tr>
               </thead>
               <tbody>
-                {processedChickens.length > 0 ? (
-                  processedChickens.map((chicken) => (
+                {sortedChickens.length > 0 ? (
+                  sortedChickens.map((chicken) => (
                     <tr key={chicken.id} className={chicken.status === 'sick' ? 'sick-batch' : ''}>
                       <td>{chicken.batch_id}</td>
                       <td>{chicken.breed}</td>

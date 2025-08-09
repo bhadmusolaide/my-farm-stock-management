@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { formatNumber, formatDate } from '../utils/formatters'
 import ColumnFilter from '../components/UI/ColumnFilter'
+import SortableTableHeader from '../components/UI/SortableTableHeader'
+import SortControls from '../components/UI/SortControls'
 import useColumnConfig from '../hooks/useColumnConfig'
+import useTableSort from '../hooks/useTableSort'
 import Pagination from '../components/UI/Pagination'
 import usePagination from '../hooks/usePagination'
 import './FeedManagement.css'
@@ -116,11 +119,15 @@ const FeedManagement = () => {
   
   const filteredFeed = getFilteredFeed()
   
+  // Sorting hooks
+  const { sortedData: sortedInventory, sortConfig: inventorySortConfig, requestSort: requestInventorySort, resetSort: resetInventorySort, getSortIcon: getInventorySortIcon } = useTableSort(filteredFeed)
+  const { sortedData: sortedConsumption, sortConfig: consumptionSortConfig, requestSort: requestConsumptionSort, resetSort: resetConsumptionSort, getSortIcon: getConsumptionSortIcon } = useTableSort(feedConsumption || [])
+  
   // Pagination for feed inventory
-  const feedPagination = usePagination(filteredFeed, 10)
+  const feedPagination = usePagination(sortedInventory, 10)
   
   // Pagination for feed consumption
-  const consumptionPagination = usePagination(feedConsumption || [], 10)
+  const consumptionPagination = usePagination(sortedConsumption, 10)
   
   // Handle filter changes
   const handleFilterChange = (e) => {
@@ -472,23 +479,73 @@ const FeedManagement = () => {
               columns={inventoryColumns}
               visibleColumns={inventoryColumnConfig.visibleColumns}
               onColumnToggle={inventoryColumnConfig.toggleColumn}
-            />
-          </div>
+            />          </div>
+          
+          {/* Sort Controls */}
+          <SortControls 
+            sortConfig={inventorySortConfig}
+            onReset={resetInventorySort}
+          />
+          
           <div className="table-container">
             <table className="feed-table">
               <thead>
                 <tr>
-                  {inventoryColumnConfig.isColumnVisible('date') && <th>Purchase Date</th>}
-                  {inventoryColumnConfig.isColumnVisible('feed_type') && <th>Feed Type</th>}
-                {inventoryColumnConfig.isColumnVisible('brand') && <th>Brand</th>}
-                {inventoryColumnConfig.isColumnVisible('number_of_bags') && <th>No. of Bags</th>}
-                {inventoryColumnConfig.isColumnVisible('quantity_kg') && <th>Quantity (kg)</th>}
-                {inventoryColumnConfig.isColumnVisible('cost_per_bag') && <th>Cost/bag</th>}
-                {inventoryColumnConfig.isColumnVisible('totalCost') && <th>Total Cost</th>}
-                {inventoryColumnConfig.isColumnVisible('supplier') && <th>Supplier</th>}
-                {inventoryColumnConfig.isColumnVisible('expiry_date') && <th>Expiry Date</th>}
-                  {inventoryColumnConfig.isColumnVisible('status') && <th>Status</th>}
-                  {inventoryColumnConfig.isColumnVisible('actions') && <th>Actions</th>}
+                  {inventoryColumnConfig.isColumnVisible('date') && (
+                    <SortableTableHeader sortKey="date" onSort={requestInventorySort} getSortIcon={getInventorySortIcon}>
+                      Purchase Date
+                    </SortableTableHeader>
+                  )}
+                  {inventoryColumnConfig.isColumnVisible('feed_type') && (
+                    <SortableTableHeader sortKey="feed_type" onSort={requestInventorySort} getSortIcon={getInventorySortIcon}>
+                      Feed Type
+                    </SortableTableHeader>
+                  )}
+                  {inventoryColumnConfig.isColumnVisible('brand') && (
+                    <SortableTableHeader sortKey="brand" onSort={requestInventorySort} getSortIcon={getInventorySortIcon}>
+                      Brand
+                    </SortableTableHeader>
+                  )}
+                  {inventoryColumnConfig.isColumnVisible('number_of_bags') && (
+                    <SortableTableHeader sortKey="number_of_bags" onSort={requestInventorySort} getSortIcon={getInventorySortIcon}>
+                      No. of Bags
+                    </SortableTableHeader>
+                  )}
+                  {inventoryColumnConfig.isColumnVisible('quantity_kg') && (
+                    <SortableTableHeader sortKey="quantity_kg" onSort={requestInventorySort} getSortIcon={getInventorySortIcon}>
+                      Quantity (kg)
+                    </SortableTableHeader>
+                  )}
+                  {inventoryColumnConfig.isColumnVisible('cost_per_bag') && (
+                    <SortableTableHeader sortKey="cost_per_bag" onSort={requestInventorySort} getSortIcon={getInventorySortIcon}>
+                      Cost/bag
+                    </SortableTableHeader>
+                  )}
+                  {inventoryColumnConfig.isColumnVisible('totalCost') && (
+                    <SortableTableHeader sortKey="totalCost" onSort={requestInventorySort} getSortIcon={getInventorySortIcon}>
+                      Total Cost
+                    </SortableTableHeader>
+                  )}
+                  {inventoryColumnConfig.isColumnVisible('supplier') && (
+                    <SortableTableHeader sortKey="supplier" onSort={requestInventorySort} getSortIcon={getInventorySortIcon}>
+                      Supplier
+                    </SortableTableHeader>
+                  )}
+                  {inventoryColumnConfig.isColumnVisible('expiry_date') && (
+                    <SortableTableHeader sortKey="expiry_date" onSort={requestInventorySort} getSortIcon={getInventorySortIcon}>
+                      Expiry Date
+                    </SortableTableHeader>
+                  )}
+                  {inventoryColumnConfig.isColumnVisible('status') && (
+                    <SortableTableHeader sortKey="status" onSort={requestInventorySort} getSortIcon={getInventorySortIcon}>
+                      Status
+                    </SortableTableHeader>
+                  )}
+                  {inventoryColumnConfig.isColumnVisible('actions') && (
+                    <SortableTableHeader sortable={false}>
+                      Actions
+                    </SortableTableHeader>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -627,18 +684,48 @@ const FeedManagement = () => {
               columns={consumptionColumns}
               visibleColumns={consumptionColumnConfig.visibleColumns}
               onColumnToggle={consumptionColumnConfig.toggleColumn}
-            />
-          </div>
+            />          </div>
+          
+          {/* Sort Controls */}
+          <SortControls 
+            sortConfig={consumptionSortConfig}
+            onReset={resetConsumptionSort}
+          />
+          
           <div className="table-container">
             <table className="feed-table">
               <thead>
                 <tr>
-                  {consumptionColumnConfig.isColumnVisible('consumption_date') && <th>Date</th>}
-                {consumptionColumnConfig.isColumnVisible('feed_type') && <th>Feed Type</th>}
-                {consumptionColumnConfig.isColumnVisible('quantity_consumed') && <th>Quantity (kg)</th>}
-                {consumptionColumnConfig.isColumnVisible('chicken_batch') && <th>Chicken Batch</th>}
-                {consumptionColumnConfig.isColumnVisible('notes') && <th>Notes</th>}
-                  {consumptionColumnConfig.isColumnVisible('actions') && <th>Actions</th>}
+                  {consumptionColumnConfig.isColumnVisible('consumption_date') && (
+                    <SortableTableHeader sortKey="consumption_date" onSort={requestConsumptionSort} getSortIcon={getConsumptionSortIcon}>
+                      Date
+                    </SortableTableHeader>
+                  )}
+                  {consumptionColumnConfig.isColumnVisible('feed_type') && (
+                    <SortableTableHeader sortKey="feed_type" onSort={requestConsumptionSort} getSortIcon={getConsumptionSortIcon}>
+                      Feed Type
+                    </SortableTableHeader>
+                  )}
+                  {consumptionColumnConfig.isColumnVisible('quantity_consumed') && (
+                    <SortableTableHeader sortKey="quantity_consumed" onSort={requestConsumptionSort} getSortIcon={getConsumptionSortIcon}>
+                      Quantity (kg)
+                    </SortableTableHeader>
+                  )}
+                  {consumptionColumnConfig.isColumnVisible('chicken_batch') && (
+                    <SortableTableHeader sortKey="chicken_batch" onSort={requestConsumptionSort} getSortIcon={getConsumptionSortIcon}>
+                      Chicken Batch
+                    </SortableTableHeader>
+                  )}
+                  {consumptionColumnConfig.isColumnVisible('notes') && (
+                    <SortableTableHeader sortKey="notes" onSort={requestConsumptionSort} getSortIcon={getConsumptionSortIcon}>
+                      Notes
+                    </SortableTableHeader>
+                  )}
+                  {consumptionColumnConfig.isColumnVisible('actions') && (
+                    <SortableTableHeader sortable={false}>
+                      Actions
+                    </SortableTableHeader>
+                  )}
                 </tr>
               </thead>
               <tbody>

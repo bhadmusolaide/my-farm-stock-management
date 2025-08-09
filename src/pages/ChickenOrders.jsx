@@ -4,13 +4,16 @@ import { useNotification } from '../context/NotificationContext'
 import { formatNumber, formatDate } from '../utils/formatters'
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner'
 import ColumnFilter from '../components/UI/ColumnFilter'
+import SortableTableHeader from '../components/UI/SortableTableHeader'
+import SortControls from '../components/UI/SortControls'
 import useColumnConfig from '../hooks/useColumnConfig'
+import useTableSort from '../hooks/useTableSort'
 import Pagination from '../components/UI/Pagination'
 import usePagination from '../hooks/usePagination'
 import './ChickenOrders.css'
 
 const ChickenOrders = () => {
-  const { chickens, addChicken, updateChicken, deleteChicken, exportToCSV } = useAppContext()
+  const { chickens, addChicken, updateChicken, deleteChicken, exportToCSV, liveChickens, updateLiveChicken } = useAppContext()
   const { showError, showSuccess, showWarning } = useNotification()
   
 
@@ -29,8 +32,11 @@ const ChickenOrders = () => {
   // State for filtered chickens
   const [filteredChickens, setFilteredChickens] = useState([])
   
+  // Sorting hook
+  const { sortedData, requestSort, resetSort, getSortIcon, sortConfig } = useTableSort(filteredChickens)
+  
   // Pagination for chicken orders
-  const chickenPagination = usePagination(filteredChickens, 10)
+  const chickenPagination = usePagination(sortedData, 10)
   
   // State for modal
   const [showModal, setShowModal] = useState(false)
@@ -47,7 +53,8 @@ const ChickenOrders = () => {
     price: '',
     amountPaid: '',
     status: 'pending',
-    calculationMode: 'count_size_cost' // 'count_size_cost', 'count_cost', 'size_cost'
+    calculationMode: 'count_size_cost', // 'count_size_cost', 'count_cost', 'size_cost'
+    batch_id: '' // New field for batch selection
   })
 
   // Column configuration
@@ -140,7 +147,8 @@ const ChickenOrders = () => {
         } else if (calculationMode === 'size_cost') {
           total = size * price
         } else {
-          total = count * size * price
+          // count_size_cost: count is for batch deduction, size is total weight, calculate as size × price
+          total = size * price
         }
         
         newFormData.amountPaid = total.toFixed(2)
@@ -161,7 +169,8 @@ const ChickenOrders = () => {
       price: '',
       amountPaid: '',
       status: 'pending',
-      calculationMode: 'count_size_cost'
+      calculationMode: 'count_size_cost',
+      batch_id: ''
     })
     setEditMode(false)
     setShowModal(true)
@@ -179,7 +188,8 @@ const ChickenOrders = () => {
       price: chicken.price,
       amountPaid: chicken.amount_paid || 0, // Use amount_paid from database
       status: chicken.status,
-      calculationMode: chicken.calculationMode || 'count_size_cost'
+      calculationMode: chicken.calculationMode || 'count_size_cost',
+      batch_id: chicken.batch_id || ''
     })
     setEditMode(true)
     setShowModal(true)
@@ -240,6 +250,23 @@ const ChickenOrders = () => {
       return
     }
     
+    // Validate batch selection if a batch is selected
+    if (formData.batch_id) {
+      const selectedBatch = liveChickens.find(batch => batch.id === parseInt(formData.batch_id))
+      if (!selectedBatch) {
+        showError('Selected batch not found')
+        return
+      }
+      
+      // Only validate count for modes that use chicken count
+      if (formData.calculationMode !== 'size_cost') {
+        if (selectedBatch.current_count < count) {
+          showError(`Insufficient chickens in batch. Available: ${selectedBatch.current_count}, Required: ${count}`)
+          return
+        }
+      }
+    }
+    
     // Calculate total based on calculation mode
     let total
     if (formData.calculationMode === 'count_cost') {
@@ -247,7 +274,8 @@ const ChickenOrders = () => {
     } else if (formData.calculationMode === 'size_cost') {
       total = size * price
     } else {
-      total = count * size * price
+      // count_size_cost: count is for batch deduction, size is total weight, calculate as size × price
+      total = size * price
     }
     
     const status = formData.status
@@ -272,6 +300,19 @@ const ChickenOrders = () => {
         showSuccess('Order updated successfully!')
       } else {
         await addChicken(chickenData)
+        
+        // Update batch chicken count if a batch was selected
+        if (formData.batch_id && formData.calculationMode !== 'size_cost') {
+          const selectedBatch = liveChickens.find(batch => batch.id === parseInt(formData.batch_id))
+          if (selectedBatch) {
+            const updatedBatch = {
+              ...selectedBatch,
+              current_count: selectedBatch.current_count - count
+            }
+            await updateLiveChicken(selectedBatch.id, updatedBatch)
+          }
+        }
+        
         showSuccess('Order added successfully!')
       }
       
@@ -411,11 +452,14 @@ const ChickenOrders = () => {
               onChange={handleFilterChange}
             />
           </div>
+          
+          <div className="filter-group">
+            <label>&nbsp;</label>
+            <button className="btn-secondary reset-filter-btn" onClick={resetFilters}>
+              Reset Filters
+            </button>
+          </div>
         </div>
-        
-        <button className="btn-secondary" onClick={resetFilters}>
-          Reset Filters
-        </button>
       </div>
       
       <div className="table-header-controls">
@@ -424,23 +468,73 @@ const ChickenOrders = () => {
           columns={orderColumns}
           visibleColumns={columnConfig.visibleColumns}
           onColumnToggle={columnConfig.toggleColumn}
-        />
-      </div>
+        />      </div>
+      
+      {/* Sort Controls */}
+      <SortControls 
+        sortConfig={sortConfig}
+        onReset={resetSort}
+      />
+      
       <div className="table-container">
         <table className="orders-table">
           <thead>
             <tr>
-              {columnConfig.isColumnVisible('date') && <th>Date</th>}
-              {columnConfig.isColumnVisible('customer') && <th>Customer</th>}
-              {columnConfig.isColumnVisible('location') && <th>Location</th>}
-              {columnConfig.isColumnVisible('count') && <th>Count</th>}
-              {columnConfig.isColumnVisible('size') && <th>Size (kg)</th>}
-              {columnConfig.isColumnVisible('price') && <th>Price</th>}
-              {columnConfig.isColumnVisible('total') && <th>Total</th>}
-              {columnConfig.isColumnVisible('paid') && <th>Paid</th>}
-              {columnConfig.isColumnVisible('balance') && <th>Balance</th>}
-              {columnConfig.isColumnVisible('status') && <th>Status</th>}
-              {columnConfig.isColumnVisible('actions') && <th>Actions</th>}
+              {columnConfig.isColumnVisible('date') && (
+                <SortableTableHeader sortKey="date" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Date
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('customer') && (
+                <SortableTableHeader sortKey="customer" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Customer
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('location') && (
+                <SortableTableHeader sortKey="location" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Location
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('count') && (
+                <SortableTableHeader sortKey="count" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Count
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('size') && (
+                <SortableTableHeader sortKey="size" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Size (kg)
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('price') && (
+                <SortableTableHeader sortKey="price" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Price
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('total') && (
+                <SortableTableHeader sortKey="total" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Total
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('paid') && (
+                <SortableTableHeader sortKey="amount_paid" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Paid
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('balance') && (
+                <SortableTableHeader sortKey="balance" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Balance
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('status') && (
+                <SortableTableHeader sortKey="status" onSort={requestSort} getSortIcon={getSortIcon}>
+                  Status
+                </SortableTableHeader>
+              )}
+              {columnConfig.isColumnVisible('actions') && (
+                <SortableTableHeader sortable={false}>
+                  Actions
+                </SortableTableHeader>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -469,7 +563,8 @@ const ChickenOrders = () => {
                       } else if (chicken.calculationMode === 'size_cost') {
                         return chicken.size * chicken.price
                       } else {
-                        return chicken.count * chicken.size * chicken.price
+                        // count_size_cost: count is for batch deduction, size is total weight, calculate as size × price
+                        return chicken.size * chicken.price
                       }
                     })(), 2)}</td>
                   )}
@@ -560,6 +655,46 @@ const ChickenOrders = () => {
                 
                 <div className="form-row">
                   <div className="form-group">
+                    <label htmlFor="batch_id">Select Chicken Batch (Optional)</label>
+                    <select
+                      id="batch_id"
+                      name="batch_id"
+                      value={formData.batch_id}
+                      onChange={handleInputChange}
+                    >
+                      <option value="">No batch selected</option>
+                      {liveChickens
+                        .filter(batch => 
+                          (batch.status === 'healthy' || batch.status === 'sick') && 
+                          batch.current_count > 0
+                        )
+                        .map(batch => (
+                          <option key={batch.id} value={batch.id}>
+                            {batch.batch_id} - {batch.breed} ({batch.current_count} available)
+                          </option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="status">Status*</label>
+                    <select
+                      id="status"
+                      name="status"
+                      value={formData.status}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="partial">Partial</option>
+                      <option value="paid">Paid</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="form-row">
+                  <div className="form-group">
                     <label htmlFor="calculationMode">Calculation Mode*</label>
                     <select
                       id="calculationMode"
@@ -568,7 +703,7 @@ const ChickenOrders = () => {
                       onChange={handleInputChange}
                       required
                     >
-                      <option value="count_size_cost">Count × Size × Price per kg</option>
+                      <option value="count_size_cost">Count (for batch) + Total Weight × Price per kg</option>
                       <option value="count_cost">Count × Price per item</option>
                       <option value="size_cost">Size × Price per kg</option>
                     </select>
@@ -576,7 +711,9 @@ const ChickenOrders = () => {
                   
                   {formData.calculationMode !== 'size_cost' && (
                     <div className="form-group">
-                      <label htmlFor="count">Count*</label>
+                      <label htmlFor="count">
+                        {formData.calculationMode === 'count_size_cost' ? 'Chicken Count (for B.D)*' : 'Count*'}
+                      </label>
                       <input
                         type="number"
                         id="count"
@@ -593,7 +730,9 @@ const ChickenOrders = () => {
                 <div className="form-row">
                   {formData.calculationMode !== 'count_cost' && (
                     <div className="form-group">
-                      <label htmlFor="size">Size (kg)*</label>
+                      <label htmlFor="size">
+                        {formData.calculationMode === 'count_size_cost' ? 'Total Weight (kg)*' : 'Size (kg)*'}
+                      </label>
                       <input
                         type="number"
                         id="size"
@@ -624,22 +763,7 @@ const ChickenOrders = () => {
                   </div>
                 </div>
                 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label htmlFor="status">Status*</label>
-                    <select
-                      id="status"
-                      name="status"
-                      value={formData.status}
-                      onChange={handleInputChange}
-                      required
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="partial">Partial</option>
-                      <option value="paid">Paid</option>
-                    </select>
-                  </div>
-                </div>
+
                 
                 <div className="form-row">
                   <div className="form-group">
@@ -667,9 +791,9 @@ const ChickenOrders = () => {
                   </div>
                 </div>
                 
-                <div className="form-group total-preview">
-                  <label>Total Cost:</label>
-                  <span className="total-cost">
+                <div className="total-cost">
+                  <h3>Total Cost</h3>
+                  <div className="total-amount">
                     ₦{formatNumber((() => {
                       const count = parseFloat(formData.count || 0)
                       const size = parseFloat(formData.size || 0)
@@ -680,10 +804,11 @@ const ChickenOrders = () => {
                       } else if (formData.calculationMode === 'size_cost') {
                         return size * price
                       } else {
-                        return count * size * price
+                        // count_size_cost: count is for batch deduction, size is total weight, calculate as size × price
+                        return size * price
                       }
                     })(), 2)}
-                  </span>
+                  </div>
                 </div>
               </div>
               
