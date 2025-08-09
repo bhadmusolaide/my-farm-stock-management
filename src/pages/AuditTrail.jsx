@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabaseClient';
 import { formatDate } from '../utils/formatters';
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner';
+import Pagination from '../components/UI/Pagination';
+import usePagination from '../hooks/usePagination';
 import './AuditTrail.css';
 
 const AuditTrail = () => {
@@ -176,64 +178,13 @@ const AuditTrail = () => {
     return log.user_id === 'anonymous' ? 'Anonymous' : 'Unknown User';
   };
 
-  const renderPagination = () => {
-    if (totalPages <= 1) return null;
-
-    const pages = [];
-    const maxVisiblePages = 5;
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1);
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(
-        <button
-          key={i}
-          className={`page-btn ${i === currentPage ? 'active' : ''}`}
-          onClick={() => setCurrentPage(i)}
-        >
-          {i}
-        </button>
-      );
-    }
-
-    return (
-      <div className="pagination">
-        <button
-          className="page-btn"
-          onClick={() => setCurrentPage(1)}
-          disabled={currentPage === 1}
-        >
-          First
-        </button>
-        <button
-          className="page-btn"
-          onClick={() => setCurrentPage(currentPage - 1)}
-          disabled={currentPage === 1}
-        >
-          Previous
-        </button>
-        {pages}
-        <button
-          className="page-btn"
-          onClick={() => setCurrentPage(currentPage + 1)}
-          disabled={currentPage === totalPages}
-        >
-          Next
-        </button>
-        <button
-          className="page-btn"
-          onClick={() => setCurrentPage(totalPages)}
-          disabled={currentPage === totalPages}
-        >
-          Last
-        </button>
-      </div>
-    );
+  const handlePageSizeChange = (newPageSize) => {
+    setCurrentPage(1);
+    // Note: logsPerPage is a constant, but we can still show the selector
+    // In a real implementation, you might want to make logsPerPage dynamic
   };
+
+  const totalItems = totalPages * logsPerPage; // Approximate total items
 
   if (loading && auditLogs.length === 0) {
     return (
@@ -417,7 +368,15 @@ const AuditTrail = () => {
       </div>
 
       {/* Pagination */}
-      {renderPagination()}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        pageSize={logsPerPage}
+        onPageSizeChange={handlePageSizeChange}
+        totalItems={totalItems}
+        pageSizeOptions={[10, 20, 50]}
+      />
     </div>
   );
 };

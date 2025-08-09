@@ -5,6 +5,8 @@ import { formatNumber, formatDate } from '../utils/formatters'
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner'
 import ColumnFilter from '../components/UI/ColumnFilter'
 import useColumnConfig from '../hooks/useColumnConfig'
+import Pagination from '../components/UI/Pagination'
+import usePagination from '../hooks/usePagination'
 import './ChickenOrders.css'
 
 const ChickenOrders = () => {
@@ -26,6 +28,9 @@ const ChickenOrders = () => {
   
   // State for filtered chickens
   const [filteredChickens, setFilteredChickens] = useState([])
+  
+  // Pagination for chicken orders
+  const chickenPagination = usePagination(filteredChickens, 10)
   
   // State for modal
   const [showModal, setShowModal] = useState(false)
@@ -439,8 +444,8 @@ const ChickenOrders = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredChickens.length > 0 ? (
-              filteredChickens.map(chicken => (
+            {chickenPagination.currentData.length > 0 ? (
+              chickenPagination.currentData.map(chicken => (
                 <tr key={chicken.id}>
                   {columnConfig.isColumnVisible('date') && <td>{formatDate(chicken.date)}</td>}
                   {columnConfig.isColumnVisible('customer') && (
@@ -509,6 +514,16 @@ const ChickenOrders = () => {
           </tbody>
         </table>
       </div>
+      
+      {/* Chicken Orders Pagination */}
+      <Pagination
+        currentPage={chickenPagination.currentPage}
+        totalPages={chickenPagination.totalPages}
+        onPageChange={chickenPagination.handlePageChange}
+        pageSize={chickenPagination.pageSize}
+        onPageSizeChange={chickenPagination.handlePageSizeChange}
+        totalItems={chickenPagination.totalItems}
+      />
       
       {/* Add/Edit Chicken Modal */}
       {showModal && (

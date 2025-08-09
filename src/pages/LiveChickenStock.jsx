@@ -1,4 +1,4 @@
-import React, { useState, useContext, useMemo } from 'react';
+import { useState, useContext, useMemo } from 'react';
 import { AppContext } from '../context/AppContext';
 import { formatDate, formatNumber } from '../utils/formatters';
 import './LiveChickenStock.css';

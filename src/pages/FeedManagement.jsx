@@ -3,7 +3,19 @@ import { useAppContext } from '../context/AppContext'
 import { formatNumber, formatDate } from '../utils/formatters'
 import ColumnFilter from '../components/UI/ColumnFilter'
 import useColumnConfig from '../hooks/useColumnConfig'
+import Pagination from '../components/UI/Pagination'
+import usePagination from '../hooks/usePagination'
 import './FeedManagement.css'
+
+// Feed brand constants
+const FEED_BRANDS = [
+  'New Hope',
+  'BreedWell', 
+  'Ultima',
+  'Happy Chicken',
+  'Chikum',
+  'Others'
+]
 
 const FeedManagement = () => {
   const { feedInventory, addFeedInventory, updateFeedInventory, deleteFeedInventory, feedConsumption, addFeedConsumption, deleteFeedConsumption, liveChickens } = useAppContext()
@@ -29,13 +41,16 @@ const FeedManagement = () => {
   const [feedFormData, setFeedFormData] = useState({
     feed_type: '',
     brand: '',
+    custom_brand: '',
     supplier: '',
     number_of_bags: '',
     quantity_kg: '',
     cost_per_bag: '',
     purchase_date: '',
     expiry_date: '',
-    notes: ''
+    notes: '',
+    deduct_from_balance: false,
+    assigned_batches: []
   })
   
   // Form state for feed consumption
@@ -101,6 +116,12 @@ const FeedManagement = () => {
   
   const filteredFeed = getFilteredFeed()
   
+  // Pagination for feed inventory
+  const feedPagination = usePagination(filteredFeed, 10)
+  
+  // Pagination for feed consumption
+  const consumptionPagination = usePagination(feedConsumption || [], 10)
+  
   // Handle filter changes
   const handleFilterChange = (e) => {
     const { name, value } = e.target
@@ -127,18 +148,50 @@ const FeedManagement = () => {
     const { name, value } = e.target
     setConsumptionFormData(prev => ({ ...prev, [name]: value }))
   }
+
+  // Handle batch assignment changes
+  const handleBatchAssignmentChange = (batchId, isChecked, quantity = '') => {
+    setFeedFormData(prev => {
+      const updatedBatches = isChecked
+        ? [...prev.assigned_batches, { batch_id: batchId, assigned_quantity_kg: parseFloat(quantity) || 0 }]
+        : prev.assigned_batches.filter(batch => batch.batch_id !== batchId)
+      
+      return { ...prev, assigned_batches: updatedBatches }
+    })
+  }
+
+  // Handle batch quantity change
+  const handleBatchQuantityChange = (batchId, quantity) => {
+    setFeedFormData(prev => ({
+      ...prev,
+      assigned_batches: prev.assigned_batches.map(batch =>
+        batch.batch_id === batchId
+          ? { ...batch, assigned_quantity_kg: parseFloat(quantity) || 0 }
+          : batch
+      )
+    }))
+  }
+
+  // Handle checkbox changes
+  const handleCheckboxChange = (e) => {
+    const { name, checked } = e.target
+    setFeedFormData(prev => ({ ...prev, [name]: checked }))
+  }
   
   // Open feed modal
   const openFeedModal = () => {
     setFeedFormData({
       feed_type: '',
       brand: '',
+      custom_brand: '',
       number_of_bags: '',
       quantity_kg: '',
       cost_per_bag: '',
       supplier: '',
       expiry_date: '',
-      notes: ''
+      notes: '',
+      deduct_from_balance: false,
+      assigned_batches: []
     })
     setShowFeedModal(true)
   }
@@ -161,13 +214,16 @@ const FeedManagement = () => {
     setFeedFormData({
       feed_type: '',
       brand: '',
+      custom_brand: '',
       supplier: '',
       number_of_bags: '',
       quantity_kg: '',
       cost_per_bag: '',
       purchase_date: '',
       expiry_date: '',
-      notes: ''
+      notes: '',
+      deduct_from_balance: false,
+      assigned_batches: []
     })
   }
   const closeConsumptionModal = () => setShowConsumptionModal(false)
@@ -180,15 +236,18 @@ const FeedManagement = () => {
       await handleUpdateFeed(e)
     } else {
       try {
+        const finalBrand = feedFormData.brand === 'Others' ? feedFormData.custom_brand : feedFormData.brand
         await addFeedInventory({
           feed_type: feedFormData.feed_type,
-          brand: feedFormData.brand,
+          brand: finalBrand,
           number_of_bags: parseInt(feedFormData.number_of_bags),
           quantity_kg: parseFloat(feedFormData.quantity_kg),
           cost_per_bag: parseFloat(feedFormData.cost_per_bag),
           supplier: feedFormData.supplier,
           expiry_date: feedFormData.expiry_date,
-          notes: feedFormData.notes
+          notes: feedFormData.notes,
+          deduct_from_balance: feedFormData.deduct_from_balance,
+          assigned_batches: feedFormData.assigned_batches
         })
         
         closeFeedModal()
@@ -219,16 +278,20 @@ const FeedManagement = () => {
   // Handle edit feed
   const handleEditFeed = (feed) => {
     setEditingFeed(feed)
+    const isCustomBrand = !FEED_BRANDS.slice(0, -1).includes(feed.brand)
     setFeedFormData({
       feed_type: feed.feed_type,
-      brand: feed.brand,
+      brand: isCustomBrand ? 'Others' : feed.brand,
+      custom_brand: isCustomBrand ? feed.brand : '',
       supplier: feed.supplier,
       number_of_bags: feed.number_of_bags.toString(),
       quantity_kg: feed.quantity_kg.toString(),
       cost_per_bag: feed.cost_per_bag.toString(),
       purchase_date: feed.purchase_date || feed.date,
       expiry_date: feed.expiry_date,
-      notes: feed.notes || ''
+      notes: feed.notes || '',
+      deduct_from_balance: feed.deduct_from_balance || false,
+      assigned_batches: feed.assigned_batches || []
     })
     setShowFeedModal(true)
   }
@@ -238,9 +301,10 @@ const FeedManagement = () => {
     e.preventDefault()
     
     try {
+      const finalBrand = feedFormData.brand === 'Others' ? feedFormData.custom_brand : feedFormData.brand
       await updateFeedInventory(editingFeed.id, {
         feed_type: feedFormData.feed_type,
-        brand: feedFormData.brand,
+        brand: finalBrand,
         number_of_bags: parseInt(feedFormData.number_of_bags),
         quantity_kg: parseFloat(feedFormData.quantity_kg),
         cost_per_bag: parseFloat(feedFormData.cost_per_bag),
@@ -281,7 +345,7 @@ const FeedManagement = () => {
   // Calculate total feed value
   const calculateTotalValue = () => {
     return filteredFeed.reduce((total, item) => {
-      return total + (item.quantity_kg * item.cost_per_bag)
+      return total + ((item.number_of_bags || 1) * item.cost_per_bag)
     }, 0)
   }
   
@@ -428,8 +492,8 @@ const FeedManagement = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredFeed.length > 0 ? (
-                  filteredFeed.map(item => {
+                {feedPagination.currentData.length > 0 ? (
+                  feedPagination.currentData.map(item => {
                     const isLowStock = item.quantity_kg < 50
                 const isExpiringSoon = new Date(item.expiry_date) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
                     
@@ -492,6 +556,16 @@ const FeedManagement = () => {
               </tbody>
             </table>
           </div>
+          
+          {/* Feed Inventory Pagination */}
+          <Pagination
+            currentPage={feedPagination.currentPage}
+            totalPages={feedPagination.totalPages}
+            onPageChange={feedPagination.handlePageChange}
+            pageSize={feedPagination.pageSize}
+            onPageSizeChange={feedPagination.handlePageSizeChange}
+            totalItems={feedPagination.totalItems}
+          />
         </>
       )}
       
@@ -542,7 +616,7 @@ const FeedManagement = () => {
             </div>
             <div className="summary-card">
               <h3>Active Batches</h3>
-              <p className="summary-value">{liveChickens.filter(batch => batch.status === 'Active').length}</p>
+              <p className="summary-value">{liveChickens.filter(batch => batch.status === 'healthy' || batch.status === 'sick').length}</p>
             </div>
           </div>
 
@@ -568,8 +642,8 @@ const FeedManagement = () => {
                 </tr>
               </thead>
               <tbody>
-                {feedConsumption.length > 0 ? (
-                  feedConsumption.map(item => {
+                {consumptionPagination.currentData.length > 0 ? (
+                  consumptionPagination.currentData.map(item => {
                     const feedItem = feedInventory.find(feed => feed.id === item.feed_id)
                     const chickenBatch = liveChickens.find(batch => batch.id === item.chicken_batch_id)
                     
@@ -604,6 +678,16 @@ const FeedManagement = () => {
               </tbody>
             </table>
           </div>
+          
+          {/* Feed Consumption Pagination */}
+          <Pagination
+            currentPage={consumptionPagination.currentPage}
+            totalPages={consumptionPagination.totalPages}
+            onPageChange={consumptionPagination.handlePageChange}
+            pageSize={consumptionPagination.pageSize}
+            onPageSizeChange={consumptionPagination.handlePageSizeChange}
+            totalItems={consumptionPagination.totalItems}
+          />
         </>
       )}
       
@@ -638,7 +722,7 @@ const FeedManagement = () => {
               <h3>Feed Cost per Bird</h3>
               <p className="summary-value">
                 {(() => {
-                  const totalFeedValue = feedInventory.reduce((sum, item) => sum + (item.quantity_kg * item.cost_per_bag), 0)
+                  const totalFeedValue = feedInventory.reduce((sum, item) => sum + ((item.number_of_bags || 1) * item.cost_per_bag), 0)
                   const totalChickens = liveChickens.reduce((sum, batch) => sum + batch.currentCount, 0)
                   const costPerBird = totalChickens > 0 ? (totalFeedValue / totalChickens).toFixed(2) : '0.00'
                   return `₦${formatNumber(costPerBird)}`
@@ -686,7 +770,7 @@ const FeedManagement = () => {
         const totalStock = typeInventory.reduce((sum, item) => sum + item.quantity_kg, 0)
         const totalConsumed = typeConsumption.reduce((sum, item) => sum + item.quantity_consumed, 0)
         const remaining = totalStock - totalConsumed
-        const totalCost = typeInventory.reduce((sum, item) => sum + (item.quantity_kg * item.cost_per_bag), 0)
+        const totalCost = typeInventory.reduce((sum, item) => sum + ((item.number_of_bags || 1) * item.cost_per_bag), 0)
                       const usageRate = totalStock > 0 ? ((totalConsumed / totalStock) * 100).toFixed(1) : '0.0'
                       
                       return (
@@ -780,14 +864,30 @@ const FeedManagement = () => {
                 
                 <div className="form-group">
                   <label htmlFor="brand">Brand</label>
-                  <input
-                    type="text"
+                  <select
                     id="brand"
                     name="brand"
                     value={feedFormData.brand}
                     onChange={handleFeedInputChange}
-                    placeholder="Feed brand"
-                  />
+                    required
+                  >
+                    <option value="">Select brand</option>
+                    {FEED_BRANDS.map(brand => (
+                      <option key={brand} value={brand}>{brand}</option>
+                    ))}
+                  </select>
+                  {feedFormData.brand === 'Others' && (
+                    <input
+                      type="text"
+                      id="custom_brand"
+                      name="custom_brand"
+                      value={feedFormData.custom_brand}
+                      onChange={handleFeedInputChange}
+                      placeholder="Enter custom brand name"
+                      style={{ marginTop: '8px' }}
+                      required
+                    />
+                  )}
                 </div>
               </div>
               
@@ -854,7 +954,7 @@ const FeedManagement = () => {
                 </div>
               </div>
               
-              {/* Row 4: Expiry date, Batch Number */}
+              {/* Row 4: Expiry date, Notes */}
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="expiry_date">Expiry Date</label>
@@ -868,15 +968,69 @@ const FeedManagement = () => {
                 </div>
                 
                 <div className="form-group">
-                  <label htmlFor="batch_number">Batch Number</label>
+                  <label htmlFor="notes">Notes</label>
                   <input
                     type="text"
-                    id="batch_number"
-                    name="batch_number"
-                    value={feedFormData.batch_number}
+                    id="notes"
+                    name="notes"
+                    value={feedFormData.notes}
                     onChange={handleFeedInputChange}
-                    placeholder="Batch number"
+                    placeholder="Optional notes"
                   />
+                </div>
+              </div>
+              
+              {/* Balance Deduction Checkbox */}
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    name="deduct_from_balance"
+                    checked={feedFormData.deduct_from_balance}
+                    onChange={handleCheckboxChange}
+                  />
+                  <span className="checkmark"></span>
+                  Deduct cost from current balance (₦{formatNumber((parseFloat(feedFormData.cost_per_bag) || 0) * (parseInt(feedFormData.number_of_bags) || 0), 2)})
+                </label>
+              </div>
+              
+              {/* Batch Assignment Section */}
+              <div className="form-section">
+                <h4>Assign to Chicken Batches (Optional)</h4>
+                <div className="batch-assignment-container">
+                  {liveChickens.filter(batch => batch.status === 'healthy' || batch.status === 'sick').map(batch => {
+                    const isAssigned = feedFormData.assigned_batches.some(ab => ab.batch_id === batch.id)
+                    const assignedBatch = feedFormData.assigned_batches.find(ab => ab.batch_id === batch.id)
+                    
+                    return (
+                      <div key={batch.id} className="batch-assignment-item">
+                        <label className="checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={isAssigned}
+                            onChange={(e) => handleBatchAssignmentChange(batch.id, e.target.checked)}
+                          />
+                          <span className="checkmark"></span>
+                          {batch.batch_id} ({batch.currentCount} birds)
+                        </label>
+                        {isAssigned && (
+                          <div className="quantity-input">
+                            <input
+                              type="number"
+                              placeholder="Quantity (kg)"
+                              step="0.01"
+                              min="0"
+                              value={assignedBatch?.assigned_quantity_kg || ''}
+                              onChange={(e) => handleBatchQuantityChange(batch.id, e.target.value)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {liveChickens.filter(batch => batch.status === 'healthy' || batch.status === 'sick').length === 0 && (
+                    <p className="no-batches-message">No active chicken batches available for assignment.</p>
+                  )}
                 </div>
               </div>
               
@@ -911,11 +1065,13 @@ const FeedManagement = () => {
                     required
                   >
                     <option value="">Select feed</option>
-                    {feedInventory.map(feed => (
+                    {feedInventory && feedInventory.length > 0 ? feedInventory.map(feed => (
                       <option key={feed.id} value={feed.id}>
                         {feed.feed_type} - {feed.brand} ({formatNumber(feed.quantity_kg)} kg available)
                       </option>
-                    ))}
+                    )) : (
+                      <option disabled>No feed inventory available</option>
+                    )}
                   </select>
                 </div>
                 
@@ -929,9 +1085,9 @@ const FeedManagement = () => {
                     required
                   >
                     <option value="">Select batch</option>
-                    {liveChickens.filter(batch => batch.status === 'Active').map(batch => (
+                    {liveChickens.filter(batch => batch.status === 'healthy' || batch.status === 'sick').map(batch => (
                       <option key={batch.id} value={batch.id}>
-                        {batch.batchId} - {batch.breed} ({batch.currentCount} birds)
+                        {batch.batch_id} ({batch.currentCount} birds)
                       </option>
                     ))}
                   </select>

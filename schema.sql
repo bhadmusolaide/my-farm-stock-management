@@ -169,95 +169,41 @@ ALTER TABLE public.live_chickens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feed_inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feed_consumption ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies for chickens table
-DROP POLICY IF EXISTS "Enable read access for all users" ON public.chickens;
-DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.chickens;
-DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.chickens;
-DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.chickens;
-CREATE POLICY "Enable read access for all users" ON public.chickens FOR SELECT USING (true);
-CREATE POLICY "Enable insert for authenticated users only" ON public.chickens FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Enable update for authenticated users only" ON public.chickens FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable delete for authenticated users only" ON public.chickens FOR DELETE USING (auth.role() = 'authenticated');
+-- Create standard RLS policies for all tables
+-- This replaces the repetitive policy creation with a more maintainable approach
 
--- Create RLS policies for stock table
-DROP POLICY IF EXISTS "Enable read access for all users" ON public.stock;
-DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.stock;
-DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.stock;
-DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.stock;
-CREATE POLICY "Enable read access for all users" ON public.stock FOR SELECT USING (true);
-CREATE POLICY "Enable insert for authenticated users only" ON public.stock FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Enable update for authenticated users only" ON public.stock FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable delete for authenticated users only" ON public.stock FOR DELETE USING (auth.role() = 'authenticated');
+-- Function to create standard RLS policies
+CREATE OR REPLACE FUNCTION create_standard_rls_policies(table_name TEXT)
+RETURNS VOID AS $$
+BEGIN
+    -- Drop existing policies
+    EXECUTE format('DROP POLICY IF EXISTS "Enable read access for all users" ON public.%I', table_name);
+    EXECUTE format('DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.%I', table_name);
+    EXECUTE format('DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.%I', table_name);
+    EXECUTE format('DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.%I', table_name);
+    
+    -- Create standard policies
+    EXECUTE format('CREATE POLICY "Enable read access for all users" ON public.%I FOR SELECT USING (true)', table_name);
+    EXECUTE format('CREATE POLICY "Enable insert for authenticated users only" ON public.%I FOR INSERT WITH CHECK (auth.role() = ''authenticated'')', table_name);
+    EXECUTE format('CREATE POLICY "Enable update for authenticated users only" ON public.%I FOR UPDATE USING (auth.role() = ''authenticated'')', table_name);
+    EXECUTE format('CREATE POLICY "Enable delete for authenticated users only" ON public.%I FOR DELETE USING (auth.role() = ''authenticated'')', table_name);
+END;
+$$ LANGUAGE plpgsql;
 
--- Create RLS policies for transactions table
-DROP POLICY IF EXISTS "Enable read access for all users" ON public.transactions;
-DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.transactions;
-DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.transactions;
-DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.transactions;
-CREATE POLICY "Enable read access for all users" ON public.transactions FOR SELECT USING (true);
-CREATE POLICY "Enable insert for authenticated users only" ON public.transactions FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Enable update for authenticated users only" ON public.transactions FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable delete for authenticated users only" ON public.transactions FOR DELETE USING (auth.role() = 'authenticated');
+-- Apply standard RLS policies to all tables
+SELECT create_standard_rls_policies('chickens');
+SELECT create_standard_rls_policies('stock');
+SELECT create_standard_rls_policies('transactions');
+SELECT create_standard_rls_policies('balance');
+SELECT create_standard_rls_policies('users');
+SELECT create_standard_rls_policies('audit_logs');
+SELECT create_standard_rls_policies('live_chickens');
+SELECT create_standard_rls_policies('feed_inventory');
+SELECT create_standard_rls_policies('feed_consumption');
+SELECT create_standard_rls_policies('feed_batch_assignments');
 
--- Create RLS policies for balance table
-DROP POLICY IF EXISTS "Enable read access for all users" ON public.balance;
-DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.balance;
-DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.balance;
-DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.balance;
-CREATE POLICY "Enable read access for all users" ON public.balance FOR SELECT USING (true);
-CREATE POLICY "Enable insert for authenticated users only" ON public.balance FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Enable update for authenticated users only" ON public.balance FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable delete for authenticated users only" ON public.balance FOR DELETE USING (auth.role() = 'authenticated');
-
--- Create RLS policies for users table
-DROP POLICY IF EXISTS "Enable read access for all users" ON public.users;
-DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.users;
-DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.users;
-DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.users;
-CREATE POLICY "Enable read access for all users" ON public.users FOR SELECT USING (true);
-CREATE POLICY "Enable insert for authenticated users only" ON public.users FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Enable update for authenticated users only" ON public.users FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable delete for authenticated users only" ON public.users FOR DELETE USING (auth.role() = 'authenticated');
-
--- Create RLS policies for audit_logs table
-DROP POLICY IF EXISTS "Enable read access for all users" ON public.audit_logs;
-DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.audit_logs;
-DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.audit_logs;
-DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.audit_logs;
-CREATE POLICY "Enable read access for all users" ON public.audit_logs FOR SELECT USING (true);
-CREATE POLICY "Enable insert for authenticated users only" ON public.audit_logs FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Enable update for authenticated users only" ON public.audit_logs FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable delete for authenticated users only" ON public.audit_logs FOR DELETE USING (auth.role() = 'authenticated');
-
--- Create RLS policies for live_chickens table
-DROP POLICY IF EXISTS "Enable read access for all users" ON public.live_chickens;
-DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.live_chickens;
-DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.live_chickens;
-DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.live_chickens;
-CREATE POLICY "Enable read access for all users" ON public.live_chickens FOR SELECT USING (true);
-CREATE POLICY "Enable insert for authenticated users only" ON public.live_chickens FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Enable update for authenticated users only" ON public.live_chickens FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable delete for authenticated users only" ON public.live_chickens FOR DELETE USING (auth.role() = 'authenticated');
-
--- Create RLS policies for feed_inventory table
-DROP POLICY IF EXISTS "Enable read access for all users" ON public.feed_inventory;
-DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.feed_inventory;
-DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.feed_inventory;
-DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.feed_inventory;
-CREATE POLICY "Enable read access for all users" ON public.feed_inventory FOR SELECT USING (true);
-CREATE POLICY "Enable insert for authenticated users only" ON public.feed_inventory FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Enable update for authenticated users only" ON public.feed_inventory FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable delete for authenticated users only" ON public.feed_inventory FOR DELETE USING (auth.role() = 'authenticated');
-
--- Create RLS policies for feed_consumption table
-DROP POLICY IF EXISTS "Enable read access for all users" ON public.feed_consumption;
-DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.feed_consumption;
-DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.feed_consumption;
-DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.feed_consumption;
-CREATE POLICY "Enable read access for all users" ON public.feed_consumption FOR SELECT USING (true);
-CREATE POLICY "Enable insert for authenticated users only" ON public.feed_consumption FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Enable update for authenticated users only" ON public.feed_consumption FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable delete for authenticated users only" ON public.feed_consumption FOR DELETE USING (auth.role() = 'authenticated');
+-- Clean up the utility function
+DROP FUNCTION create_standard_rls_policies(TEXT);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION public.handle_updated_at()

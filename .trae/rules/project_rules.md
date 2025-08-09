@@ -81,6 +81,7 @@ rules = {
 - Be fast, but not at the cost of accuracy.
 - Ask before assuming.
 - Improve with every run.
+- Always check the codebase and use default property names, never assume property names
 
 ## When working with databases
 - Always examine existing data before creating new records - don't assume tables are empty

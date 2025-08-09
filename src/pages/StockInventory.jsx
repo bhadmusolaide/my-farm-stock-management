@@ -3,6 +3,8 @@ import { useAppContext } from '../context/AppContext'
 import { formatNumber, formatDate } from '../utils/formatters'
 import ColumnFilter from '../components/UI/ColumnFilter'
 import useColumnConfig from '../hooks/useColumnConfig'
+import Pagination from '../components/UI/Pagination'
+import usePagination from '../hooks/usePagination'
 import './StockInventory.css'
 
 const StockInventory = () => {
@@ -69,6 +71,9 @@ const StockInventory = () => {
   }
   
   const filteredStock = getFilteredStock()
+  
+  // Pagination for stock inventory
+  const stockPagination = usePagination(filteredStock, 10)
   
   // Handle filter changes
   const handleFilterChange = (e) => {
@@ -270,8 +275,8 @@ const StockInventory = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredStock.length > 0 ? (
-              filteredStock.map(item => (
+            {stockPagination.currentData.length > 0 ? (
+              stockPagination.currentData.map(item => (
                 <tr key={item.id}>
                   {columnConfig.isColumnVisible('date') && <td>{formatDate(item.date)}</td>}
                   {columnConfig.isColumnVisible('description') && <td>{item.description}</td>}
@@ -302,6 +307,16 @@ const StockInventory = () => {
           </tbody>
         </table>
       </div>
+      
+      {/* Stock Inventory Pagination */}
+      <Pagination
+        currentPage={stockPagination.currentPage}
+        totalPages={stockPagination.totalPages}
+        onPageChange={stockPagination.handlePageChange}
+        pageSize={stockPagination.pageSize}
+        onPageSizeChange={stockPagination.handlePageSizeChange}
+        totalItems={stockPagination.totalItems}
+      />
       
       {/* Add Stock Modal */}
       {showModal && (

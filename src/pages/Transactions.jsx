@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { formatNumber, formatDate } from '../utils/formatters'
+import Pagination from '../components/UI/Pagination'
+import usePagination from '../hooks/usePagination'
 import './Transactions.css'
 
 const Transactions = () => {
@@ -44,6 +46,9 @@ const Transactions = () => {
   }
   
   const filteredTransactions = getFilteredTransactions()
+  
+  // Pagination for transactions
+  const transactionsPagination = usePagination(filteredTransactions, 10)
   
   // Calculate totals
   const calculateTotals = () => {
@@ -241,8 +246,8 @@ const Transactions = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredTransactions.length > 0 ? (
-              filteredTransactions.map(transaction => (
+            {transactionsPagination.currentData.length > 0 ? (
+              transactionsPagination.currentData.map(transaction => (
                 <tr 
                   key={transaction.id}
                   className={getTransactionTypeClass(transaction.type)}
@@ -270,6 +275,16 @@ const Transactions = () => {
           </tbody>
         </table>
       </div>
+      
+      {/* Transactions Pagination */}
+      <Pagination
+        currentPage={transactionsPagination.currentPage}
+        totalPages={transactionsPagination.totalPages}
+        onPageChange={transactionsPagination.handlePageChange}
+        pageSize={transactionsPagination.pageSize}
+        onPageSizeChange={transactionsPagination.handlePageSizeChange}
+        totalItems={transactionsPagination.totalItems}
+      />
       
       {/* Transaction Modal */}
       {activeModal && (
