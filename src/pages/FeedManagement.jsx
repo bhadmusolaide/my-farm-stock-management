@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useAppContext } from '../context/AppContext'
-import { useNotification } from '../context/NotificationContext'
 import { formatNumber, formatDate } from '../utils/formatters'
 import ColumnFilter from '../components/UI/ColumnFilter'
 import SortableTableHeader from '../components/UI/SortableTableHeader'
@@ -22,8 +21,7 @@ const FEED_BRANDS = [
 ]
 
 const FeedManagement = () => {
-  const { feedInventory, addFeedInventory, updateFeedInventory, deleteFeedInventory, feedConsumption, addFeedConsumption, deleteFeedConsumption, liveChickens, feedBatchAssignments } = useAppContext()
-  const { showSuccess, showError } = useNotification()
+  const { feedInventory, addFeedInventory, updateFeedInventory, deleteFeedInventory, feedConsumption, addFeedConsumption, deleteFeedConsumption, liveChickens } = useAppContext()
   
 
   
@@ -162,8 +160,8 @@ const FeedManagement = () => {
   const handleBatchAssignmentChange = (batchId, isChecked, quantity = '') => {
     setFeedFormData(prev => {
       const updatedBatches = isChecked
-        ? [...prev.assigned_batches, { batch_id: String(batchId), assigned_quantity_kg: parseFloat(quantity) || 0 }]
-        : prev.assigned_batches.filter(batch => batch.batch_id !== String(batchId))
+        ? [...prev.assigned_batches, { batch_id: batchId, assigned_quantity_kg: parseFloat(quantity) || 0 }]
+        : prev.assigned_batches.filter(batch => batch.batch_id !== batchId)
       
       return { ...prev, assigned_batches: updatedBatches }
     })
@@ -174,7 +172,7 @@ const FeedManagement = () => {
     setFeedFormData(prev => ({
       ...prev,
       assigned_batches: prev.assigned_batches.map(batch =>
-        batch.batch_id === String(batchId)
+        batch.batch_id === batchId
           ? { ...batch, assigned_quantity_kg: parseFloat(quantity) || 0 }
           : batch
       )
@@ -259,10 +257,9 @@ const FeedManagement = () => {
           assigned_batches: feedFormData.assigned_batches
         })
         
-        showSuccess('Feed inventory added successfully!')
         closeFeedModal()
       } catch (error) {
-        showError(`Error adding feed inventory: ${error.message}`)
+        alert(`Error: ${error.message}`)
       }
     }
   }
@@ -279,10 +276,9 @@ const FeedManagement = () => {
         notes: consumptionFormData.notes
       })
       
-      showSuccess('Feed consumption logged successfully!')
       closeConsumptionModal()
     } catch (error) {
-      showError(`Error logging feed consumption: ${error.message}`)
+      alert(`Error: ${error.message}`)
     }
   }
 
@@ -290,14 +286,6 @@ const FeedManagement = () => {
   const handleEditFeed = (feed) => {
     setEditingFeed(feed)
     const isCustomBrand = !FEED_BRANDS.slice(0, -1).includes(feed.brand)
-    
-    // Get batch assignments for this feed
-    const feedAssignments = feedBatchAssignments.filter(assignment => assignment.feed_id === feed.id)
-    const formattedAssignments = feedAssignments.map(assignment => ({
-      batch_id: String(assignment.chicken_batch_id), // Ensure string type
-      assigned_quantity_kg: assignment.assigned_quantity_kg
-    }))
-    
     setFeedFormData({
       feed_type: feed.feed_type,
       brand: isCustomBrand ? 'Others' : feed.brand,
@@ -310,7 +298,7 @@ const FeedManagement = () => {
       expiry_date: feed.expiry_date,
       notes: feed.notes || '',
       deduct_from_balance: feed.deduct_from_balance || false,
-      assigned_batches: formattedAssignments
+      assigned_batches: feed.assigned_batches || []
     })
     setShowFeedModal(true)
   }
@@ -329,16 +317,13 @@ const FeedManagement = () => {
         cost_per_bag: parseFloat(feedFormData.cost_per_bag),
         supplier: feedFormData.supplier,
         expiry_date: feedFormData.expiry_date,
-        notes: feedFormData.notes,
-        deduct_from_balance: feedFormData.deduct_from_balance,
-        original_deduct_from_balance: editingFeed.deduct_from_balance
+        notes: feedFormData.notes
       })
       
-      showSuccess('Feed inventory updated successfully!')
       setEditingFeed(null)
       closeFeedModal()
     } catch (error) {
-      showError(`Error updating feed inventory: ${error.message}`)
+      alert(`Error: ${error.message}`)
     }
   }
   
@@ -347,9 +332,8 @@ const FeedManagement = () => {
     if (window.confirm('Are you sure you want to delete this feed item?')) {
       try {
         await deleteFeedInventory(id)
-        showSuccess('Feed inventory deleted successfully!')
       } catch (error) {
-        showError(`Error deleting feed inventory: ${error.message}`)
+        alert(`Error: ${error.message}`)
       }
     }
   }
@@ -359,9 +343,8 @@ const FeedManagement = () => {
     if (window.confirm('Are you sure you want to delete this consumption record?')) {
       try {
         await deleteFeedConsumption(id)
-        showSuccess('Feed consumption record deleted successfully!')
       } catch (error) {
-        showError(`Error deleting consumption record: ${error.message}`)
+        alert(`Error: ${error.message}`)
       }
     }
   }
@@ -1103,8 +1086,8 @@ const FeedManagement = () => {
                 <h4>Assign to Chicken Batches (Optional)</h4>
                 <div className="batch-assignment-container">
                   {liveChickens.filter(batch => batch.status === 'healthy' || batch.status === 'sick').map(batch => {
-                    const isAssigned = feedFormData.assigned_batches.some(ab => ab.batch_id === String(batch.id))
-                    const assignedBatch = feedFormData.assigned_batches.find(ab => ab.batch_id === String(batch.id))
+                    const isAssigned = feedFormData.assigned_batches.some(ab => ab.batch_id === batch.id)
+                    const assignedBatch = feedFormData.assigned_batches.find(ab => ab.batch_id === batch.id)
                     
                     return (
                       <div key={batch.id} className="batch-assignment-item">
@@ -1143,7 +1126,7 @@ const FeedManagement = () => {
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary">
-                  {editingFeed ? 'Update Feed Stock' : 'Add Feed Stock'}
+                  Add Feed Stock
                 </button>
               </div>
             </form>

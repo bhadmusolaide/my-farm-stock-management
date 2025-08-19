@@ -168,9 +168,6 @@ ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.live_chickens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feed_inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feed_consumption ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vaccination_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.health_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
 
 -- Create standard RLS policies for all tables
 -- This replaces the repetitive policy creation with a more maintainable approach
@@ -203,10 +200,7 @@ SELECT create_standard_rls_policies('audit_logs');
 SELECT create_standard_rls_policies('live_chickens');
 SELECT create_standard_rls_policies('feed_inventory');
 SELECT create_standard_rls_policies('feed_consumption');
-SELECT create_standard_rls_policies('vaccination_records');
-SELECT create_standard_rls_policies('health_records');
 SELECT create_standard_rls_policies('feed_batch_assignments');
-SELECT create_standard_rls_policies('site_settings');
 
 -- Clean up the utility function
 DROP FUNCTION create_standard_rls_policies(TEXT);

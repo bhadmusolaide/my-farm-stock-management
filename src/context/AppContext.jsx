@@ -1089,26 +1089,20 @@ export function AppProvider({ children }) {
       const feedToDelete = feedInventory.find(feed => feed.id === id)
       if (!feedToDelete) throw new Error('Feed inventory not found')
       
-      let refundTransaction = null
-      let newBalance = balance
+      // Calculate refund amount (number of bags * cost per bag)
+      const refundAmount = feedToDelete.number_of_bags * feedToDelete.cost_per_bag
       
-      // Only create refund transaction if the feed was originally set to deduct from balance
-      if (feedToDelete.deduct_from_balance || feedToDelete.balance_deducted) {
-        // Calculate refund amount (number of bags * cost per bag)
-        const refundAmount = feedToDelete.number_of_bags * feedToDelete.cost_per_bag
-        
-        // Create refund transaction for feed deletion
-        refundTransaction = {
-          id: Date.now().toString(),
-          type: 'income',
-          amount: refundAmount,
-          description: `Feed Refund: ${feedToDelete.feed_type} - ${feedToDelete.brand}`,
-          date: new Date().toISOString().split('T')[0]
-        }
-        
-        // Update balance
-        newBalance = balance + refundAmount
+      // Create refund transaction for feed deletion
+      const refundTransaction = {
+        id: Date.now().toString(),
+        type: 'income',
+        amount: refundAmount,
+        description: `Feed Refund: ${feedToDelete.feed_type} - ${feedToDelete.brand}`,
+        date: new Date().toISOString().split('T')[0]
       }
+      
+      // Update balance
+      const newBalance = balance + refundAmount
       
       // Delete from Supabase database
       const { error } = await supabase
@@ -1118,24 +1112,20 @@ export function AppProvider({ children }) {
       
       if (error) throw error
       
-      // Add refund transaction to database only if there was a deduction
-      if (refundTransaction) {
-        const { error: transactionError } = await supabase.from('transactions').insert(refundTransaction)
-        if (transactionError) throw transactionError
-        
-        // Update balance in database
-        const { error: balanceError } = await supabase
-          .from('balance')
-          .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
-        if (balanceError) throw balanceError
-        
-        // Update local state for transaction and balance
-        setTransactions(prev => [refundTransaction, ...prev])
-        setBalance(newBalance)
-      }
+      // Add refund transaction to database
+      const { error: transactionError } = await supabase.from('transactions').insert(refundTransaction)
+      if (transactionError) throw transactionError
+      
+      // Update balance in database
+      const { error: balanceError } = await supabase
+        .from('balance')
+        .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
+      if (balanceError) throw balanceError
       
       // Update local state
       setFeedInventory(prev => prev.filter(feed => feed.id !== id))
+      setTransactions(prev => [refundTransaction, ...prev])
+      setBalance(newBalance)
       
       // Log audit action
       await logAuditAction('DELETE', 'feed_inventory', id, feedToDelete, null)
@@ -1151,67 +1141,15 @@ export function AppProvider({ children }) {
       const feedToUpdate = feedInventory.find(feed => feed.id === id)
       if (!feedToUpdate) throw new Error('Feed inventory not found')
       
-      // Handle balance changes when deduct_from_balance is modified
-      const originalDeductFromBalance = updatedData.original_deduct_from_balance ?? feedToUpdate.deduct_from_balance
-      const newDeductFromBalance = updatedData.deduct_from_balance
-      const totalCost = (updatedData.number_of_bags || feedToUpdate.number_of_bags) * (updatedData.cost_per_bag || feedToUpdate.cost_per_bag)
-      
-      let balanceTransaction = null
-      let newBalance = balance
-      
-      // Check if deduct_from_balance status changed
-      if (originalDeductFromBalance !== newDeductFromBalance) {
-        if (newDeductFromBalance && !originalDeductFromBalance) {
-          // Changed from false to true - deduct money
-          balanceTransaction = {
-            id: Date.now().toString(),
-            type: 'expense',
-            amount: totalCost,
-            description: `Feed Purchase (Updated): ${updatedData.feed_type || feedToUpdate.feed_type} - ${updatedData.brand || feedToUpdate.brand}`,
-            date: new Date().toISOString().split('T')[0]
-          }
-          newBalance = balance - totalCost
-        } else if (!newDeductFromBalance && originalDeductFromBalance) {
-          // Changed from true to false - refund money
-          balanceTransaction = {
-            id: Date.now().toString(),
-            type: 'income',
-            amount: totalCost,
-            description: `Feed Refund (Updated): ${updatedData.feed_type || feedToUpdate.feed_type} - ${updatedData.brand || feedToUpdate.brand}`,
-            date: new Date().toISOString().split('T')[0]
-          }
-          newBalance = balance + totalCost
-        }
-      }
-      
-      // Remove the original_deduct_from_balance field before database update
-      const { original_deduct_from_balance, ...dataForDB } = updatedData
-      
-      const updatedFeed = { ...feedToUpdate, ...dataForDB }
+      const updatedFeed = { ...feedToUpdate, ...updatedData }
       
       // Update in Supabase database
       const { error } = await supabase
         .from('feed_inventory')
-        .update(dataForDB)
+        .update(updatedData)
         .eq('id', id)
       
       if (error) throw error
-      
-      // Handle balance transaction if needed
-      if (balanceTransaction) {
-        const { error: transactionError } = await supabase.from('transactions').insert(balanceTransaction)
-        if (transactionError) throw transactionError
-        
-        // Update balance
-        const { error: balanceError } = await supabase
-          .from('balance')
-          .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
-        if (balanceError) throw balanceError
-        
-        // Update local state for transaction and balance
-        setTransactions(prev => [balanceTransaction, ...prev])
-        setBalance(newBalance)
-      }
       
       // Update local state
       setFeedInventory(prev => prev.map(feed => 

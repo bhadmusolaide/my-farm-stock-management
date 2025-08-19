@@ -31,14 +31,9 @@ ALTER TABLE public.feed_batch_assignments ENABLE ROW LEVEL SECURITY;
 -- RLS policies are now handled by the main schema.sql file
 -- This avoids duplication and ensures consistency
 
--- Create trigger for updated_at (only if it doesn't exist)
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'handle_updated_at' AND tgrelid = 'public.feed_batch_assignments'::regclass) THEN
-        CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.feed_batch_assignments 
-        FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
-    END IF;
-END $$;
+-- Create trigger for updated_at
+CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.feed_batch_assignments 
+FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_feed_batch_assignments_feed_id ON public.feed_batch_assignments(feed_id);
