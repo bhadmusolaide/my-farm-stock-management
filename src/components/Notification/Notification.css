@@ -1,0 +1,140 @@
+.notification {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  min-width: 320px;
+  max-width: 500px;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  animation: slideIn 0.3s ease-out;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.notification-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.notification-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.notification-message {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.notification-close:hover {
+  opacity: 1;
+}
+
+.notification-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Notification Types */
+.notification-success {
+  background-color: rgba(16, 185, 129, 0.95);
+  color: white;
+}
+
+.notification-error {
+  background-color: rgba(239, 68, 68, 0.95);
+  color: white;
+}
+
+.notification-warning {
+  background-color: rgba(245, 158, 11, 0.95);
+  color: white;
+}
+
+.notification-info {
+  background-color: rgba(59, 130, 246, 0.95);
+  color: white;
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification-exit {
+  animation: slideOut 0.3s ease-in forwards;
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .notification {
+    left: 1rem;
+    right: 1rem;
+    min-width: auto;
+    max-width: none;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .notification {
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .notification-success {
+    background-color: rgba(16, 185, 129, 0.9);
+  }
+  
+  .notification-error {
+    background-color: rgba(239, 68, 68, 0.9);
+  }
+  
+  .notification-warning {
+    background-color: rgba(245, 158, 11, 0.9);
+  }
+  
+  .notification-info {
+    background-color: rgba(59, 130, 246, 0.9);
+  }
+}

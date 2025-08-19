@@ -1,0 +1,236 @@
+:root {
+  /* Base theme variables - light mode by default */
+  --primary-color: #4caf50;
+  --primary-hover: #45a049;
+  --secondary-color: #2196f3;
+  --secondary-hover: #0b7dda;
+  --danger-color: #f44336;
+  --danger-hover: #d32f2f;
+  --warning-color: #ff9800;
+  --warning-hover: #ef6c00;
+  
+  /* Light theme variables */
+  --text-color: #333;
+  --text-light: #666;
+  --background-color: #f5f5f5;
+  --card-background: #ffffff;
+  --border-color: #ddd;
+  --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  
+  /* Form elements */
+  --input-background: #ffffff;
+  --input-border: #d1d5db;
+  --input-text: #333;
+  --input-placeholder: #9ca3af;
+  --input-focus-border: #4caf50;
+  --input-focus-shadow: rgba(76, 175, 80, 0.2);
+  
+  /* Table elements */
+  --table-header-bg: #f9fafb;
+  --table-header-text: #374151;
+  --table-border: #e5e7eb;
+  --table-row-hover: #f9fafb;
+  
+  /* Filter elements */
+  --filter-bg: #ffffff;
+  --filter-border: #e5e7eb;
+  --filter-label: #374151;
+  --filter-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  
+  /* Modal elements */
+  --modal-overlay: rgba(0, 0, 0, 0.5);
+  --modal-bg: #ffffff;
+  --modal-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  
+  /* Button elements */
+  --button-secondary-bg: #f5f5f5;
+  --button-secondary-text: #333;
+  --button-secondary-hover: #e0e0e0;
+  
+  /* Header elements */
+  --header-bg: linear-gradient(135deg, #4caf50 0%, #45a049 50%, #388e3c 100%);
+  --header-text: #ffffff;
+  --header-shadow: 0 4px 20px rgba(76, 175, 80, 0.3), 0 2px 8px rgba(0, 0, 0, 0.1);
+  --nav-item-bg: rgba(255, 255, 255, 0.05);
+  --nav-item-border: rgba(255, 255, 255, 0.1);
+  --nav-item-hover-bg: rgba(255, 255, 255, 0.15);
+  --nav-item-hover-border: rgba(255, 255, 255, 0.2);
+  --nav-item-active-bg: rgba(255, 255, 255, 0.2);
+  --nav-item-active-border: rgba(255, 255, 255, 0.3);
+  --balance-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%);
+  --balance-border: rgba(255, 255, 255, 0.2);
+  --balance-text: #ffffff;
+  
+  /* Menu elements */
+  --menu-item-text: #1f2937;
+  --menu-item-hover-text: #4caf50;
+  --menu-item-hover-bg: rgba(76, 175, 80, 0.08);
+}
+
+/* Dark theme variables */
+[data-theme="dark"] {
+  --text-color: #e5e7eb;
+  --text-light: #9ca3af;
+  --background-color: #111827;
+  --card-background: #1f2937;
+  --border-color: #374151;
+  --shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  
+  /* Form elements */
+  --input-background: #374151;
+  --input-border: #4b5563;
+  --input-text: #e5e7eb;
+  --input-placeholder: #6b7280;
+  --input-focus-border: #4caf50;
+  --input-focus-shadow: rgba(76, 175, 80, 0.3);
+  
+  /* Table elements */
+  --table-header-bg: #1f2937;
+  --table-header-text: #e5e7eb;
+  --table-border: #374151;
+  --table-row-hover: #2d3748;
+  
+  /* Filter elements */
+  --filter-bg: #1f2937;
+  --filter-border: #374151;
+  --filter-label: #d1d5db;
+  --filter-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  
+  /* Modal elements */
+  --modal-overlay: rgba(0, 0, 0, 0.7);
+  --modal-bg: #1f2937;
+  --modal-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  
+  /* Button elements */
+  --button-secondary-bg: #374151;
+  --button-secondary-text: #e5e7eb;
+  --button-secondary-hover: #4b5563;
+  
+  /* Menu elements */
+  --menu-item-text: #e5e7eb;
+  --menu-item-hover-text: #4caf50;
+  --menu-item-hover-bg: rgba(76, 175, 80, 0.15);
+  --button-secondary-text: #e5e7eb;
+  --button-secondary-hover: #4b5563;
+  
+  /* Header elements */
+  --header-bg: linear-gradient(135deg, #2d3748 0%, #1a202c 50%, #0f172a 100%);
+  --header-text: #ffffff;
+  --header-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --nav-item-bg: rgba(255, 255, 255, 0.05);
+  --nav-item-border: rgba(255, 255, 255, 0.1);
+  --nav-item-hover-bg: rgba(255, 255, 255, 0.1);
+  --nav-item-hover-border: rgba(255, 255, 255, 0.15);
+  --nav-item-active-bg: rgba(255, 255, 255, 0.15);
+  --nav-item-active-border: rgba(255, 255, 255, 0.2);
+  --balance-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%);
+  --balance-border: rgba(255, 255, 255, 0.15);
+  --balance-text: #ffffff;
+}
+
+/* Apply theme variables to elements */
+body {
+  color: var(--text-color);
+  background-color: var(--background-color);
+}
+
+/* Header styles */
+.app-header {
+  background: var(--header-bg);
+  color: var(--header-text);
+  box-shadow: var(--header-shadow);
+}
+
+.main-nav a {
+  color: var(--header-text);
+  background: var(--nav-item-bg);
+  border-color: var(--nav-item-border);
+}
+
+.main-nav a:hover {
+  background: var(--nav-item-hover-bg);
+  border-color: var(--nav-item-hover-border);
+}
+
+.main-nav a.active {
+  background: var(--nav-item-active-bg);
+  border-color: var(--nav-item-active-border);
+}
+
+.user-menu-trigger {
+  background: var(--nav-item-bg);
+  border-color: var(--nav-item-border);
+  color: var(--header-text);
+}
+
+.user-menu-trigger:hover {
+  background: var(--nav-item-hover-bg);
+  border-color: var(--nav-item-hover-border);
+}
+
+input, select, textarea {
+  color: var(--input-text);
+  background-color: var(--input-background);
+  border-color: var(--input-border);
+  -webkit-text-fill-color: var(--input-text); /* For WebKit browsers */
+}
+
+input::placeholder, select::placeholder, textarea::placeholder {
+  color: var(--input-placeholder);
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--input-focus-border);
+  box-shadow: 0 0 0 2px var(--input-focus-shadow);
+}
+
+table th {
+  background-color: var(--table-header-bg);
+  color: var(--table-header-text);
+  border-color: var(--table-border);
+}
+
+table td {
+  color: var(--text-color);
+  border-color: var(--table-border);
+}
+
+table tbody tr:hover {
+  background-color: var(--table-row-hover);
+}
+
+.filters-container {
+  background-color: var(--filter-bg);
+  border-color: var(--filter-border);
+  box-shadow: var(--filter-shadow);
+}
+
+.filter-group label {
+  color: var(--filter-label);
+}
+
+.filter-group select,
+.filter-group input {
+  background-color: var(--input-background);
+  border-color: var(--input-border);
+  color: var(--input-text);
+  -webkit-text-fill-color: var(--input-text);
+}
+
+.modal-overlay {
+  background-color: var(--modal-overlay);
+}
+
+.modal-content {
+  background-color: var(--modal-bg);
+  box-shadow: var(--modal-shadow);
+}
+
+.btn-secondary {
+  background-color: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+}
+
+.btn-secondary:hover {
+  background-color: var(--button-secondary-hover);
+}
