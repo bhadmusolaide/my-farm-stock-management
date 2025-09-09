@@ -621,19 +621,21 @@ const ChickenOrders = () => {
                   {columnConfig.isColumnVisible('actions') && (
                     <td>
                       <div className="action-buttons">
-                        <button 
-                          className="edit-btn" 
+                        <button
+                          className="edit-btn"
                           onClick={() => openEditModal(chicken)}
-                          aria-label="Edit"
+                          aria-label="Edit Order"
+                          title="Edit Order"
                         >
-                          Edit
+                          ✏️
                         </button>
-                        <button 
-                          className="delete-btn" 
+                        <button
+                          className="delete-btn"
                           onClick={() => handleDelete(chicken.id)}
-                          aria-label="Delete"
+                          aria-label="Delete Order"
+                          title="Delete Order"
                         >
-                          Delete
+                          🗑️
                         </button>
                       </div>
                     </td>
