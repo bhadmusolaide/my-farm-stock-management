@@ -13,7 +13,7 @@ import usePagination from '../hooks/usePagination'
 import './ChickenOrders.css'
 
 const ChickenOrders = () => {
-  const { chickens, addChicken, updateChicken, deleteChicken, exportToCSV, liveChickens, updateLiveChicken } = useAppContext()
+  const { chickens, addChicken, updateChicken, deleteChicken, exportToCSV, liveChickens, updateLiveChicken, logChickenTransaction } = useAppContext()
   const { showError, showSuccess, showWarning } = useNotification()
   
 
@@ -188,7 +188,7 @@ const ChickenOrders = () => {
       price: chicken.price,
       amountPaid: chicken.amount_paid || 0, // Use amount_paid from database
       status: chicken.status,
-      calculationMode: chicken.calculationMode || 'count_size_cost',
+      calculationMode: chicken.calculation_mode || 'count_size_cost',
       batch_id: chicken.batch_id || ''
     })
     setEditMode(true)
@@ -252,7 +252,7 @@ const ChickenOrders = () => {
     
     // Validate batch selection if a batch is selected
     if (formData.batch_id) {
-      const selectedBatch = liveChickens.find(batch => batch.id === parseInt(formData.batch_id))
+      const selectedBatch = liveChickens.find(batch => batch.id == formData.batch_id)
       if (!selectedBatch) {
         showError('Selected batch not found')
         return
@@ -296,6 +296,33 @@ const ChickenOrders = () => {
       }
       
       if (editMode && currentChicken) {
+        // Handle batch deduction for edit operations
+        if (formData.batch_id && formData.calculationMode !== 'size_cost') {
+          const batchId = formData.batch_id
+          const selectedBatch = liveChickens.find(batch => batch.id == batchId)
+          if (selectedBatch) {
+            const updatedBatch = {
+              ...selectedBatch,
+              current_count: selectedBatch.current_count - count
+            }
+            await updateLiveChicken(selectedBatch.id, updatedBatch)
+            
+            // Log the sales transaction for edit
+            try {
+              await logChickenTransaction(
+                selectedBatch.id,
+                'sale',
+                -count,
+                `Chicken order update for ${formData.customer}`,
+                currentChicken.id,
+                'chicken_order'
+              )
+            } catch (logError) {
+              console.warn('Failed to log chicken transaction for edit:', logError)
+            }
+          }
+        }
+        
         await updateChicken(currentChicken.id, chickenData)
         showSuccess('Order updated successfully!')
       } else {
@@ -303,13 +330,27 @@ const ChickenOrders = () => {
         
         // Update batch chicken count if a batch was selected
         if (formData.batch_id && formData.calculationMode !== 'size_cost') {
-          const selectedBatch = liveChickens.find(batch => batch.id === parseInt(formData.batch_id))
+          const selectedBatch = liveChickens.find(batch => batch.id == formData.batch_id)
           if (selectedBatch) {
             const updatedBatch = {
               ...selectedBatch,
               current_count: selectedBatch.current_count - count
             }
             await updateLiveChicken(selectedBatch.id, updatedBatch)
+            
+            // Log the sales transaction
+            try {
+              await logChickenTransaction(
+                selectedBatch.id,
+                'sale',
+                -count,
+                `Chicken order sale to ${formData.customer}`,
+                chickenData.id || Date.now().toString(),
+                'chicken_order'
+              )
+            } catch (logError) {
+              console.warn('Failed to log chicken transaction:', logError)
+            }
           }
         }
         
@@ -344,12 +385,12 @@ const ChickenOrders = () => {
     try {
       const dataToExport = filteredChickens.map(chicken => {
         let total
-        if (chicken.calculationMode === 'count_cost') {
+        if (chicken.calculation_mode === 'count_cost') {
           total = chicken.count * chicken.price
-        } else if (chicken.calculationMode === 'size_cost') {
+        } else if (chicken.calculation_mode === 'size_cost') {
           total = chicken.size * chicken.price
         } else {
-          total = chicken.count * chicken.size * chicken.price
+          total = chicken.size * chicken.price
         }
         
         return {
@@ -360,7 +401,7 @@ const ChickenOrders = () => {
           Count: chicken.count,
           Size: chicken.size,
           Price: chicken.price,
-          'Calculation Mode': chicken.calculationMode || 'count_size_cost',
+          'Calculation Mode': chicken.calculation_mode || 'count_size_cost',
           Total: total,
           'Amount Paid': chicken.amount_paid || 0,
           Balance: chicken.balance,
@@ -558,9 +599,9 @@ const ChickenOrders = () => {
                   {columnConfig.isColumnVisible('price') && <td>₦{formatNumber(chicken.price, 2)}</td>}
                   {columnConfig.isColumnVisible('total') && (
                     <td>₦{formatNumber((() => {
-                      if (chicken.calculationMode === 'count_cost') {
+                      if (chicken.calculation_mode === 'count_cost') {
                         return chicken.count * chicken.price
-                      } else if (chicken.calculationMode === 'size_cost') {
+                      } else if (chicken.calculation_mode === 'size_cost') {
                         return chicken.size * chicken.price
                       } else {
                         // count_size_cost: count is for batch deduction, size is total weight, calculate as size × price

@@ -1,5 +1,5 @@
 import { useState, useContext, useMemo } from 'react';
-import { AppContext } from '../context/AppContext';
+import { useAppContext } from '../context/AppContext';
 import { formatDate, formatNumber } from '../utils/formatters';
 import SortableTableHeader from '../components/UI/SortableTableHeader';
 import SortControls from '../components/UI/SortControls';
@@ -7,7 +7,7 @@ import useTableSort from '../hooks/useTableSort';
 import './LiveChickenStock.css';
 
 const LiveChickenStock = () => {
-  const { liveChickens, addLiveChicken, deleteLiveChicken, updateLiveChicken } = useContext(AppContext);
+  const { liveChickens, addLiveChicken, deleteLiveChicken, updateLiveChicken, chickenInventoryTransactions } = useAppContext();
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showVaccinationModal, setShowVaccinationModal] = useState(false);
@@ -15,6 +15,11 @@ const LiveChickenStock = () => {
   const [editingChicken, setEditingChicken] = useState(null);
   const [showBatchSelectionModal, setShowBatchSelectionModal] = useState(false);
   const [activeTab, setActiveTab] = useState('batches');
+  const [selectedBatchForTransactions, setSelectedBatchForTransactions] = useState(null);
+  const [transactionFilters, setTransactionFilters] = useState({
+    type: '',
+    dateRange: ''
+  });
   const [filters, setFilters] = useState({
     breed: '',
     status: '',
@@ -177,6 +182,58 @@ const LiveChickenStock = () => {
         return matchesBreed && matchesStatus && matchesSearch && matchesAge;
       });
   }, [liveChickens, filters]);
+
+  // Process chicken inventory transactions for display
+  const processedTransactions = useMemo(() => {
+    if (!chickenInventoryTransactions || !selectedBatchForTransactions) return [];
+    
+    return chickenInventoryTransactions
+      .filter(transaction => transaction.batch_id == selectedBatchForTransactions.id)
+      .map(transaction => ({
+        ...transaction,
+        displayType: transaction.transaction_type === 'sale' ? 'Sales' :
+                     transaction.transaction_type === 'mortality' ? 'Mortality' :
+                     transaction.transaction_type.charAt(0).toUpperCase() + transaction.transaction_type.slice(1),
+        displayQuantity: Math.abs(transaction.quantity_changed),
+        isDeduction: transaction.quantity_changed < 0
+      }))
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }, [chickenInventoryTransactions, selectedBatchForTransactions, transactionFilters]);
+
+  // Calculate batch transaction summary
+  const batchTransactionSummary = useMemo(() => {
+    if (!selectedBatchForTransactions || !processedTransactions.length) {
+      return {
+        totalSales: 0,
+        totalMortality: 0,
+        totalAdjustments: 0,
+        netChange: 0,
+        transactionCount: 0
+      };
+    }
+
+    const summary = processedTransactions.reduce((acc, transaction) => {
+      switch (transaction.transaction_type) {
+        case 'sale':
+          acc.totalSales += Math.abs(transaction.quantity_changed);
+          break;
+        case 'mortality':
+          acc.totalMortality += Math.abs(transaction.quantity_changed);
+          break;
+        case 'adjustment':
+          acc.totalAdjustments += transaction.quantity_changed;
+          break;
+      }
+      acc.netChange += transaction.quantity_changed;
+      acc.transactionCount += 1;
+      return acc;
+    }, { totalSales: 0, totalMortality: 0, totalAdjustments: 0, netChange: 0, transactionCount: 0 });
+
+    return summary;
+  }, [processedTransactions, selectedBatchForTransactions]);
+
+  // Sorting for transactions
+  const { sortedData: sortedTransactions, sortConfig: transactionSortConfig, requestSort: requestTransactionSort, resetSort: resetTransactionSort, getSortIcon: getTransactionSortIcon } = useTableSort(processedTransactions);
 
   // Sorting hooks for different tables
   const { sortedData: sortedChickens, sortConfig: chickenSortConfig, requestSort: requestChickenSort, resetSort: resetChickenSort, getSortIcon: getChickenSortIcon } = useTableSort(processedChickens);
@@ -614,6 +671,147 @@ const LiveChickenStock = () => {
               <h3>Avg Mortality Rate</h3>
               <p className="summary-value">{summaryStats.averageMortalityRate}%</p>
             </div>
+          </div>
+
+          {/* Transaction History Section */}
+          <div className="transaction-section">
+            <div className="section-header">
+              <h3>📊 Inventory Transaction History</h3>
+              <div className="transaction-actions">
+                <select
+                  value={selectedBatchForTransactions?.id || ''}
+                  onChange={(e) => {
+                    const batchId = e.target.value;
+                    const batch = liveChickens.find(b => b.id == batchId);
+                    setSelectedBatchForTransactions(batch);
+                  }}
+                  className="batch-select"
+                >
+                  <option value="">Select Batch for Transaction History</option>
+                  {liveChickens.map(batch => (
+                    <option key={batch.id} value={batch.id}>
+                      {batch.batch_id} - {batch.breed} ({batch.current_count} birds)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {selectedBatchForTransactions && (
+              <div className="batch-transaction-summary">
+                <div className="summary-cards">
+                  <div className="summary-card sales">
+                    <h4>Sales</h4>
+                    <p className="summary-value">{formatNumber(batchTransactionSummary.totalSales)}</p>
+                  </div>
+                  <div className="summary-card mortality">
+                    <h4>Mortality</h4>
+                    <p className="summary-value">{formatNumber(batchTransactionSummary.totalMortality)}</p>
+                  </div>
+                  <div className="summary-card adjustments">
+                    <h4>Adjustments</h4>
+                    <p className="summary-value">{formatNumber(batchTransactionSummary.totalAdjustments)}</p>
+                  </div>
+                  <div className="summary-card net">
+                    <h4>Net Change</h4>
+                    <p className={`summary-value ${batchTransactionSummary.netChange < 0 ? 'negative' : 'positive'}`}>
+                      {batchTransactionSummary.netChange >= 0 ? '+' : ''}{formatNumber(batchTransactionSummary.netChange)}
+                    </p>
+                  </div>
+                  <div className="summary-card total">
+                    <h4>Total Transactions</h4>
+                    <p className="summary-value">{batchTransactionSummary.transactionCount}</p>
+                  </div>
+                </div>
+
+                <div className="transaction-filters">
+                  <select
+                    value={transactionFilters.type}
+                    onChange={(e) => setTransactionFilters(prev => ({ ...prev, type: e.target.value }))}
+                  >
+                    <option value="">All Transaction Types</option>
+                    <option value="sale">Sales</option>
+                    <option value="mortality">Mortality</option>
+                    <option value="adjustment">Adjustments</option>
+                    <option value="transfer">Transfers</option>
+                  </select>
+                  <input
+                    type="date"
+                    placeholder="Filter by date"
+                    value={transactionFilters.dateRange}
+                    onChange={(e) => setTransactionFilters(prev => ({ ...prev, dateRange: e.target.value }))}
+                  />
+                </div>
+
+                <div className="table-container">
+                  <table className="transactions-table">
+                    <thead>
+                      <tr>
+                        <SortableTableHeader
+                          sortKey="created_at"
+                          onSort={requestTransactionSort}
+                          getSortIcon={getTransactionSortIcon}
+                        >
+                          Date
+                        </SortableTableHeader>
+                        <SortableTableHeader
+                          sortKey="displayType"
+                          onSort={requestTransactionSort}
+                          getSortIcon={getTransactionSortIcon}
+                        >
+                          Type
+                        </SortableTableHeader>
+                        <SortableTableHeader
+                          sortKey="displayQuantity"
+                          onSort={requestTransactionSort}
+                          getSortIcon={getTransactionSortIcon}
+                        >
+                          Quantity
+                        </SortableTableHeader>
+                        <th>Reference</th>
+                        <th>Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedTransactions.length > 0 ? (
+                        sortedTransactions.map((transaction, index) => (
+                          <tr key={index} className={transaction.isDeduction ? 'deduction-row' : ''}>
+                            <td>{formatDate(transaction.created_at)}</td>
+                            <td>
+                              <span className={`transaction-type ${transaction.transaction_type}`}>
+                                {transaction.displayType}
+                              </span>
+                            </td>
+                            <td className={transaction.isDeduction ? 'negative' : ''}>
+                              {transaction.isDeduction ? '-' : '+'}{formatNumber(transaction.displayQuantity)}
+                            </td>
+                            <td>
+                              {transaction.reference_id && (
+                                <span className="reference-link">
+                                  {transaction.reference_type === 'chicken_order' ? 'Order #' : 'Ref: '}{transaction.reference_id}
+                                </span>
+                              )}
+                            </td>
+                            <td>{transaction.reason}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="5" className="no-data">
+                            No transactions found for this batch
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <SortControls
+                  sortConfig={transactionSortConfig}
+                  onReset={resetTransactionSort}
+                />
+              </div>
+            )}
           </div>
 
           <div className="filters-container">

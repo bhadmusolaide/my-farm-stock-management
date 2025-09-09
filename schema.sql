@@ -303,3 +303,41 @@ COMMENT ON TABLE public.live_chickens IS 'Live chicken batch tracking and manage
 COMMENT ON TABLE public.feed_inventory IS 'Feed inventory management';
 COMMENT ON TABLE public.feed_consumption IS 'Feed consumption tracking by chicken batches';
 COMMENT ON TABLE public.site_settings IS 'Global site settings and configuration';
+
+-- Create chicken_inventory_transactions table for tracking inventory changes
+CREATE TABLE IF NOT EXISTS public.chicken_inventory_transactions (
+    id BIGSERIAL PRIMARY KEY,
+    batch_id TEXT NOT NULL REFERENCES live_chickens(id) ON DELETE CASCADE,
+    transaction_type VARCHAR(50) NOT NULL CHECK (transaction_type IN ('sale', 'mortality', 'transfer', 'adjustment')),
+    quantity_changed INTEGER NOT NULL CHECK (quantity_changed != 0),
+    reason TEXT,
+    reference_id VARCHAR(255),
+    reference_type VARCHAR(50),
+    transaction_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    user_id UUID REFERENCES auth.users(id)
+);
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_chicken_transactions_batch ON public.chicken_inventory_transactions(batch_id);
+CREATE INDEX IF NOT EXISTS idx_chicken_transactions_date ON public.chicken_inventory_transactions(transaction_date);
+CREATE INDEX IF NOT EXISTS idx_chicken_transactions_type ON public.chicken_inventory_transactions(transaction_type);
+CREATE INDEX IF NOT EXISTS idx_chicken_transactions_batch_date ON public.chicken_inventory_transactions(batch_id, transaction_date);
+CREATE INDEX IF NOT EXISTS idx_chicken_transactions_reference ON public.chicken_inventory_transactions(reference_id, reference_type);
+
+-- Create trigger for updated_at column
+DROP TRIGGER IF EXISTS update_chicken_transactions_updated_at ON public.chicken_inventory_transactions;
+CREATE TRIGGER update_chicken_transactions_updated_at
+    BEFORE UPDATE ON public.chicken_inventory_transactions
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Enable RLS for the new table
+ALTER TABLE public.chicken_inventory_transactions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable read access for all users" ON public.chicken_inventory_transactions FOR SELECT USING (true);
+CREATE POLICY "Enable insert for authenticated users only" ON public.chicken_inventory_transactions FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Enable update for authenticated users only" ON public.chicken_inventory_transactions FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "Enable delete for authenticated users only" ON public.chicken_inventory_transactions FOR DELETE USING (auth.role() = 'authenticated');
+
+-- Add comment for documentation
+COMMENT ON TABLE public.chicken_inventory_transactions IS 'Audit trail for all changes to live chicken inventory (sales, mortality, transfers, etc.)';

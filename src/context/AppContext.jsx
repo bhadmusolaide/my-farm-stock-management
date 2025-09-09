@@ -51,6 +51,7 @@ export function AppProvider({ children }) {
   }
   const [feedConsumption, setFeedConsumption] = useState([])
   const [feedBatchAssignments, setFeedBatchAssignments] = useState([])
+  const [chickenInventoryTransactions, setChickenInventoryTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [migrationStatus, setMigrationStatus] = useState({
@@ -88,7 +89,7 @@ export function AppProvider({ children }) {
           const { data: chickensData, error: chickensError } = await supabase
             .from('chickens')
             .select('*')
-            .order('date', { ascending: false })
+            .order('created_at', { ascending: false })
           
           if (chickensError) throw chickensError
           setChickens(chickensData || [])
@@ -176,6 +177,38 @@ export function AppProvider({ children }) {
             console.warn('Feed batch assignments feature not available yet:', err)
             setFeedBatchAssignments([])
           }
+
+          // Load chicken inventory transactions (handle gracefully if table doesn't exist)
+          try {
+            const { data: chickenTransactionsData, error: chickenTransactionsError } = await supabase
+              .from('chicken_inventory_transactions')
+              .select('*')
+              .order('created_at', { ascending: false })
+            
+            if (chickenTransactionsError && !chickenTransactionsError.message.includes('relation "chicken_inventory_transactions" does not exist')) {
+              throw chickenTransactionsError
+            }
+            
+            // Prioritize database data over localStorage
+            if (chickenTransactionsData && chickenTransactionsData.length > 0) {
+              setChickenInventoryTransactions(chickenTransactionsData)
+            } else {
+              // Fallback to localStorage
+              const localChickenTransactions = localStorage.getItem('chickenInventoryTransactions')
+              if (localChickenTransactions && localChickenTransactions !== 'undefined') {
+                try {
+                  const parsedTransactions = JSON.parse(localChickenTransactions)
+                  setChickenInventoryTransactions(parsedTransactions)
+                } catch (e) {
+                  console.warn('Invalid chickenInventoryTransactions data in localStorage:', e)
+                  setChickenInventoryTransactions([])
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Chicken inventory transactions table not available yet:', err)
+            setChickenInventoryTransactions([])
+          }
           
           // Load transactions
           const { data: transactionsData, error: transactionsError } = await supabase
@@ -231,7 +264,8 @@ export function AppProvider({ children }) {
             const localTransactions = localStorage.getItem('transactions')
             if (localTransactions && localTransactions !== 'undefined') {
               try {
-                setTransactions(JSON.parse(localTransactions))
+                const parsedTransactions = JSON.parse(localTransactions)
+                setTransactions([...parsedTransactions].sort((a, b) => new Date(b.date) - new Date(a.date)))
               } catch (e) {
                 console.warn('Invalid transactions data in localStorage:', e)
               }
@@ -252,6 +286,17 @@ export function AppProvider({ children }) {
                 setLiveChickens(JSON.parse(localLiveChickens))
               } catch (e) {
                 console.warn('Invalid liveChickens data in localStorage:', e)
+              }
+            }
+
+            // Load chicken inventory transactions from localStorage as fallback
+            const localChickenTransactions = localStorage.getItem('chickenInventoryTransactions')
+            if (localChickenTransactions && localChickenTransactions !== 'undefined') {
+              try {
+                const parsedTransactions = JSON.parse(localChickenTransactions)
+                setChickenInventoryTransactions(parsedTransactions)
+              } catch (e) {
+                console.warn('Invalid chickenInventoryTransactions data in localStorage:', e)
               }
             }
           } else {
@@ -1274,6 +1319,58 @@ export function AppProvider({ children }) {
     }
   }
 
+  // Helper function to update chicken inventory transactions and save to localStorage
+  const updateChickenInventoryTransactions = (newTransactions) => {
+    setChickenInventoryTransactionsState(newTransactions)
+    localStorage.setItem('chickenInventoryTransactions', JSON.stringify(newTransactions))
+  }
+
+  // Function to log chicken inventory transaction
+  const logChickenTransaction = async (batchId, transactionType, quantityChanged, reason = '', referenceId = null, referenceType = null) => {
+    try {
+      const transactionData = {
+        batch_id: batchId,
+        transaction_type: transactionType,
+        quantity_changed: quantityChanged,
+        reason: reason,
+        reference_id: referenceId,
+        reference_type: referenceType,
+        transaction_date: new Date().toISOString().split('T')[0]
+      }
+
+      // Try to save to Supabase
+      try {
+        const { error } = await supabase
+          .from('chicken_inventory_transactions')
+          .insert(transactionData)
+        
+        if (error) {
+          console.warn('Failed to save chicken transaction to Supabase:', error)
+        }
+      } catch (supabaseError) {
+        console.warn('Supabase not available for chicken transactions, saving locally only:', supabaseError)
+      }
+
+      // Always update local state
+      const newTransaction = {
+        ...transactionData,
+        id: Date.now().toString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+      
+      setChickenInventoryTransactions(prev => [newTransaction, ...prev])
+
+      // Log audit action
+      await logAuditAction('CREATE', 'chicken_inventory_transactions', newTransaction.id, null, newTransaction)
+
+      return newTransaction
+    } catch (err) {
+      console.error('Error logging chicken transaction:', err)
+      throw err
+    }
+  }
+
   const value = {
     // State
     chickens,
@@ -1284,6 +1381,7 @@ export function AppProvider({ children }) {
     feedInventory,
     feedConsumption,
     feedBatchAssignments,
+    chickenInventoryTransactions,
     loading,
     error,
     migrationStatus,
@@ -1318,6 +1416,9 @@ export function AppProvider({ children }) {
     // Feed batch assignment operations
     addFeedBatchAssignment,
     deleteFeedBatchAssignment,
+    
+    // Chicken Inventory Transaction operations
+    logChickenTransaction,
     
     // Stats and reports
     stats,

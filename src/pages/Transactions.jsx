@@ -62,9 +62,9 @@ const Transactions = () => {
     let expenses = 0
     
     filteredTransactions.forEach(transaction => {
-      if (transaction.type === 'fund') {
+      if (transaction.type === 'fund' || transaction.type === 'income') {
         income += transaction.amount
-      } else {
+      } else if (transaction.type === 'expense' || transaction.type === 'stock_expense' || transaction.type === 'withdrawal') {
         expenses += transaction.amount
       }
     })

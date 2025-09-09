@@ -12,17 +12,18 @@ import useTableSort from '../hooks/useTableSort'
 import './Reports.css'
 
 const Reports = () => {
-  const { 
-    chickens, 
-    liveChickens, 
-    feedInventory, 
-    feedConsumption, 
-    stock, 
-    transactions, 
+  const {
+    chickens,
+    liveChickens,
+    feedInventory,
+    feedConsumption,
+    stock,
+    transactions,
     balance,
+    chickenInventoryTransactions,
     stats,
-    generateReport, 
-    exportToCSV 
+    generateReport,
+    exportToCSV
   } = useAppContext()
   
 
@@ -264,7 +265,97 @@ const Reports = () => {
       },
       breeds: breedPerformance
     }
-  }, [chickens, liveChickens, feedInventory, feedConsumption, transactions, stats])
+  }, [chickens, liveChickens, feedInventory, feedConsumption, transactions, stats, chickenInventoryTransactions])
+
+  // Chicken Inventory Analytics
+  const inventoryAnalytics = useMemo(() => {
+    if (!chickenInventoryTransactions.length) {
+      return {
+        totalSales: 0,
+        totalMortality: 0,
+        salesByMonth: [],
+        mortalityByMonth: [],
+        batchPerformance: [],
+        salesMortalityRatio: 0
+      };
+    }
+
+    // Calculate totals
+    const totalSales = chickenInventoryTransactions
+      .filter(t => t.transaction_type === 'sale')
+      .reduce((sum, t) => sum + Math.abs(t.quantity_changed), 0)
+    const totalMortality = chickenInventoryTransactions
+      .filter(t => t.transaction_type === 'mortality')
+      .reduce((sum, t) => sum + Math.abs(t.quantity_changed), 0)
+    const salesMortalityRatio = totalSales > 0 ? (totalMortality / totalSales) * 100 : 0
+
+    // Monthly breakdown
+    const monthlyData = {}
+    chickenInventoryTransactions.forEach(transaction => {
+      const date = new Date(transaction.transaction_date)
+      const monthKey = `${date.toLocaleString('default', { month: 'short' })} ${date.getFullYear()}`
+
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = {
+          name: monthKey,
+          sales: 0,
+          mortality: 0
+        }
+      }
+
+      if (transaction.transaction_type === 'sale') {
+        monthlyData[monthKey].sales += Math.abs(transaction.quantity_changed)
+      } else if (transaction.transaction_type === 'mortality') {
+        monthlyData[monthKey].mortality += Math.abs(transaction.quantity_changed)
+      }
+    })
+
+    const salesByMonth = Object.entries(monthlyData)
+      .map(([month, data]) => ({
+        name: month,
+        sales: data.sales,
+        mortality: data.mortality
+      }))
+      .sort((a, b) => {
+        const dateA = new Date(a.name)
+        const dateB = new Date(b.name)
+        return dateA - dateB
+      })
+      .slice(-6)
+
+    // Batch performance
+    const batchPerformance = liveChickens.map(batch => {
+      const batchTransactions = chickenInventoryTransactions.filter(t => t.batch_id == batch.id)
+      const sales = batchTransactions
+        .filter(t => t.transaction_type === 'sale')
+        .reduce((sum, t) => sum + Math.abs(t.quantity_changed), 0)
+      const mortality = batchTransactions
+        .filter(t => t.transaction_type === 'mortality')
+        .reduce((sum, t) => sum + Math.abs(t.quantity_changed), 0)
+      
+      return {
+        batch_id: batch.batch_id,
+        breed: batch.breed,
+        initial_count: batch.initial_count,
+        current_count: batch.current_count,
+        sales,
+        mortality,
+        survival_rate: batch.initial_count > 0 ? ((batch.current_count / batch.initial_count) * 100).toFixed(1) : 0
+      }
+    })
+
+    return {
+      totalSales,
+      totalMortality,
+      salesByMonth,
+      mortalityByMonth: salesByMonth.map(item => ({
+        ...item,
+        mortality: item.mortality
+      })),
+      batchPerformance,
+      salesMortalityRatio
+    }
+  }, [chickenInventoryTransactions, liveChickens])
   
   // Sorting hooks for customer table
   const {
@@ -331,11 +422,17 @@ const Reports = () => {
         >
           ⚙️ Operational
         </button>
-        <button 
+        <button
           className={`tab-button ${activeTab === 'customers' ? 'active' : ''}`}
           onClick={() => setActiveTab('customers')}
         >
           👥 Customers
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'inventory' ? 'active' : ''}`}
+          onClick={() => setActiveTab('inventory')}
+        >
+          🐔 Inventory Analytics
         </button>
       </div>
       
