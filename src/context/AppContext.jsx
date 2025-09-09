@@ -344,7 +344,7 @@ export function AppProvider({ children }) {
   const addChicken = async (chickenData) => {
     try {
       // Convert amountPaid to amount_paid to match database schema
-      const { amountPaid, calculationMode, ...otherData } = chickenData;
+      const { amountPaid, calculationMode, batch_id, ...otherData } = chickenData;
       
       const chicken = {
         id: Date.now().toString(),
@@ -352,6 +352,7 @@ export function AppProvider({ children }) {
         ...otherData,
         amount_paid: amountPaid || 0,
         calculation_mode: calculationMode || 'count_size_cost',
+        batch_id: batch_id || null,
         balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0)
       }
 
@@ -400,12 +401,13 @@ export function AppProvider({ children }) {
   const updateChicken = async (id, chickenData) => {
     try {
       // Convert amountPaid to amount_paid to match database schema
-      const { amountPaid, calculationMode, ...otherData } = chickenData;
+      const { amountPaid, calculationMode, batch_id, ...otherData } = chickenData;
       
       const updatedChicken = {
         ...otherData,
         amount_paid: amountPaid || 0,
         calculation_mode: calculationMode || 'count_size_cost',
+        batch_id: batch_id || null,
         balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0)
       }
 
@@ -425,7 +427,7 @@ export function AppProvider({ children }) {
       if (paymentDifference !== 0) {
         const transactionType = paymentDifference > 0 ? 'income' : 'expense'
         const transactionAmount = Math.abs(paymentDifference)
-        const transactionDescription = paymentDifference > 0 
+        const transactionDescription = paymentDifference > 0
           ? `Additional payment from ${updatedChicken.customer} for chicken order`
           : `Payment refund to ${updatedChicken.customer} for chicken order`
 
@@ -458,7 +460,7 @@ export function AppProvider({ children }) {
       await logAuditAction('UPDATE', 'chickens', id, oldChicken, updatedChicken)
 
       // Update local state
-      setChickens(prev => 
+      setChickens(prev =>
         prev.map(chicken => chicken.id === id ? { ...chicken, ...updatedChicken } : chicken)
       )
       return updatedChicken
@@ -492,6 +494,28 @@ export function AppProvider({ children }) {
           description: `Refund for deleted chicken order: ${chickenToDelete.customer}`,
           date: new Date().toISOString().split('T')[0]
         }
+      }
+      
+      // Restore chickens to batch if batch_id exists
+      if (chickenToDelete.batch_id) {
+        const batchUpdate = await supabase
+          .from('live_chickens')
+          .update({ current_count: supabase.sql`current_count + ${chickenToDelete.count}` })
+          .eq('id', chickenToDelete.batch_id)
+        
+        if (batchUpdate.error) {
+          console.warn('Failed to restore chicken count to batch:', batchUpdate.error)
+        }
+        
+        // Log return transaction
+        await logChickenTransaction(
+          chickenToDelete.batch_id,
+          'return',
+          chickenToDelete.count,
+          `Return of ${chickenToDelete.count} chickens from deleted order ${id}`,
+          id,
+          'chicken_order_return'
+        )
       }
       
       // Delete the chicken order

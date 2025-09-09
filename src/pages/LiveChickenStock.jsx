@@ -942,16 +942,20 @@ const LiveChickenStock = () => {
                       <td>{chicken.feed_type}</td>
                       <td>
                         <button
-                          className="edit-btn"
+                          className="edit-btn-icon"
                           onClick={() => handleEdit(chicken)}
+                          title="Edit batch"
+                          aria-label="Edit batch"
                         >
-                          Edit
+                          ✏️
                         </button>
                         <button
-                          className="delete-btn"
+                          className="delete-btn-icon"
                           onClick={() => handleDelete(chicken.id)}
+                          title="Delete batch"
+                          aria-label="Delete batch"
                         >
-                          Delete
+                          🗑️
                         </button>
                       </td>
                     </tr>
