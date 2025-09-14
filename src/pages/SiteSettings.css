@@ -295,25 +295,81 @@ input:checked + .slider:before {
 
 .nav-children {
   margin-top: 1rem;
-  padding-left: 2rem;
-  border-left: 2px solid var(--border-color);
+  padding: 1rem;
+  background: var(--nav-bg);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.nav-children-header {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.875rem;
 }
 
 .nav-child-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem 0;
+  padding: 0.75rem 0;
   border-bottom: 1px solid var(--border-color);
+  gap: 0.75rem;
 }
 
 .nav-child-item:last-child {
   border-bottom: none;
 }
 
-.nav-child-item span {
-  color: var(--text-secondary);
+.child-item-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-child-label-input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--text-primary);
   font-size: 0.875rem;
+}
+
+.nav-child-label-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}
+
+/* Dark mode for child navigation items */
+[data-theme="dark"] .nav-children {
+  background: var(--nav-bg-dark);
+  border-color: var(--border-color-dark);
+}
+
+[data-theme="dark"] .nav-children-header {
+  color: var(--text-primary-dark);
+  border-bottom-color: var(--border-color-dark);
+}
+
+[data-theme="dark"] .nav-child-item {
+  border-bottom-color: var(--border-color-dark);
+}
+
+[data-theme="dark"] .nav-child-label-input {
+  background: var(--input-bg-dark);
+  color: var(--text-primary-dark);
+  border-color: var(--border-color-dark);
+}
+
+[data-theme="dark"] .nav-child-label-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
 .settings-actions {

@@ -12,8 +12,8 @@ const defaultNavItems = [
     { id: 'live-chickens', label: 'Live Chicken Stock', path: '/live-chickens', enabled: true },
     { id: 'lifecycle', label: 'Lifecycle Tracking', path: '/lifecycle', enabled: true },
     { id: 'feed', label: 'Feed Management', path: '/feed', enabled: true },
-    { id: 'enhanced-feed', label: 'Enhanced Feed Mgt', path: '/enhanced-feed', enabled: true },
-    { id: 'processing', label: 'Processing Mgt', path: '/processing', enabled: true },
+    { id: 'enhanced-feed', label: 'Enhanced Feed Management', path: '/enhanced-feed', enabled: true },
+    { id: 'processing', label: 'Processing Management', path: '/processing', enabled: true },
     { id: 'batch-relationships', label: 'Batch Relationships', path: '/batch-relationships', enabled: true },
     { id: 'unified-inventory', label: 'Unified Inventory', path: '/unified-inventory', enabled: true }
   ]},
