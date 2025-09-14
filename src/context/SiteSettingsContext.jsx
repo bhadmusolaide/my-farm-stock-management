@@ -10,7 +10,12 @@ const defaultNavItems = [
   { id: 'inventory', label: 'Inventory', path: '/inventory', enabled: true, order: 3, isDropdown: true, children: [
     { id: 'stock', label: 'General Stock', path: '/stock', enabled: true },
     { id: 'live-chickens', label: 'Live Chicken Stock', path: '/live-chickens', enabled: true },
-    { id: 'feed', label: 'Feed Management', path: '/feed', enabled: true }
+    { id: 'lifecycle', label: 'Lifecycle Tracking', path: '/lifecycle', enabled: true },
+    { id: 'feed', label: 'Feed Management', path: '/feed', enabled: true },
+    { id: 'enhanced-feed', label: 'Enhanced Feed Management', path: '/enhanced-feed', enabled: true },
+    { id: 'processing', label: 'Processing Management', path: '/processing', enabled: true },
+    { id: 'batch-relationships', label: 'Batch Relationships', path: '/batch-relationships', enabled: true },
+    { id: 'unified-inventory', label: 'Unified Inventory', path: '/unified-inventory', enabled: true }
   ]},
   { id: 'transactions', label: 'Transactions', path: '/transactions', enabled: true, order: 4 },
   { id: 'reports', label: 'Reports', path: '/reports', enabled: true, order: 5 }

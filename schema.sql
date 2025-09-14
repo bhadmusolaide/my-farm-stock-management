@@ -94,6 +94,14 @@ CREATE TABLE IF NOT EXISTS public.live_chickens (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Add lifecycle tracking columns if they don't exist
+ALTER TABLE public.live_chickens ADD COLUMN IF NOT EXISTS lifecycle_stage TEXT DEFAULT 'arrival';
+ALTER TABLE public.live_chickens ADD COLUMN IF NOT EXISTS stage_arrival_date DATE;
+ALTER TABLE public.live_chickens ADD COLUMN IF NOT EXISTS stage_brooding_date DATE;
+ALTER TABLE public.live_chickens ADD COLUMN IF NOT EXISTS stage_growing_date DATE;
+ALTER TABLE public.live_chickens ADD COLUMN IF NOT EXISTS stage_processing_date DATE;
+ALTER TABLE public.live_chickens ADD COLUMN IF NOT EXISTS stage_freezer_date DATE;
+
 -- Create feed_inventory table
 CREATE TABLE IF NOT EXISTS public.feed_inventory (
     id TEXT PRIMARY KEY,
@@ -201,7 +209,6 @@ SELECT create_standard_rls_policies('audit_logs');
 SELECT create_standard_rls_policies('live_chickens');
 SELECT create_standard_rls_policies('feed_inventory');
 SELECT create_standard_rls_policies('feed_consumption');
-SELECT create_standard_rls_policies('feed_batch_assignments');
 
 -- Clean up the utility function
 DROP FUNCTION create_standard_rls_policies(TEXT);
@@ -284,13 +291,17 @@ INSERT INTO public.site_settings (settings_data) VALUES ('{
   "loginLogoType": "svg",
   "loginLogoUrl": "",
   "navigationItems": [
-    {"id": "dashboard", "label": "Dashboard", "path": "/", "icon": "📊", "enabled": true},
-    {"id": "chickens", "label": "Chicken Orders", "path": "/chickens", "icon": "🐔", "enabled": true},
-    {"id": "stock", "label": "Stock Management", "path": "/stock", "icon": "📦", "enabled": true},
-    {"id": "live-chickens", "label": "Live Chickens", "path": "/live-chickens", "icon": "🐓", "enabled": true},
-    {"id": "feed", "label": "Feed Management", "path": "/feed", "icon": "🌾", "enabled": true},
-    {"id": "transactions", "label": "Transactions", "path": "/transactions", "icon": "💰", "enabled": true},
-    {"id": "reports", "label": "Reports", "path": "/reports", "icon": "📈", "enabled": true}
+    {"id": "dashboard", "label": "Dashboard", "path": "/", "icon": "📊", "enabled": true, "order": 1},
+    {"id": "chickens", "label": "Chicken Orders", "path": "/chickens", "icon": "🐔", "enabled": true, "order": 2},
+    {"id": "inventory", "label": "Inventory", "path": "/inventory", "icon": "📦", "enabled": true, "order": 3, "isDropdown": true, "children": [
+      {"id": "stock", "label": "General Stock", "path": "/stock", "enabled": true},
+      {"id": "live-chickens", "label": "Live Chicken Stock", "path": "/live-chickens", "enabled": true},
+      {"id": "lifecycle", "label": "Lifecycle Tracking", "path": "/lifecycle", "enabled": true},
+      {"id": "feed", "label": "Feed Management", "path": "/feed", "enabled": true},
+      {"id": "enhanced-feed", "label": "Enhanced Feed Management", "path": "/enhanced-feed", "enabled": true}
+    ]},
+    {"id": "transactions", "label": "Transactions", "path": "/transactions", "icon": "💰", "enabled": true, "order": 4},
+    {"id": "reports", "label": "Reports", "path": "/reports", "icon": "📈", "enabled": true, "order": 5}
   ]
 }') ON CONFLICT DO NOTHING;
 
@@ -321,12 +332,51 @@ CREATE TABLE IF NOT EXISTS public.chicken_inventory_transactions (
     user_id UUID REFERENCES auth.users(id)
 );
 
+-- Create dressed_chickens table for tracking processed/dressed chicken inventory
+CREATE TABLE IF NOT EXISTS public.dressed_chickens (
+    id TEXT PRIMARY KEY,
+    batch_id TEXT NOT NULL,
+    processing_date DATE NOT NULL,
+    initial_count INTEGER NOT NULL,
+    current_count INTEGER NOT NULL,
+    average_weight DECIMAL(10,2) NOT NULL,
+    size_category TEXT NOT NULL, -- 'small', 'medium', 'large', 'extra-large'
+    status TEXT NOT NULL DEFAULT 'in-storage', -- 'in-storage', 'sold', 'expired'
+    storage_location TEXT,
+    expiry_date DATE,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create batch_relationships table for tracking relationships between batches
+CREATE TABLE IF NOT EXISTS public.batch_relationships (
+    id TEXT PRIMARY KEY,
+    source_batch_id TEXT NOT NULL,
+    source_batch_type TEXT NOT NULL, -- 'live_chickens', 'dressed_chickens', 'feed_inventory'
+    target_batch_id TEXT NOT NULL,
+    target_batch_type TEXT NOT NULL, -- 'live_chickens', 'dressed_chickens', 'feed_inventory'
+    relationship_type TEXT NOT NULL, -- 'fed_to', 'processed_from', 'sold_to', 'transferred_to'
+    quantity INTEGER,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_chicken_transactions_batch ON public.chicken_inventory_transactions(batch_id);
 CREATE INDEX IF NOT EXISTS idx_chicken_transactions_date ON public.chicken_inventory_transactions(transaction_date);
 CREATE INDEX IF NOT EXISTS idx_chicken_transactions_type ON public.chicken_inventory_transactions(transaction_type);
 CREATE INDEX IF NOT EXISTS idx_chicken_transactions_batch_date ON public.chicken_inventory_transactions(batch_id, transaction_date);
 CREATE INDEX IF NOT EXISTS idx_chicken_transactions_reference ON public.chicken_inventory_transactions(reference_id, reference_type);
+CREATE INDEX IF NOT EXISTS idx_dressed_chickens_batch_id ON public.dressed_chickens(batch_id);
+CREATE INDEX IF NOT EXISTS idx_dressed_chickens_processing_date ON public.dressed_chickens(processing_date);
+CREATE INDEX IF NOT EXISTS idx_dressed_chickens_status ON public.dressed_chickens(status);
+CREATE INDEX IF NOT EXISTS idx_dressed_chickens_size_category ON public.dressed_chickens(size_category);
+CREATE INDEX IF NOT EXISTS idx_dressed_chickens_expiry_date ON public.dressed_chickens(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_batch_relationships_source ON public.batch_relationships(source_batch_id, source_batch_type);
+CREATE INDEX IF NOT EXISTS idx_batch_relationships_target ON public.batch_relationships(target_batch_id, target_batch_type);
+CREATE INDEX IF NOT EXISTS idx_batch_relationships_type ON public.batch_relationships(relationship_type);
 
 -- Create trigger for updated_at column
 DROP TRIGGER IF EXISTS update_chicken_transactions_updated_at ON public.chicken_inventory_transactions;
@@ -334,12 +384,28 @@ CREATE TRIGGER update_chicken_transactions_updated_at
     BEFORE UPDATE ON public.chicken_inventory_transactions
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
--- Enable RLS for the new table
+-- Create trigger for updated_at column for dressed chickens
+DROP TRIGGER IF EXISTS update_dressed_chickens_updated_at ON public.dressed_chickens;
+CREATE TRIGGER update_dressed_chickens_updated_at
+    BEFORE UPDATE ON public.dressed_chickens
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Create trigger for updated_at column for batch relationships
+DROP TRIGGER IF EXISTS update_batch_relationships_updated_at ON public.batch_relationships;
+CREATE TRIGGER update_batch_relationships_updated_at
+    BEFORE UPDATE ON public.batch_relationships
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Enable RLS for the new table (policies will be applied by the function)
 ALTER TABLE public.chicken_inventory_transactions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Enable read access for all users" ON public.chicken_inventory_transactions FOR SELECT USING (true);
-CREATE POLICY "Enable insert for authenticated users only" ON public.chicken_inventory_transactions FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "Enable update for authenticated users only" ON public.chicken_inventory_transactions FOR UPDATE USING (auth.role() = 'authenticated');
-CREATE POLICY "Enable delete for authenticated users only" ON public.chicken_inventory_transactions FOR DELETE USING (auth.role() = 'authenticated');
+ALTER TABLE public.dressed_chickens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.batch_relationships ENABLE ROW LEVEL SECURITY;
+
+-- Apply standard RLS policies to the new table
+SELECT create_standard_rls_policies('dressed_chickens');
+SELECT create_standard_rls_policies('batch_relationships');
 
 -- Add comment for documentation
 COMMENT ON TABLE public.chicken_inventory_transactions IS 'Audit trail for all changes to live chicken inventory (sales, mortality, transfers, etc.)';
+COMMENT ON TABLE public.dressed_chickens IS 'Processed/dressed chicken inventory tracking';
+COMMENT ON TABLE public.batch_relationships IS 'Relationships between different batches (feed to chickens, processing, etc.)';

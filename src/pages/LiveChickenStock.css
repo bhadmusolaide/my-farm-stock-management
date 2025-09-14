@@ -1485,3 +1485,69 @@
   border-color: var(--input-focus-border);
   box-shadow: 0 0 0 2px var(--input-focus-shadow);
 }
+
+.lifecycle-stage-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: capitalize;
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.lifecycle-stage-badge.arrival {
+  background-color: #fff3e0;
+  color: #f57c00;
+}
+
+.lifecycle-stage-badge.brooding {
+  background-color: #e8f5e8;
+  color: #2e7d32;
+}
+
+.lifecycle-stage-badge.growing {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.lifecycle-stage-badge.processing {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.lifecycle-stage-badge.freezer {
+  background-color: #e0f7fa;
+  color: #0097a7;
+}
+
+/* Dark mode styles for lifecycle stage badge */
+[data-theme="dark"] .lifecycle-stage-badge {
+  background-color: rgba(33, 150, 243, 0.2);
+  color: #64b5f6;
+}
+
+[data-theme="dark"] .lifecycle-stage-badge.arrival {
+  background-color: rgba(255, 152, 0, 0.2);
+  color: #ffb74d;
+}
+
+[data-theme="dark"] .lifecycle-stage-badge.brooding {
+  background-color: rgba(76, 175, 80, 0.2);
+  color: #81c784;
+}
+
+[data-theme="dark"] .lifecycle-stage-badge.growing {
+  background-color: rgba(33, 150, 243, 0.2);
+  color: #64b5f6;
+}
+
+[data-theme="dark"] .lifecycle-stage-badge.processing {
+  background-color: rgba(156, 39, 176, 0.2);
+  color: #ce93d8;
+}
+
+[data-theme="dark"] .lifecycle-stage-badge.freezer {
+  background-color: rgba(0, 151, 167, 0.2);
+  color: #4dd0e1;
+}
