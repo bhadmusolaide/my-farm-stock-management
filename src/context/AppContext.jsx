@@ -352,7 +352,7 @@ export function AppProvider({ children }) {
         ...otherData,
         amount_paid: amountPaid || 0,
         calculation_mode: calculationMode || 'count_size_cost',
-        batch_id: batch_id || null,
+        batch_id: batch_id || null, // Now included in database schema
         balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0)
       }
 
@@ -407,7 +407,7 @@ export function AppProvider({ children }) {
         ...otherData,
         amount_paid: amountPaid || 0,
         calculation_mode: calculationMode || 'count_size_cost',
-        batch_id: batch_id || null,
+        batch_id: batch_id || null, // Now included in database schema
         balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0)
       }
 

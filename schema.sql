@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.chickens (
     balance DECIMAL(10,2) NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     calculation_mode TEXT DEFAULT 'count_size_cost',
+    batch_id TEXT, -- Add batch_id column to link to live_chickens
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -236,6 +237,7 @@ CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.feed_consumption FOR EA
 CREATE INDEX IF NOT EXISTS idx_chickens_date ON public.chickens(date DESC);
 CREATE INDEX IF NOT EXISTS idx_chickens_customer ON public.chickens(customer);
 CREATE INDEX IF NOT EXISTS idx_chickens_status ON public.chickens(status);
+CREATE INDEX IF NOT EXISTS idx_chickens_batch_id ON public.chickens(batch_id); -- Add index for batch_id
 CREATE INDEX IF NOT EXISTS idx_stock_date ON public.stock(date DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_date ON public.transactions(date DESC);
 CREATE INDEX IF NOT EXISTS idx_transactions_type ON public.transactions(type);
