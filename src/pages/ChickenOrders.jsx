@@ -698,7 +698,7 @@ const ChickenOrders = () => {
                 
                 <div className="form-row">
                   <div className="form-group">
-                    <label htmlFor="batch_id">Select Chicken Batch (Optional)</label>
+                    <label htmlFor="batch_id">Chicken Batch (Optional)</label>
                     <select
                       id="batch_id"
                       name="batch_id"
@@ -746,7 +746,7 @@ const ChickenOrders = () => {
                       onChange={handleInputChange}
                       required
                     >
-                      <option value="count_size_cost">Count (for batch) + Total Weight × Price per kg</option>
+                      <option value="count_size_cost">Count + Total Weight × Price per kg</option>
                       <option value="count_cost">Count × Price per item</option>
                       <option value="size_cost">Size × Price per kg</option>
                     </select>
