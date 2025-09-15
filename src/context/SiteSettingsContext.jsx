@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { supabaseUrl, supabaseAnonKey } from '../utils/supabaseClient'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../utils/supabaseClient'
 
 const SiteSettingsContext = createContext()
 
@@ -44,24 +43,32 @@ export const SiteSettingsProvider = ({ children }) => {
 
   // Real-time subscription for site settings changes
   useEffect(() => {
-    const subscription = supabase
-      .channel('site-settings-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'site_settings'
-        },
-        () => {
-          console.log('Site settings changed, reloading...')
-          loadSettings()
-        }
-      )
-      .subscribe()
+    let subscription
+    
+    const setupSubscription = async () => {
+      subscription = supabase
+        .channel('site-settings-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'site_settings'
+          },
+          () => {
+            console.log('Site settings changed, reloading...')
+            loadSettings()
+          }
+        )
+        .subscribe()
+    }
+    
+    setupSubscription()
 
     return () => {
-      supabase.removeChannel(subscription)
+      if (subscription) {
+        subscription.unsubscribe()
+      }
     }
   }, [])
 
@@ -102,13 +109,18 @@ export const SiteSettingsProvider = ({ children }) => {
 
   const initializeSettingsTable = async () => {
     try {
-      // Use admin client to create table if needed
-      const { error: createError } = await adminSupabase.rpc('create_site_settings_table')
-      if (createError) {
-        console.warn('Settings table creation warning:', createError)
+      // Use service role key for admin operations if available
+      const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
+      
+      if (serviceRoleKey) {
+        // Temporarily switch to service role for table creation
+        const { error: createError } = await supabase.rpc('create_site_settings_table')
+        if (createError) {
+          console.warn('Settings table creation warning:', createError)
+        }
       }
       
-      // Insert default settings using admin client
+      // Insert default settings
       await saveSettingsToSupabase(defaultSettings)
       setSettings(defaultSettings)
       console.log('Initialized site settings table with defaults')
@@ -118,15 +130,13 @@ export const SiteSettingsProvider = ({ children }) => {
       setSettings(defaultSettings)
     }
   }
-
-  const adminSupabase = createClient(supabaseUrl, import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey)
   
   const saveSettingsToSupabase = async (newSettings) => {
     try {
       console.log('Saving settings to database:', newSettings)
       
-      // Use admin client to bypass RLS for settings updates
-      const { error } = await adminSupabase
+      // Perform upsert operation
+      const { error } = await supabase
         .from('site_settings')
         .upsert({
           id: 1,
@@ -145,14 +155,13 @@ export const SiteSettingsProvider = ({ children }) => {
       console.log('Settings saved successfully to database')
       
       // Trigger real-time update for other clients using main client
-      await supabase
-        .channel('site-settings-update')
-        .send({
-          type: 'broadcast',
-          event: 'settings-updated',
-          payload: { timestamp: new Date().toISOString() }
-        })
-  
+      const channel = supabase.channel('site-settings-update')
+      channel.send({
+        type: 'broadcast',
+        event: 'settings-updated',
+        payload: { timestamp: new Date().toISOString() }
+      })
+
     } catch (error) {
       console.error('Error saving settings:', error)
       throw error
