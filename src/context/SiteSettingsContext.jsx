@@ -41,22 +41,55 @@ export const SiteSettingsProvider = ({ children }) => {
     loadSettings()
   }, [])
 
+  // Real-time subscription for site settings changes
+  useEffect(() => {
+    const subscription = supabase
+      .channel('site-settings-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'site_settings'
+        },
+        () => {
+          console.log('Site settings changed, reloading...')
+          loadSettings()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subscription)
+    }
+  }, [])
+
   const loadSettings = async () => {
     try {
+      setLoading(true)
       const { data, error } = await supabase
         .from('site_settings')
         .select('settings_data')
-        .order('id', { ascending: false })
+        .order('updated_at', { ascending: false })
         .limit(1)
         .single()
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error loading settings:', error)
+        // If table doesn't exist, create it
+        if (error.code === '42P01') {
+          await initializeSettingsTable()
+        }
         return
       }
 
       if (data?.settings_data) {
+        console.log('Loaded settings from database:', data.settings_data)
         setSettings({ ...defaultSettings, ...data.settings_data })
+      } else {
+        // No settings found, initialize with defaults
+        console.log('No settings found in database, using defaults')
+        await initializeSettingsTable()
       }
     } catch (error) {
       console.error('Error loading settings:', error)
@@ -65,21 +98,70 @@ export const SiteSettingsProvider = ({ children }) => {
     }
   }
 
+  const initializeSettingsTable = async () => {
+    try {
+      // Create table if it doesn't exist
+      const { error: createError } = await supabase.rpc('create_site_settings_table')
+      if (createError && createError.message.includes('already exists')) {
+        // Table exists, initialize with defaults
+        await saveSettingsToSupabase(defaultSettings)
+      }
+      
+      // Insert default settings
+      await saveSettingsToSupabase(defaultSettings)
+      setSettings(defaultSettings)
+      console.log('Initialized site settings table with defaults')
+    } catch (error) {
+      console.error('Error initializing settings table:', error)
+      // Fallback to local defaults
+      setSettings(defaultSettings)
+    }
+  }
+
   const saveSettingsToSupabase = async (newSettings) => {
     try {
+      console.log('Saving settings to database:', newSettings)
+      
+      // First, ensure the table exists by trying to create it (idempotent)
+      try {
+        const { error: createError } = await supabase.rpc('create_site_settings_table')
+        if (createError) {
+          console.warn('Settings table creation warning:', createError)
+        }
+      } catch (createErr) {
+        console.warn('Could not verify settings table existence:', createErr)
+      }
+  
       const { error } = await supabase
         .from('site_settings')
         .upsert({
           id: 1,
           settings_data: newSettings,
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'id',
+          ignoreDuplicates: false
         })
-
+  
       if (error) {
-        console.error('Error saving settings:', error)
+        console.error('Error saving settings to database:', error)
+        throw error
       }
+  
+      console.log('Settings saved successfully to database')
+      
+      // Trigger real-time update for other clients
+      await supabase
+        .channel('site-settings-update')
+        .send({
+          type: 'broadcast',
+          event: 'settings-updated',
+          payload: { timestamp: new Date().toISOString() }
+        })
+  
     } catch (error) {
       console.error('Error saving settings:', error)
+      throw error
     }
   }
 
@@ -87,12 +169,18 @@ export const SiteSettingsProvider = ({ children }) => {
     const updatedSettings = { ...settings, ...newSettings }
     setSettings(updatedSettings)
     await saveSettingsToSupabase(updatedSettings)
+    
+    // Force reload to ensure latest data
+    await loadSettings()
   }
-
+  
   const updateNavigationItems = async (items) => {
     const updatedSettings = { ...settings, navigationItems: items }
     setSettings(updatedSettings)
     await saveSettingsToSupabase(updatedSettings)
+    
+    // Force reload to ensure latest data
+    await loadSettings()
   }
 
   const resetToDefaults = async () => {
