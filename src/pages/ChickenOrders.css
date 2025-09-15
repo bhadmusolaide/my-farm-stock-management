@@ -271,6 +271,7 @@
 
 .customer-name {
   font-weight: 500;
+  font-size: 0.85rem; /* Match the font size of other table cells */
 }
 
 .customer-phone {

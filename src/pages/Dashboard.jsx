@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useAppContext } from '../context/AppContext'
-import { formatNumber, formatDate } from '../utils/formatters'
+import { formatNumber, formatDate, formatDateWithTime } from '../utils/formatters'
 import { 
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, Area, AreaChart, ComposedChart
@@ -74,8 +74,14 @@ const Dashboard = () => {
     }
   }, [chickens, selectedStatusFilter])
   
-  // Memoized data for recent transactions
-  const recentTransactions = useMemo(() => transactions.slice(0, 5), [transactions])
+  // Memoized data for recent transactions - sorted by date descending (most recent first)
+  const recentTransactions = useMemo(() => {
+    // Create a copy of transactions and sort by date descending
+    const sortedTransactions = [...transactions].sort((a, b) => 
+      new Date(b.date) - new Date(a.date)
+    )
+    return sortedTransactions.slice(0, 5)
+  }, [transactions])
   
   // Get pending and partial orders for carousel
   const pendingPartialOrders = useMemo(() => {
@@ -248,7 +254,7 @@ const Dashboard = () => {
                   </div>
                   <div className="order-meta">
                     <span className="order-date">
-                      {formatDate(order.date)}
+                      {formatDateWithTime(order.date)}
                     </span>
                     <span className="order-size">
                       Size: {formatNumber(order.size)}kg
@@ -502,7 +508,7 @@ const Dashboard = () => {
             {recentTransactions.map(transaction => (
               <div key={transaction.id} className={`transaction-item ${transaction.type}`}>
                 <div className="transaction-info">
-                  <span className="transaction-date">{formatDate(transaction.date)}</span>
+                  <span className="transaction-date">{formatDateWithTime(transaction.created_at || transaction.date)}</span>
                   <span className="transaction-description">{transaction.description}</span>
                 </div>
                 <span className="transaction-amount">

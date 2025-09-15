@@ -282,6 +282,68 @@
   transform: translateY(-1px);
 }
 
+/* Icon Action Buttons */
+.edit-btn-icon, .delete-btn-icon {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  margin: 0 0.2rem;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.edit-btn-icon {
+  color: #2196f3;
+}
+
+.edit-btn-icon:hover {
+  background-color: rgba(33, 150, 243, 0.1);
+  transform: scale(1.1);
+}
+
+.delete-btn-icon {
+  color: #f44336;
+}
+
+.delete-btn-icon:hover {
+  background-color: rgba(244, 67, 54, 0.1);
+  transform: scale(1.1);
+}
+
+/* Responsive icon buttons */
+@media (max-width: 768px) {
+  .edit-btn-icon, .delete-btn-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 0.9rem;
+    padding: 0.3rem;
+  }
+}
+
+/* Dark mode for icon buttons */
+[data-theme="dark"] .edit-btn-icon {
+  color: #64b5f6;
+}
+
+[data-theme="dark"] .edit-btn-icon:hover {
+  background-color: rgba(33, 150, 243, 0.2);
+}
+
+[data-theme="dark"] .delete-btn-icon {
+  color: #e57373;
+}
+
+[data-theme="dark"] .delete-btn-icon:hover {
+  background-color: rgba(244, 67, 54, 0.2);
+}
+
 .no-data {
   text-align: center;
   color: #666;
@@ -1422,4 +1484,70 @@
 [data-theme="dark"] .form-group textarea:focus {
   border-color: var(--input-focus-border);
   box-shadow: 0 0 0 2px var(--input-focus-shadow);
+}
+
+.lifecycle-stage-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: capitalize;
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.lifecycle-stage-badge.arrival {
+  background-color: #fff3e0;
+  color: #f57c00;
+}
+
+.lifecycle-stage-badge.brooding {
+  background-color: #e8f5e8;
+  color: #2e7d32;
+}
+
+.lifecycle-stage-badge.growing {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.lifecycle-stage-badge.processing {
+  background-color: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.lifecycle-stage-badge.freezer {
+  background-color: #e0f7fa;
+  color: #0097a7;
+}
+
+/* Dark mode styles for lifecycle stage badge */
+[data-theme="dark"] .lifecycle-stage-badge {
+  background-color: rgba(33, 150, 243, 0.2);
+  color: #64b5f6;
+}
+
+[data-theme="dark"] .lifecycle-stage-badge.arrival {
+  background-color: rgba(255, 152, 0, 0.2);
+  color: #ffb74d;
+}
+
+[data-theme="dark"] .lifecycle-stage-badge.brooding {
+  background-color: rgba(76, 175, 80, 0.2);
+  color: #81c784;
+}
+
+[data-theme="dark"] .lifecycle-stage-badge.growing {
+  background-color: rgba(33, 150, 243, 0.2);
+  color: #64b5f6;
+}
+
+[data-theme="dark"] .lifecycle-stage-badge.processing {
+  background-color: rgba(156, 39, 176, 0.2);
+  color: #ce93d8;
+}
+
+[data-theme="dark"] .lifecycle-stage-badge.freezer {
+  background-color: rgba(0, 151, 167, 0.2);
+  color: #4dd0e1;
 }

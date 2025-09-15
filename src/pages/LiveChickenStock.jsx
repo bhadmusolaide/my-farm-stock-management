@@ -149,6 +149,19 @@ const LiveChickenStock = () => {
     return diffWeeks;
   };
 
+  // Get lifecycle stage display
+  const getLifecycleStage = (batch) => {
+    const stage = batch.lifecycle_stage || 'arrival';
+    const stages = {
+      'arrival': 'DOC Arrival',
+      'brooding': 'Brooding',
+      'growing': 'Growing',
+      'processing': 'Processing',
+      'freezer': 'Freezer Storage'
+    };
+    return stages[stage] || stage;
+  };
+
   // Filter and process chicken data
   const processedChickens = useMemo(() => {
     if (!liveChickens) return [];
@@ -899,6 +912,9 @@ const LiveChickenStock = () => {
                   <SortableTableHeader sortKey="mortalityRate" onSort={requestChickenSort} getSortIcon={getChickenSortIcon}>
                     Mortality
                   </SortableTableHeader>
+                  <SortableTableHeader sortKey="lifecycle_stage" onSort={requestChickenSort} getSortIcon={getChickenSortIcon}>
+                    Lifecycle Stage
+                  </SortableTableHeader>
                   <SortableTableHeader sortKey="status" onSort={requestChickenSort} getSortIcon={getChickenSortIcon}>
                     Status
                   </SortableTableHeader>
@@ -935,6 +951,11 @@ const LiveChickenStock = () => {
                         {chicken.initial_count - chicken.current_count}
                       </td>
                       <td>
+                        <span className="lifecycle-stage-badge">
+                          {getLifecycleStage(chicken)}
+                        </span>
+                      </td>
+                      <td>
                         <span className={getStatusBadge(chicken.status)}>
                           {chicken.status}
                         </span>
@@ -942,16 +963,20 @@ const LiveChickenStock = () => {
                       <td>{chicken.feed_type}</td>
                       <td>
                         <button
-                          className="edit-btn"
+                          className="edit-btn-icon"
                           onClick={() => handleEdit(chicken)}
+                          title="Edit batch"
+                          aria-label="Edit batch"
                         >
-                          Edit
+                          ✏️
                         </button>
                         <button
-                          className="delete-btn"
+                          className="delete-btn-icon"
                           onClick={() => handleDelete(chicken.id)}
+                          title="Delete batch"
+                          aria-label="Delete batch"
                         >
-                          Delete
+                          🗑️
                         </button>
                       </td>
                     </tr>

@@ -344,7 +344,7 @@ export function AppProvider({ children }) {
   const addChicken = async (chickenData) => {
     try {
       // Convert amountPaid to amount_paid to match database schema
-      const { amountPaid, calculationMode, ...otherData } = chickenData;
+      const { amountPaid, calculationMode, batch_id, ...otherData } = chickenData;
       
       const chicken = {
         id: Date.now().toString(),
@@ -352,6 +352,7 @@ export function AppProvider({ children }) {
         ...otherData,
         amount_paid: amountPaid || 0,
         calculation_mode: calculationMode || 'count_size_cost',
+        batch_id: batch_id || null, // Now included in database schema
         balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0)
       }
 
@@ -400,12 +401,13 @@ export function AppProvider({ children }) {
   const updateChicken = async (id, chickenData) => {
     try {
       // Convert amountPaid to amount_paid to match database schema
-      const { amountPaid, calculationMode, ...otherData } = chickenData;
+      const { amountPaid, calculationMode, batch_id, ...otherData } = chickenData;
       
       const updatedChicken = {
         ...otherData,
         amount_paid: amountPaid || 0,
         calculation_mode: calculationMode || 'count_size_cost',
+        batch_id: batch_id || null, // Now included in database schema
         balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0)
       }
 
@@ -425,7 +427,7 @@ export function AppProvider({ children }) {
       if (paymentDifference !== 0) {
         const transactionType = paymentDifference > 0 ? 'income' : 'expense'
         const transactionAmount = Math.abs(paymentDifference)
-        const transactionDescription = paymentDifference > 0 
+        const transactionDescription = paymentDifference > 0
           ? `Additional payment from ${updatedChicken.customer} for chicken order`
           : `Payment refund to ${updatedChicken.customer} for chicken order`
 
@@ -458,7 +460,7 @@ export function AppProvider({ children }) {
       await logAuditAction('UPDATE', 'chickens', id, oldChicken, updatedChicken)
 
       // Update local state
-      setChickens(prev => 
+      setChickens(prev =>
         prev.map(chicken => chicken.id === id ? { ...chicken, ...updatedChicken } : chicken)
       )
       return updatedChicken
@@ -492,6 +494,28 @@ export function AppProvider({ children }) {
           description: `Refund for deleted chicken order: ${chickenToDelete.customer}`,
           date: new Date().toISOString().split('T')[0]
         }
+      }
+      
+      // Restore chickens to batch if batch_id exists
+      if (chickenToDelete.batch_id) {
+        const batchUpdate = await supabase
+          .from('live_chickens')
+          .update({ current_count: supabase.sql`current_count + ${chickenToDelete.count}` })
+          .eq('id', chickenToDelete.batch_id)
+        
+        if (batchUpdate.error) {
+          console.warn('Failed to restore chicken count to batch:', batchUpdate.error)
+        }
+        
+        // Log return transaction
+        await logChickenTransaction(
+          chickenToDelete.batch_id,
+          'return',
+          chickenToDelete.count,
+          `Return of ${chickenToDelete.count} chickens from deleted order ${id}`,
+          id,
+          'chicken_order_return'
+        )
       }
       
       // Delete the chicken order
@@ -944,7 +968,9 @@ export function AppProvider({ children }) {
   const addLiveChicken = async (chickenData) => {
     try {
       const chicken = {
-        ...chickenData
+        ...chickenData,
+        lifecycle_stage: 'arrival',
+        stage_arrival_date: new Date().toISOString().split('T')[0]
       }
       
       // Save to Supabase first - this is mandatory for data persistence
@@ -1371,6 +1397,237 @@ export function AppProvider({ children }) {
     }
   }
 
+  // Dressed Chicken CRUD operations
+  const [dressedChickens, setDressedChickens] = useState([])
+
+  // Load dressed chickens from Supabase
+  useEffect(() => {
+    async function loadDressedChickens() {
+      try {
+        const { data, error } = await supabase
+          .from('dressed_chickens')
+          .select('*')
+          .order('processing_date', { ascending: false })
+        
+        if (error && !error.message.includes('relation "dressed_chickens" does not exist')) {
+          throw error
+        }
+        
+        if (data) {
+          setDressedChickens(data)
+        }
+      } catch (err) {
+        console.warn('Dressed chickens table not available yet:', err)
+      }
+    }
+    
+    if (!loading && (!migrationStatus.needed || migrationStatus.completed)) {
+      loadDressedChickens()
+    }
+  }, [loading, migrationStatus.needed, migrationStatus.completed])
+
+  // Batch Relationships state and functions
+  const [batchRelationships, setBatchRelationships] = useState([])
+
+  // Load batch relationships from Supabase
+  useEffect(() => {
+    async function loadBatchRelationships() {
+      try {
+        const { data, error } = await supabase
+          .from('batch_relationships')
+          .select('*')
+          .order('created_at', { ascending: false })
+        
+        if (error && !error.message.includes('relation "batch_relationships" does not exist')) {
+          throw error
+        }
+        
+        if (data) {
+          setBatchRelationships(data)
+        }
+      } catch (err) {
+        console.warn('Batch relationships table not available yet:', err)
+      }
+    }
+    
+    if (!loading && (!migrationStatus.needed || migrationStatus.completed)) {
+      loadBatchRelationships()
+    }
+  }, [loading, migrationStatus.needed, migrationStatus.completed])
+
+  const addDressedChicken = async (dressedChickenData) => {
+    try {
+      const dressedChicken = {
+        id: Date.now().toString(),
+        ...dressedChickenData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+      
+      // Save to Supabase first
+      const { error } = await supabase.from('dressed_chickens').insert(dressedChicken)
+      if (error) {
+        console.warn('Failed to save to Supabase, saving locally only:', error)
+      }
+      
+      // Update local state
+      setDressedChickens(prev => [dressedChicken, ...prev])
+      
+      // Log audit action
+      await logAuditAction('CREATE', 'dressed_chickens', dressedChicken.id, null, dressedChicken)
+      
+      return dressedChicken
+    } catch (err) {
+      console.error('Error adding dressed chicken:', err)
+      throw err
+    }
+  }
+
+  const updateDressedChicken = async (id, updates) => {
+    try {
+      const oldDressedChicken = dressedChickens.find(item => item.id === id)
+      if (!oldDressedChicken) throw new Error('Dressed chicken not found')
+      
+      const updatedDressedChicken = { ...oldDressedChicken, ...updates, updated_at: new Date().toISOString() }
+      
+      // Update in Supabase
+      const { error } = await supabase
+        .from('dressed_chickens')
+        .update(updatedDressedChicken)
+        .eq('id', id)
+      
+      if (error) {
+        console.warn('Failed to update in Supabase, updating locally only:', error)
+      }
+      
+      // Update local state
+      setDressedChickens(prev => prev.map(item =>
+        item.id === id ? updatedDressedChicken : item
+      ))
+      
+      // Log audit action
+      await logAuditAction('UPDATE', 'dressed_chickens', id, oldDressedChicken, updatedDressedChicken)
+      
+      return updatedDressedChicken
+    } catch (err) {
+      console.error('Error updating dressed chicken:', err)
+      throw err
+    }
+  }
+
+  const deleteDressedChicken = async (id) => {
+    try {
+      const dressedChickenToDelete = dressedChickens.find(item => item.id === id)
+      if (!dressedChickenToDelete) throw new Error('Dressed chicken not found')
+      
+      // Delete from Supabase
+      const { error } = await supabase
+        .from('dressed_chickens')
+        .delete()
+        .eq('id', id)
+      
+      if (error) {
+        console.warn('Failed to delete from Supabase, deleting locally only:', error)
+      }
+      
+      // Update local state
+      setDressedChickens(prev => prev.filter(item => item.id !== id))
+      
+      // Log audit action
+      await logAuditAction('DELETE', 'dressed_chickens', id, dressedChickenToDelete, null)
+    } catch (err) {
+      console.error('Error deleting dressed chicken:', err)
+      throw err
+    }
+  }
+
+  // Batch Relationship CRUD operations
+  const addBatchRelationship = async (relationshipData) => {
+    try {
+      const relationship = {
+        id: Date.now().toString(),
+        ...relationshipData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+      
+      // Save to Supabase first
+      const { error } = await supabase.from('batch_relationships').insert(relationship)
+      if (error) {
+        console.warn('Failed to save to Supabase, saving locally only:', error)
+      }
+      
+      // Update local state
+      setBatchRelationships(prev => [relationship, ...prev])
+      
+      // Log audit action
+      await logAuditAction('CREATE', 'batch_relationships', relationship.id, null, relationship)
+      
+      return relationship
+    } catch (err) {
+      console.error('Error adding batch relationship:', err)
+      throw err
+    }
+  }
+
+  const updateBatchRelationship = async (id, updates) => {
+    try {
+      const oldRelationship = batchRelationships.find(item => item.id === id)
+      if (!oldRelationship) throw new Error('Batch relationship not found')
+      
+      const updatedRelationship = { ...oldRelationship, ...updates, updated_at: new Date().toISOString() }
+      
+      // Update in Supabase
+      const { error } = await supabase
+        .from('batch_relationships')
+        .update(updatedRelationship)
+        .eq('id', id)
+      
+      if (error) {
+        console.warn('Failed to update in Supabase, updating locally only:', error)
+      }
+      
+      // Update local state
+      setBatchRelationships(prev => prev.map(item =>
+        item.id === id ? updatedRelationship : item
+      ))
+      
+      // Log audit action
+      await logAuditAction('UPDATE', 'batch_relationships', id, oldRelationship, updatedRelationship)
+      
+      return updatedRelationship
+    } catch (err) {
+      console.error('Error updating batch relationship:', err)
+      throw err
+    }
+  }
+
+  const deleteBatchRelationship = async (id) => {
+    try {
+      const relationshipToDelete = batchRelationships.find(item => item.id === id)
+      if (!relationshipToDelete) throw new Error('Batch relationship not found')
+      
+      // Delete from Supabase
+      const { error } = await supabase
+        .from('batch_relationships')
+        .delete()
+        .eq('id', id)
+      
+      if (error) {
+        console.warn('Failed to delete from Supabase, deleting locally only:', error)
+      }
+      
+      // Update local state
+      setBatchRelationships(prev => prev.filter(item => item.id !== id))
+      
+      // Log audit action
+      await logAuditAction('DELETE', 'batch_relationships', id, relationshipToDelete, null)
+    } catch (err) {
+      console.error('Error deleting batch relationship:', err)
+      throw err
+    }
+  }
+
   const value = {
     // State
     chickens,
@@ -1382,6 +1639,8 @@ export function AppProvider({ children }) {
     feedConsumption,
     feedBatchAssignments,
     chickenInventoryTransactions,
+    dressedChickens,
+    batchRelationships,
     loading,
     error,
     migrationStatus,
@@ -1419,6 +1678,16 @@ export function AppProvider({ children }) {
     
     // Chicken Inventory Transaction operations
     logChickenTransaction,
+    
+    // Dressed Chicken operations
+    addDressedChicken,
+    updateDressedChicken,
+    deleteDressedChicken,
+    
+    // Batch Relationship operations
+    addBatchRelationship,
+    updateBatchRelationship,
+    deleteBatchRelationship,
     
     // Stats and reports
     stats,

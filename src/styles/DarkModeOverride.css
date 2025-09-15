@@ -156,6 +156,34 @@
   border-color: var(--border-color) !important;
 }
 
+/* Analytics table specific dark mode overrides */
+[data-theme="dark"] .analytics-table {
+  background-color: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+[data-theme="dark"] .analytics-table thead th {
+  background-color: var(--table-header-bg) !important;
+  color: var(--table-header-text) !important;
+  border-color: var(--table-border) !important;
+}
+
+[data-theme="dark"] .analytics-table td {
+  color: var(--text-color) !important;
+  background-color: var(--card-background) !important;
+  border-color: var(--table-border) !important;
+}
+
+[data-theme="dark"] .analytics-table tr:nth-child(even) {
+  background-color: var(--table-row-hover) !important;
+}
+
+[data-theme="dark"] .analytics-table tr:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* General table styles */
 [data-theme="dark"] table thead,
 [data-theme="dark"] .orders-table th,
 [data-theme="dark"] .transactions-table th,
@@ -275,8 +303,23 @@
   box-shadow: var(--shadow) !important;
 }
 
-[data-theme="dark"] .chart-container {
-  background-color: var(--table-header-bg) !important;
+[data-theme="dark"] .reports-page .chart-container {
+  background-color: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .analytics-section {
+  background-color: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .analytics-section h2 {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .analytics-section p {
+  color: var(--text-light) !important;
 }
 
 [data-theme="dark"] .report-summary {
@@ -284,6 +327,142 @@
 }
 
 [data-theme="dark"] .report-summary .summary-item p {
+  color: var(--text-light) !important;
+}
+
+/* Status badges for reports */
+[data-theme="dark"] .status-badge {
+  color: white !important;
+}
+
+[data-theme="dark"] .status-badge.active,
+[data-theme="dark"] .status-badge.paid {
+  background-color: rgba(76, 175, 80, 0.8) !important;
+}
+
+[data-theme="dark"] .status-badge.inactive,
+[data-theme="dark"] .status-badge.pending {
+  background-color: rgba(239, 68, 68, 0.8) !important;
+}
+
+[data-theme="dark"] .status-badge.partial {
+  background-color: rgba(59, 130, 246, 0.8) !important;
+}
+
+/* Metric cards and quick summary */
+[data-theme="dark"] .metric-card,
+[data-theme="dark"] .quick-summary {
+  background-color: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .metric-header {
+  background-color: var(--table-header-bg) !important;
+  border-bottom-color: var(--table-border) !important;
+}
+
+[data-theme="dark"] .metric-header h3 {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .metric-label {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .metric-value {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .metric-value.positive {
+  color: #4ade80 !important;
+}
+
+[data-theme="dark"] .metric-value.negative {
+  color: #f87171 !important;
+}
+
+[data-theme="dark"] .summary-content p {
+  background-color: var(--table-row-hover) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .summary-content strong {
+  color: var(--text-color) !important;
+}
+
+/* Tab navigation for reports */
+[data-theme="dark"] .tab-navigation {
+  border-bottom-color: var(--table-border) !important;
+}
+
+[data-theme="dark"] .tab-btn {
+  background-color: var(--table-row-hover) !important;
+  border-color: var(--table-border) !important;
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .tab-btn:hover {
+  background-color: var(--table-header-bg) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .tab-btn.active {
+  background-color: var(--primary-color) !important;
+  color: white !important;
+  border-color: var(--primary-color) !important;
+}
+
+/* View mode selector */
+[data-theme="dark"] .view-mode-selector {
+  background-color: var(--card-background) !important;
+  border-color: var(--table-border) !important;
+}
+
+[data-theme="dark"] .toggle-container {
+  background-color: var(--table-header-bg) !important;
+}
+
+[data-theme="dark"] .toggle-button {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .toggle-button.active {
+  background-color: var(--primary-color) !important;
+  color: white !important;
+}
+
+[data-theme="dark"] .date-range-inputs input {
+  background-color: var(--input-background) !important;
+  border-color: var(--input-border) !important;
+  color: var(--input-text) !important;
+  -webkit-text-fill-color: var(--input-text) !important;
+}
+
+[data-theme="dark"] .date-range-inputs span {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .view-description {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .btn-secondary {
+  background-color: var(--table-row-hover) !important;
+  border-color: var(--table-border) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+  background-color: var(--table-header-bg) !important;
+}
+
+/* Page header */
+[data-theme="dark"] .page-header h1 {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .page-header p {
   color: var(--text-light) !important;
 }
 

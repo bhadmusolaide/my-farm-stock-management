@@ -333,20 +333,52 @@ const SiteSettings = () => {
                     
                     {item.children && (
                       <div className="nav-children">
+                        <div className="nav-children-header">
+                          <span>Sub-menu Items</span>
+                        </div>
                         {item.children.map(child => (
                           <div key={child.id} className="nav-child-item">
-                            <span>{child.label}</span>
+                            <div className="child-item-content">
+                              <input
+                                type="text"
+                                value={child.label}
+                                onChange={(e) => {
+                                  const updatedItems = settings.navigationItems.map(navItem =>
+                                    navItem.id === item.id
+                                      ? {
+                                          ...navItem,
+                                          children: navItem.children.map(childItem =>
+                                            childItem.id === child.id
+                                              ? { ...childItem, label: e.target.value }
+                                              : childItem
+                                          )
+                                        }
+                                      : navItem
+                                  )
+                                  ;(async () => {
+                                    try {
+                                      await updateNavigationItems(updatedItems)
+                                      showSuccess('Sub-menu label updated successfully')
+                                    } catch (error) {
+                                      showError('Failed to update sub-menu label')
+                                    }
+                                  })()
+                                }}
+                                className="nav-child-label-input"
+                                placeholder="Enter sub-menu label"
+                              />
+                            </div>
                             <label className="toggle-switch">
                               <input
                                 type="checkbox"
                                 checked={child.enabled}
                                 onChange={() => {
-                                  const updatedItems = settings.navigationItems.map(navItem => 
-                                    navItem.id === item.id 
+                                  const updatedItems = settings.navigationItems.map(navItem =>
+                                    navItem.id === item.id
                                       ? {
                                           ...navItem,
                                           children: navItem.children.map(childItem =>
-                                            childItem.id === child.id 
+                                            childItem.id === child.id
                                               ? { ...childItem, enabled: !childItem.enabled }
                                               : childItem
                                           )
@@ -356,8 +388,9 @@ const SiteSettings = () => {
                                   ;(async () => {
                                     try {
                                       await updateNavigationItems(updatedItems)
+                                      showSuccess('Sub-menu item updated successfully')
                                     } catch (error) {
-                                      showError('Failed to update child navigation item')
+                                      showError('Failed to update sub-menu item')
                                     }
                                   })()
                                 }}

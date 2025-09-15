@@ -50,8 +50,11 @@ const Transactions = () => {
   
   const filteredTransactions = getFilteredTransactions()
   
-  // Sorting hook
-  const { sortedData, sortConfig, requestSort, resetSort, getSortIcon } = useTableSort(filteredTransactions)
+  // Sorting hook with initial sort by date descending
+  const { sortedData, sortConfig, requestSort, resetSort, getSortIcon } = useTableSort(
+    filteredTransactions, 
+    { key: 'date', direction: 'desc' } // Initial sort by date descending
+  )
   
   // Pagination for transactions
   const transactionsPagination = usePagination(sortedData, 10)

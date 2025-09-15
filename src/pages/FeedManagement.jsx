@@ -583,19 +583,21 @@ const FeedManagement = () => {
                         {inventoryColumnConfig.isColumnVisible('actions') && (
                           <td>
                             <div className="action-buttons">
-                              <button 
-                                className="edit-btn" 
+                              <button
+                                className="edit-btn-icon"
                                 onClick={() => handleEditFeed(item)}
-                                aria-label="Edit"
+                                title="Edit feed item"
+                                aria-label="Edit feed item"
                               >
-                                Edit
+                                ✏️
                               </button>
-                              <button 
-                                className="delete-btn" 
+                              <button
+                                className="delete-btn-icon"
                                 onClick={() => handleDeleteFeed(item.id)}
-                                aria-label="Delete"
+                                title="Delete feed item"
+                                aria-label="Delete feed item"
                               >
-                                Delete
+                                🗑️
                               </button>
                             </div>
                           </td>
@@ -743,12 +745,13 @@ const FeedManagement = () => {
                         {consumptionColumnConfig.isColumnVisible('notes') && <td>{item.notes || '-'}</td>}
                         {consumptionColumnConfig.isColumnVisible('actions') && (
                           <td>
-                            <button 
-                              className="delete-btn" 
+                            <button
+                              className="delete-btn-icon"
                               onClick={() => handleDeleteConsumption(item.id)}
-                              aria-label="Delete"
+                              title="Delete consumption record"
+                              aria-label="Delete consumption record"
                             >
-                              Delete
+                              🗑️
                             </button>
                           </td>
                         )}
