@@ -170,18 +170,16 @@ export const SiteSettingsProvider = ({ children }) => {
     const updatedSettings = { ...settings, ...newSettings }
     setSettings(updatedSettings)
     await saveSettingsToSupabase(updatedSettings)
-    
-    // Force reload to ensure latest data
-    await loadSettings()
+    // State is already updated locally; subscription handles sync for other clients
+    // No immediate reload needed to prevent loading stale data
   }
   
   const updateNavigationItems = async (items) => {
     const updatedSettings = { ...settings, navigationItems: items }
     setSettings(updatedSettings)
     await saveSettingsToSupabase(updatedSettings)
-    
-    // Force reload to ensure latest data
-    await loadSettings()
+    // State is already updated locally; subscription handles sync for other clients
+    // No immediate reload needed to prevent loading stale data
   }
 
   const resetToDefaults = async () => {
