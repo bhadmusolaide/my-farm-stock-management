@@ -203,17 +203,11 @@ function App() {
   return (
     <ErrorBoundary>
       <Router>
-        <ThemeProvider>
-          <SiteSettingsProvider>
-            <AuthProvider>
-              <AppProvider>
-                <NotificationProvider>
-                  <AppContent />
-                </NotificationProvider>
-              </AppProvider>
-            </AuthProvider>
-          </SiteSettingsProvider>
-        </ThemeProvider>
+        <AuthProvider>
+          <AppProvider>
+            <AppContent />
+          </AppProvider>
+        </AuthProvider>
       </Router>
     </ErrorBoundary>
   )
