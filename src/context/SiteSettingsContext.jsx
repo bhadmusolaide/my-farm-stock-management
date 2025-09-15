@@ -85,7 +85,8 @@ export const SiteSettingsProvider = ({ children }) => {
 
       if (data?.settings_data) {
         console.log('Loaded settings from database:', data.settings_data)
-        setSettings({ ...defaultSettings, ...data.settings_data })
+        // Prioritize database data over defaults for saved values
+        setSettings({ ...data.settings_data, ...defaultSettings })
       } else {
         // No settings found, initialize with defaults
         console.log('No settings found in database, using defaults')
