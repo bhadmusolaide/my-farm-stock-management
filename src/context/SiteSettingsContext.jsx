@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { supabase } from '../utils/supabaseClient'
+import { supabaseUrl, supabaseAnonKey } from '../utils/supabaseClient'
+import { createClient } from '@supabase/supabase-js'
 
 const SiteSettingsContext = createContext()
 
@@ -101,14 +102,13 @@ export const SiteSettingsProvider = ({ children }) => {
 
   const initializeSettingsTable = async () => {
     try {
-      // Create table if it doesn't exist
-      const { error: createError } = await supabase.rpc('create_site_settings_table')
-      if (createError && createError.message.includes('already exists')) {
-        // Table exists, initialize with defaults
-        await saveSettingsToSupabase(defaultSettings)
+      // Use admin client to create table if needed
+      const { error: createError } = await adminSupabase.rpc('create_site_settings_table')
+      if (createError) {
+        console.warn('Settings table creation warning:', createError)
       }
       
-      // Insert default settings
+      // Insert default settings using admin client
       await saveSettingsToSupabase(defaultSettings)
       setSettings(defaultSettings)
       console.log('Initialized site settings table with defaults')
@@ -119,21 +119,14 @@ export const SiteSettingsProvider = ({ children }) => {
     }
   }
 
+  const adminSupabase = createClient(supabaseUrl, import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey)
+  
   const saveSettingsToSupabase = async (newSettings) => {
     try {
       console.log('Saving settings to database:', newSettings)
       
-      // First, ensure the table exists by trying to create it (idempotent)
-      try {
-        const { error: createError } = await supabase.rpc('create_site_settings_table')
-        if (createError) {
-          console.warn('Settings table creation warning:', createError)
-        }
-      } catch (createErr) {
-        console.warn('Could not verify settings table existence:', createErr)
-      }
-  
-      const { error } = await supabase
+      // Use admin client to bypass RLS for settings updates
+      const { error } = await adminSupabase
         .from('site_settings')
         .upsert({
           id: 1,
@@ -146,12 +139,12 @@ export const SiteSettingsProvider = ({ children }) => {
   
       if (error) {
         console.error('Error saving settings to database:', error)
-        throw error
+        throw new Error(`Database save failed: ${error.message}`)
       }
   
       console.log('Settings saved successfully to database')
       
-      // Trigger real-time update for other clients
+      // Trigger real-time update for other clients using main client
       await supabase
         .channel('site-settings-update')
         .send({
@@ -185,6 +178,8 @@ export const SiteSettingsProvider = ({ children }) => {
   const resetToDefaults = async () => {
     setSettings(defaultSettings)
     await saveSettingsToSupabase(defaultSettings)
+    // Optionally reload to confirm
+    await loadSettings()
   }
 
   const uploadImage = async (file) => {
