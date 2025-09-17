@@ -104,13 +104,13 @@ const FeedManagement = () => {
     
     if (filters.startDate) {
       filtered = filtered.filter(item => 
-        new Date(item.date) >= new Date(filters.startDate)
+        new Date(item.purchase_date) >= new Date(filters.startDate)
       )
     }
     
     if (filters.endDate) {
       filtered = filtered.filter(item => 
-        new Date(item.date) <= new Date(filters.endDate)
+        new Date(item.purchase_date) <= new Date(filters.endDate)
       )
     }
     
@@ -556,7 +556,7 @@ const FeedManagement = () => {
                     
                     return (
                       <tr key={item.id} className={isLowStock ? 'low-stock' : ''}>
-                        {inventoryColumnConfig.isColumnVisible('date') && <td>{formatDate(item.date)}</td>}
+                        {inventoryColumnConfig.isColumnVisible('purchase_date') && <td>{formatDate(item.purchase_date)}</td>}
                         {inventoryColumnConfig.isColumnVisible('feed_type') && <td>{item.feed_type}</td>}
                     {inventoryColumnConfig.isColumnVisible('brand') && <td>{item.brand}</td>}
                     {inventoryColumnConfig.isColumnVisible('number_of_bags') && <td>{item.number_of_bags}</td>}
@@ -638,8 +638,8 @@ const FeedManagement = () => {
               <p className="summary-value">
                 {formatNumber(
                   feedConsumption
-                    .filter(item => new Date(item.date).toDateString() === new Date().toDateString())
-                    .reduce((sum, item) => sum + item.quantityConsumed, 0)
+                    .filter(item => new Date(item.consumption_date).toDateString() === new Date().toDateString())
+                    .reduce((sum, item) => sum + item.quantity_consumed, 0)
                 )} kg
               </p>
             </div>
@@ -649,12 +649,12 @@ const FeedManagement = () => {
                 {formatNumber(
                   feedConsumption
                     .filter(item => {
-                      const itemDate = new Date(item.date)
+                      const itemDate = new Date(item.consumption_date)
                       const weekAgo = new Date()
                       weekAgo.setDate(weekAgo.getDate() - 7)
                       return itemDate >= weekAgo
                     })
-                    .reduce((sum, item) => sum + item.quantityConsumed, 0)
+                    .reduce((sum, item) => sum + item.quantity_consumed, 0)
                 )} kg
               </p>
             </div>
@@ -664,12 +664,12 @@ const FeedManagement = () => {
                 {formatNumber(
                   feedConsumption
                     .filter(item => {
-                      const itemDate = new Date(item.date)
+                      const itemDate = new Date(item.consumption_date)
                       const monthAgo = new Date()
                       monthAgo.setMonth(monthAgo.getMonth() - 1)
                       return itemDate >= monthAgo
                     })
-                    .reduce((sum, item) => sum + item.quantityConsumed, 0)
+                    .reduce((sum, item) => sum + item.quantity_consumed, 0)
                 )} kg
               </p>
             </div>
@@ -741,7 +741,7 @@ const FeedManagement = () => {
                         {consumptionColumnConfig.isColumnVisible('consumption_date') && <td>{formatDate(item.consumption_date)}</td>}
                         {consumptionColumnConfig.isColumnVisible('feed_type') && <td>{feedItem?.feed_type || 'Unknown'}</td>}
                         {consumptionColumnConfig.isColumnVisible('quantity_consumed') && <td>{formatNumber(item.quantity_consumed)}</td>}
-                        {consumptionColumnConfig.isColumnVisible('chicken_batch') && <td>{chickenBatch?.batchId || 'Unknown'}</td>}
+                        {consumptionColumnConfig.isColumnVisible('chicken_batch') && <td>{chickenBatch?.batch_id || 'Unknown'}</td>}
                         {consumptionColumnConfig.isColumnVisible('notes') && <td>{item.notes || '-'}</td>}
                         {consumptionColumnConfig.isColumnVisible('actions') && (
                           <td>
@@ -801,7 +801,7 @@ const FeedManagement = () => {
               <h3>Average Daily Consumption</h3>
               <p className="summary-value">
                 {(() => {
-                  const daysWithData = new Set(feedConsumption.map(item => item.date)).size
+                  const daysWithData = new Set(feedConsumption.map(item => item.consumption_date)).size
                   const totalConsumption = feedConsumption.reduce((sum, item) => sum + item.quantity_consumed, 0)
                   const avgDaily = daysWithData > 0 ? (totalConsumption / daysWithData).toFixed(1) : '0.0'
                   return `${avgDaily} kg/day`
@@ -1155,11 +1155,13 @@ const FeedManagement = () => {
                     required
                   >
                     <option value="">Select feed</option>
-                    {feedInventory && feedInventory.length > 0 ? feedInventory.map(feed => (
-                      <option key={feed.id} value={feed.id}>
-                        {feed.feed_type} - {feed.brand} ({formatNumber(feed.quantity_kg)} kg available)
-                      </option>
-                    )) : (
+                    {feedInventory && feedInventory.length > 0 ? feedInventory
+                      .filter(feed => feed.quantity_kg > 0)
+                      .map(feed => (
+                        <option key={feed.id} value={feed.id}>
+                          {feed.feed_type} - {feed.brand} ({formatNumber(feed.quantity_kg)} kg available)
+                        </option>
+                      )) : (
                       <option disabled>No feed inventory available</option>
                     )}
                   </select>

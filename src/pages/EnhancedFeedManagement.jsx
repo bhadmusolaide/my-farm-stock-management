@@ -3,6 +3,16 @@ import { useAppContext } from '../context/AppContext'
 import { formatNumber, formatDate } from '../utils/formatters'
 import './EnhancedFeedManagement.css'
 
+// Feed brand constants
+const FEED_BRANDS = [
+  'New Hope',
+  'BreedWell', 
+  'Ultima',
+  'Happy Chicken',
+  'Chikum',
+  'Others'
+]
+
 const EnhancedFeedManagement = () => {
   const { 
     liveChickens, 
@@ -187,9 +197,10 @@ const EnhancedFeedManagement = () => {
     try {
       if (modalType === 'purchase') {
         // Handle feed purchase
+        const finalBrand = formData.brand === 'Others' ? formData.custom_brand : formData.brand
         const purchaseData = {
           feed_type: formData.feed_type,
-          brand: formData.brand,
+          brand: finalBrand,
           number_of_bags: parseInt(formData.number_of_bags),
           quantity_kg: parseFloat(formData.quantity_kg),
           cost_per_bag: parseFloat(formData.cost_per_bag),
@@ -448,15 +459,30 @@ const EnhancedFeedManagement = () => {
                 
                 <div className="form-group">
                   <label htmlFor="brand">Brand*</label>
-                  <input
-                    type="text"
+                  <select
                     id="brand"
                     name="brand"
                     value={formData.brand || ''}
                     onChange={handleInputChange}
                     required
-                    placeholder="e.g., New Hope, BreedWell"
-                  />
+                  >
+                    <option value="">Select brand</option>
+                    {FEED_BRANDS.map(brand => (
+                      <option key={brand} value={brand}>{brand}</option>
+                    ))}
+                  </select>
+                  {formData.brand === 'Others' && (
+                    <input
+                      type="text"
+                      id="custom_brand"
+                      name="custom_brand"
+                      value={formData.custom_brand || ''}
+                      onChange={handleInputChange}
+                      placeholder="Enter custom brand name"
+                      style={{ marginTop: '8px' }}
+                      required
+                    />
+                  )}
                 </div>
               </div>
               
@@ -578,7 +604,7 @@ const EnhancedFeedManagement = () => {
                 >
                   <option value="">Select feed</option>
                   {feedInventory
-                    .filter(feed => feed.feed_type === selectedBatch.feedType)
+                    .filter(feed => feed.feed_type === selectedBatch.feedType && feed.quantity_kg > 0)
                     .map(feed => (
                       <option key={feed.id} value={feed.id}>
                         {feed.feed_type} - {feed.brand} ({formatNumber(feed.quantity_kg)} kg available)
