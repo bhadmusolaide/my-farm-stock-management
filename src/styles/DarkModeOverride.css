@@ -1066,3 +1066,19 @@
 [data-theme="dark"] .live-chicken-container .chicken-table tbody tr:hover {
   background-color: var(--table-row-hover) !important;
 }
+
+/* Chicken Orders Status Badges Dark Mode */
+[data-theme="dark"] .chicken-orders-container .status-paid {
+  background-color: #1b5e20 !important;
+  color: #c8e6c9 !important;
+}
+
+[data-theme="dark"] .chicken-orders-container .status-partial {
+  background-color: #f57f17 !important;
+  color: #fff8e1 !important;
+}
+
+[data-theme="dark"] .chicken-orders-container .status-pending {
+  background-color: #c62828 !important;
+  color: #ffcdd2 !important;
+}

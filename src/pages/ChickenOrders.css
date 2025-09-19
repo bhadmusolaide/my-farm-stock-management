@@ -304,6 +304,22 @@
   color: #c62828;
 }
 
+/* Dark mode optimization for status badges */
+[data-theme="dark"] .status-paid {
+  background-color: #1b5e20;
+  color: #c8e6c9;
+}
+
+[data-theme="dark"] .status-partial {
+  background-color: #f57f17;
+  color: #fff8e1;
+}
+
+[data-theme="dark"] .status-pending {
+  background-color: #c62828;
+  color: #ffcdd2;
+}
+
 .action-buttons {
   display: flex;
   gap: 0.25rem; /* Reduced gap for compact layout */

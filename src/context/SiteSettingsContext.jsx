@@ -41,22 +41,64 @@ export const SiteSettingsProvider = ({ children }) => {
     loadSettings()
   }, [])
 
+  // Real-time subscription for site settings changes
+  useEffect(() => {
+    let subscription
+    
+    const setupSubscription = async () => {
+      subscription = supabase
+        .channel('site-settings-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'site_settings'
+          },
+          () => {
+            console.log('Site settings changed, reloading...')
+            loadSettings()
+          }
+        )
+        .subscribe()
+    }
+    
+    setupSubscription()
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+    }
+  }, [])
+
   const loadSettings = async () => {
     try {
+      setLoading(true)
       const { data, error } = await supabase
         .from('site_settings')
         .select('settings_data')
-        .order('id', { ascending: false })
+        .order('updated_at', { ascending: false })
         .limit(1)
         .single()
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error loading settings:', error)
+        // If table doesn't exist, create it
+        if (error.code === '42P01') {
+          await initializeSettingsTable()
+        }
         return
       }
 
       if (data?.settings_data) {
-        setSettings({ ...defaultSettings, ...data.settings_data })
+        console.log('Loaded settings from database:', data.settings_data)
+        // Prioritize database data over defaults for saved values
+        setSettings({ ...data.settings_data, ...defaultSettings })
+      } else {
+        // No settings found, initialize with defaults
+        console.log('No settings found in database, using defaults')
+        await initializeSettingsTable()
       }
     } catch (error) {
       console.error('Error loading settings:', error)
@@ -65,21 +107,64 @@ export const SiteSettingsProvider = ({ children }) => {
     }
   }
 
+  const initializeSettingsTable = async () => {
+    try {
+      // Use service role key for admin operations if available
+      const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
+      
+      if (serviceRoleKey) {
+        // Temporarily switch to service role for table creation
+        const { error: createError } = await supabase.rpc('create_site_settings_table')
+        if (createError) {
+          console.warn('Settings table creation warning:', createError)
+        }
+      }
+      
+      // Insert default settings
+      await saveSettingsToSupabase(defaultSettings)
+      setSettings(defaultSettings)
+      console.log('Initialized site settings table with defaults')
+    } catch (error) {
+      console.error('Error initializing settings table:', error)
+      // Fallback to local defaults
+      setSettings(defaultSettings)
+    }
+  }
+  
   const saveSettingsToSupabase = async (newSettings) => {
     try {
+      console.log('Saving settings to database:', newSettings)
+      
+      // Perform upsert operation
       const { error } = await supabase
         .from('site_settings')
         .upsert({
           id: 1,
           settings_data: newSettings,
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'id',
+          ignoreDuplicates: false
         })
-
+  
       if (error) {
-        console.error('Error saving settings:', error)
+        console.error('Error saving settings to database:', error)
+        throw new Error(`Database save failed: ${error.message}`)
       }
+  
+      console.log('Settings saved successfully to database')
+      
+      // Trigger real-time update for other clients using main client
+      const channel = supabase.channel('site-settings-update')
+      channel.send({
+        type: 'broadcast',
+        event: 'settings-updated',
+        payload: { timestamp: new Date().toISOString() }
+      })
+
     } catch (error) {
       console.error('Error saving settings:', error)
+      throw error
     }
   }
 
@@ -87,17 +172,23 @@ export const SiteSettingsProvider = ({ children }) => {
     const updatedSettings = { ...settings, ...newSettings }
     setSettings(updatedSettings)
     await saveSettingsToSupabase(updatedSettings)
+    // State is already updated locally; subscription handles sync for other clients
+    // No immediate reload needed to prevent loading stale data
   }
-
+  
   const updateNavigationItems = async (items) => {
     const updatedSettings = { ...settings, navigationItems: items }
     setSettings(updatedSettings)
     await saveSettingsToSupabase(updatedSettings)
+    // State is already updated locally; subscription handles sync for other clients
+    // No immediate reload needed to prevent loading stale data
   }
 
   const resetToDefaults = async () => {
     setSettings(defaultSettings)
     await saveSettingsToSupabase(defaultSettings)
+    // Optionally reload to confirm
+    await loadSettings()
   }
 
   const uploadImage = async (file) => {

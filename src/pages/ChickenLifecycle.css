@@ -229,7 +229,7 @@
   background: var(--card-bg);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  max-width: 500px;
+  max-width: 800px;
   width: 90%;
   max-height: 90vh;
   overflow-y: auto;
@@ -287,6 +287,100 @@
   margin-top: 30px;
 }
 
+/* Tab interface styles */
+.weight-tabs {
+  margin: 20px 0;
+  border-top: 1px solid var(--border-color);
+  padding-top: 15px;
+}
+
+.tab-buttons {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 15px;
+}
+
+.tab-button {
+  padding: 8px 16px;
+  background: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.tab-button:hover {
+  background: var(--bg-secondary);
+}
+
+.tab-button.active {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+/* Weight history table styles */
+.weight-history-content {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.weight-history-table {
+  margin-bottom: 20px;
+}
+
+.weight-history-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.weight-history-table th,
+.weight-history-table td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color-light);
+}
+
+.weight-history-table th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.weight-history-table tr:hover {
+  background: var(--bg-light);
+}
+
+/* Weight chart styles */
+.weight-chart-container {
+  margin-bottom: 30px;
+}
+
+.weight-chart-container h3 {
+  margin-top: 0;
+  color: var(--text-primary);
+  margin-bottom: 15px;
+}
+
+/* Batch info summary */
+.batch-info-summary {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+
+.batch-info-summary .info-item {
+  font-size: 1.1rem;
+}
+
+.batch-info-summary .info-item strong {
+  color: var(--primary-color);
+}
+
 @media (max-width: 768px) {
   .batches-grid {
     grid-template-columns: 1fr;
@@ -302,5 +396,18 @@
   
   .form-actions button {
     width: 100%;
+  }
+  
+  .tab-buttons {
+    flex-direction: column;
+  }
+  
+  .tab-button {
+    border-radius: 4px;
+  }
+  
+  .batch-info-summary {
+    flex-direction: column;
+    gap: 10px;
   }
 }

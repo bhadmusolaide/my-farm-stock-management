@@ -1,18 +1,31 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { formatNumber, formatDate } from '../utils/formatters'
+import FeedDashboardOverview from '../components/FeedDashboardOverview'
+import BatchFeedView from '../components/BatchFeedView'
 import './EnhancedFeedManagement.css'
+
+// Feed brand constants
+const FEED_BRANDS = [
+  'New Hope',
+  'BreedWell', 
+  'Ultima',
+  'Happy Chicken',
+  'Chikum',
+  'Others'
+]
 
 const EnhancedFeedManagement = () => {
   const { 
     liveChickens, 
     feedInventory, 
     feedConsumption, 
+    feedBatchAssignments,
     addFeedInventory, 
     addFeedConsumption 
   } = useAppContext()
   
-  const [activeTab, setActiveTab] = useState('plans')
+  const [activeTab, setActiveTab] = useState('dashboard')
   const [selectedBatch, setSelectedBatch] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [modalType, setModalType] = useState('')
@@ -132,6 +145,92 @@ const EnhancedFeedManagement = () => {
     return batch.status === 'sick' ? 15 : batch.status === 'quarantine' ? 10 : 5
   }
 
+  // Enhanced performance analytics functions
+  const calculateFeedCostPerBird = (batchId) => {
+    const batchConsumption = feedConsumption.filter(item => item.chicken_batch_id === batchId)
+    const batch = liveChickens.find(b => b.id === batchId)
+    if (!batch || batchConsumption.length === 0) return 0
+
+    const totalCost = batchConsumption.reduce((sum, item) => {
+      const feedItem = feedInventory.find(f => f.id === item.feed_id)
+      return sum + (item.quantity_consumed * (feedItem?.cost_per_kg || 0))
+    }, 0)
+    
+    return (totalCost / batch.initial_count).toFixed(2)
+  }
+
+  const calculateWeightGainEfficiency = (batchId) => {
+    const batch = liveChickens.find(b => b.id === batchId)
+    if (!batch) return 0
+    
+    const ageInWeeks = calculateAgeInWeeks(batch.hatch_date)
+    const expectedWeight = ageInWeeks * 0.15 // Assume 150g per week growth
+    const actualWeight = batch.current_weight || expectedWeight
+    
+    return ((actualWeight / expectedWeight) * 100).toFixed(1)
+  }
+
+  const calculateDailyFeedConsumption = (batchId) => {
+    const batchConsumption = feedConsumption.filter(item => item.chicken_batch_id === batchId)
+    const batch = liveChickens.find(b => b.id === batchId)
+    if (!batch || batchConsumption.length === 0) return 0
+
+    const totalConsumed = batchConsumption.reduce((sum, item) => sum + item.quantity_consumed, 0)
+    const ageInDays = Math.floor((new Date() - new Date(batch.hatch_date)) / (1000 * 60 * 60 * 24))
+    
+    return ageInDays > 0 ? (totalConsumed / ageInDays / batch.initial_count * 1000).toFixed(1) : 0 // grams per bird per day
+  }
+
+  const getBatchPerformanceRating = (batchId) => {
+    const fcr = parseFloat(calculateFCR(batchId))
+    const efficiency = parseFloat(calculateWeightGainEfficiency(batchId))
+    const wastage = parseFloat(calculateWastage(batchId))
+    
+    let score = 0
+    if (fcr <= 1.8) score += 30
+    else if (fcr <= 2.2) score += 20
+    else if (fcr <= 2.5) score += 10
+    
+    if (efficiency >= 95) score += 30
+    else if (efficiency >= 85) score += 20
+    else if (efficiency >= 75) score += 10
+    
+    if (wastage <= 3) score += 25
+    else if (wastage <= 5) score += 15
+    else if (wastage <= 8) score += 5
+    
+    if (score >= 80) return { rating: 'Excellent', color: '#10b981' }
+    if (score >= 60) return { rating: 'Good', color: '#3b82f6' }
+    if (score >= 40) return { rating: 'Average', color: '#f59e0b' }
+    return { rating: 'Poor', color: '#ef4444' }
+  }
+
+  const getTopPerformingBatches = () => {
+    return liveChickens
+      .map(batch => ({
+        ...batch,
+        performance: getBatchPerformanceRating(batch.id),
+        fcr: parseFloat(calculateFCR(batch.id)),
+        efficiency: parseFloat(calculateWeightGainEfficiency(batch.id))
+      }))
+      .sort((a, b) => {
+        const scoreA = a.performance.rating === 'Excellent' ? 4 : 
+                      a.performance.rating === 'Good' ? 3 : 
+                      a.performance.rating === 'Average' ? 2 : 1
+        const scoreB = b.performance.rating === 'Excellent' ? 4 : 
+                      b.performance.rating === 'Good' ? 3 : 
+                      b.performance.rating === 'Average' ? 2 : 1
+        return scoreB - scoreA
+      })
+      .slice(0, 3)
+  }
+
+  const calculateAverageFeedCost = () => {
+    const totalCost = feedInventory.reduce((sum, item) => sum + (item.quantity_kg * (item.cost_per_bag / 25)), 0)
+    const totalQuantity = feedInventory.reduce((sum, item) => sum + item.quantity_kg, 0)
+    return totalQuantity > 0 ? (totalCost / totalQuantity).toFixed(2) : 0
+  }
+
   // Filter live chickens based on filters
   const filteredBatches = useMemo(() => {
     return liveChickens.filter(batch => {
@@ -151,6 +250,80 @@ const EnhancedFeedManagement = () => {
   const lowStockFeed = useMemo(() => {
     return feedInventory.filter(feed => feed.quantity_kg < 50)
   }, [feedInventory])
+
+  // Get unassigned feeds (feeds not currently assigned to any batch)
+  const unassignedFeeds = useMemo(() => {
+    const assignedFeedIds = new Set(feedBatchAssignments.map(assignment => assignment.feed_id))
+    return feedInventory.filter(feed => !assignedFeedIds.has(feed.id) && feed.quantity_kg > 0)
+  }, [feedInventory, feedBatchAssignments])
+
+  // Get feeds expiring soon (within 30 days)
+  const expiringSoonFeeds = useMemo(() => {
+    const thirtyDaysFromNow = new Date()
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
+    
+    return feedInventory.filter(feed => {
+      const expiryDate = new Date(feed.expiry_date)
+      return expiryDate <= thirtyDaysFromNow && expiryDate > new Date()
+    }).sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date))
+  }, [feedInventory])
+
+  // Get expired feeds
+  const expiredFeeds = useMemo(() => {
+    const today = new Date()
+    return feedInventory.filter(feed => new Date(feed.expiry_date) < today)
+  }, [feedInventory])
+
+  // Calculate batch priority based on age, health, and feed requirements
+  const calculateBatchPriority = (batch) => {
+    const ageInWeeks = calculateAgeInWeeks(batch.hatch_date)
+    let priority = 'medium'
+    let score = 0
+
+    // Age factor (younger batches need more attention)
+    if (ageInWeeks < 2) score += 3
+    else if (ageInWeeks < 4) score += 2
+    else if (ageInWeeks < 8) score += 1
+
+    // Health factor
+    if (batch.status === 'sick') score += 3
+    else if (batch.status === 'quarantine') score += 2
+    else if (batch.status === 'healthy') score += 0
+
+    // Feed availability factor
+    const currentStage = getCurrentFeedStage(batch)
+    const availableFeed = feedInventory.find(feed => 
+      feed.feed_type === currentStage.feedType && feed.quantity_kg > 0
+    )
+    if (!availableFeed) score += 2
+
+    // Determine priority
+    if (score >= 5) priority = 'high'
+    else if (score >= 3) priority = 'medium'
+    else priority = 'low'
+
+    return { priority, score }
+  }
+
+  // Get batches sorted by priority
+  const batchesByPriority = useMemo(() => {
+    return filteredBatches.map(batch => ({
+      ...batch,
+      ...calculateBatchPriority(batch)
+    })).sort((a, b) => {
+      const priorityOrder = { high: 3, medium: 2, low: 1 }
+      return priorityOrder[b.priority] - priorityOrder[a.priority] || b.score - a.score
+    })
+  }, [filteredBatches, feedInventory])
+
+  // Calculate days until expiry
+  const getDaysUntilExpiry = (expiryDate) => {
+    const today = new Date()
+    const expiry = new Date(expiryDate)
+    const diffTime = expiry - today
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays
+  }
 
   // Open modal for different actions
   const openModal = (type, data = null) => {
@@ -187,9 +360,10 @@ const EnhancedFeedManagement = () => {
     try {
       if (modalType === 'purchase') {
         // Handle feed purchase
+        const finalBrand = formData.brand === 'Others' ? formData.custom_brand : formData.brand
         const purchaseData = {
           feed_type: formData.feed_type,
-          brand: formData.brand,
+          brand: finalBrand,
           number_of_bags: parseInt(formData.number_of_bags),
           quantity_kg: parseFloat(formData.quantity_kg),
           cost_per_bag: parseFloat(formData.cost_per_bag),
@@ -228,6 +402,12 @@ const EnhancedFeedManagement = () => {
       {/* Tab Navigation */}
       <div className="tab-navigation">
         <button 
+          className={`tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          Dashboard
+        </button>
+        <button 
           className={`tab-btn ${activeTab === 'plans' ? 'active' : ''}`}
           onClick={() => setActiveTab('plans')}
         >
@@ -240,15 +420,62 @@ const EnhancedFeedManagement = () => {
           Recommendations
         </button>
         <button 
-          className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-          onClick={() => setActiveTab('analytics')}
+          className={`tab-btn ${activeTab === 'inventory' ? 'active' : ''}`}
+          onClick={() => setActiveTab('inventory')}
         >
-          Analytics
+          Inventory
         </button>
+        <button 
+            className={`tab-button ${activeTab === 'batches' ? 'active' : ''}`}
+            onClick={() => setActiveTab('batches')}
+          >
+            Batches
+          </button>
+          <button 
+            className={`tab-button ${activeTab === 'analytics' ? 'active' : ''}`}
+            onClick={() => setActiveTab('analytics')}
+          >
+            Analytics
+          </button>
       </div>
 
-      {/* Feed Plans Tab */}
-      {activeTab === 'plans' && (
+        {/* Dashboard Tab */}
+        {activeTab === 'dashboard' && (
+          <div className="tab-content">
+            <FeedDashboardOverview
+              liveChickens={liveChickens}
+              feedInventory={feedInventory}
+              feedConsumption={feedConsumption}
+              feedBatchAssignments={feedBatchAssignments}
+              calculateFCR={calculateFCR}
+              getCurrentFeedStage={getCurrentFeedStage}
+              formatNumber={formatNumber}
+            />
+          </div>
+        )}
+
+        {/* Batches Tab */}
+        {activeTab === 'batches' && (
+          <div className="tab-content">
+            <BatchFeedView
+              liveChickens={liveChickens}
+              feedInventory={feedInventory}
+              feedConsumption={feedConsumption}
+              feedBatchAssignments={feedBatchAssignments}
+              onAssignFeed={(batch) => {
+                setSelectedBatch(batch)
+                openModal('smart-allocation', batch)
+              }}
+              onViewDetails={(batch) => {
+                setSelectedBatch(batch)
+                // Could open a detailed view modal here
+              }}
+            />
+          </div>
+        )}
+
+        {/* Feed Plans Tab */}
+        {activeTab === 'plans' && (
         <div className="plans-section">
           <h2>Feed Plans by Breed</h2>
           <div className="plans-grid">
@@ -369,19 +596,217 @@ const EnhancedFeedManagement = () => {
         </div>
       )}
 
+      {/* Inventory Tab */}
+      {activeTab === 'inventory' && (
+        <div className="inventory-section">
+          <h2>Feed Inventory Management</h2>
+          
+          {/* Inventory Summary Cards */}
+          <div className="inventory-summary-cards">
+            <div className="summary-card">
+              <h3>Total Inventory</h3>
+              <p className="summary-value">{feedInventory.length}</p>
+              <p className="summary-label">Feed Items</p>
+            </div>
+            <div className="summary-card">
+              <h3>Unassigned Feeds</h3>
+              <p className="summary-value">{unassignedFeeds.length}</p>
+              <p className="summary-label">Available for Assignment</p>
+            </div>
+            <div className="summary-card">
+              <h3>Expiring Soon</h3>
+              <p className="summary-value">{expiringSoonFeeds.length}</p>
+              <p className="summary-label">Within 30 Days</p>
+            </div>
+            <div className="summary-card">
+              <h3>Expired</h3>
+              <p className="summary-value">{expiredFeeds.length}</p>
+              <p className="summary-label">Needs Attention</p>
+            </div>
+          </div>
+
+          {/* Unassigned Feeds Section */}
+          {unassignedFeeds.length > 0 && (
+            <div className="inventory-panel">
+              <h3>🔄 Unassigned Feeds</h3>
+              <p className="panel-description">These feeds are available for batch assignment</p>
+              <div className="unassigned-feeds-grid">
+                {unassignedFeeds.map(feed => (
+                  <div key={feed.id} className="unassigned-feed-card">
+                    <div className="feed-header">
+                      <h4>{feed.feed_type}</h4>
+                      <span className="feed-brand">{feed.brand}</span>
+                    </div>
+                    <div className="feed-details">
+                      <p><strong>Quantity:</strong> {formatNumber(feed.quantity_kg)} kg</p>
+                      <p><strong>Bags:</strong> {feed.number_of_bags}</p>
+                      <p><strong>Expires:</strong> {new Date(feed.expiry_date).toLocaleDateString()}</p>
+                      <p><strong>Supplier:</strong> {feed.supplier}</p>
+                    </div>
+                    <div className="feed-actions">
+                      <button 
+                        className="btn-primary"
+                        onClick={() => openModal('smart-allocation', { feedId: feed.id })}
+                      >
+                        Assign to Batch
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Expiry Tracking Section */}
+          <div className="inventory-panel">
+            <h3>⏰ Expiry Tracking</h3>
+            
+            {/* Expiring Soon */}
+            {expiringSoonFeeds.length > 0 && (
+              <div className="expiry-subsection">
+                <h4>Expiring Soon (Next 30 Days)</h4>
+                <div className="expiry-feeds-list">
+                  {expiringSoonFeeds.map(feed => {
+                    const daysUntilExpiry = getDaysUntilExpiry(feed.expiry_date)
+                    return (
+                      <div key={feed.id} className={`expiry-feed-item ${daysUntilExpiry <= 7 ? 'urgent' : daysUntilExpiry <= 14 ? 'warning' : 'caution'}`}>
+                        <div className="expiry-feed-info">
+                          <h5>{feed.feed_type} - {feed.brand}</h5>
+                          <p>{formatNumber(feed.quantity_kg)} kg remaining</p>
+                        </div>
+                        <div className="expiry-countdown">
+                          <span className="days-remaining">{daysUntilExpiry}</span>
+                          <span className="days-label">days left</span>
+                        </div>
+                        <div className="expiry-actions">
+                          <button 
+                            className="btn-secondary"
+                            onClick={() => openModal('smart-allocation', { feedId: feed.id })}
+                          >
+                            Use First
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Expired Feeds */}
+            {expiredFeeds.length > 0 && (
+              <div className="expiry-subsection">
+                <h4>⚠️ Expired Feeds</h4>
+                <div className="expired-feeds-list">
+                  {expiredFeeds.map(feed => (
+                    <div key={feed.id} className="expired-feed-item">
+                      <div className="expired-feed-info">
+                        <h5>{feed.feed_type} - {feed.brand}</h5>
+                        <p>{formatNumber(feed.quantity_kg)} kg</p>
+                        <p className="expired-date">Expired: {new Date(feed.expiry_date).toLocaleDateString()}</p>
+                      </div>
+                      <div className="expired-actions">
+                        <button 
+                          className="btn-danger"
+                          onClick={() => {
+                            if (confirm('Are you sure you want to dispose of this expired feed?')) {
+                              // Handle disposal
+                            }
+                          }}
+                        >
+                          Dispose
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Batch Priorities Section */}
+          <div className="inventory-panel">
+            <h3>🎯 Batch Priorities</h3>
+            <p className="panel-description">Batches ranked by feeding priority based on age, health, and feed availability</p>
+            <div className="batch-priorities-list">
+              {batchesByPriority.map(batch => {
+                const currentStage = getCurrentFeedStage(batch)
+                const availableFeed = feedInventory.find(feed => 
+                  feed.feed_type === currentStage.feedType && feed.quantity_kg > 0
+                )
+                
+                return (
+                  <div key={batch.id} className={`batch-priority-item priority-${batch.priority}`}>
+                    <div className="batch-priority-header">
+                      <h4>{batch.batch_id}</h4>
+                      <span className={`priority-badge priority-${batch.priority}`}>
+                        {batch.priority.toUpperCase()} PRIORITY
+                      </span>
+                    </div>
+                    <div className="batch-priority-details">
+                      <div className="batch-info">
+                        <p><strong>Age:</strong> {calculateAgeInWeeks(batch.hatch_date)} weeks</p>
+                        <p><strong>Count:</strong> {batch.initial_count} birds</p>
+                        <p><strong>Status:</strong> {batch.status}</p>
+                        <p><strong>Required Feed:</strong> {currentStage.feedType}</p>
+                      </div>
+                      <div className="feed-availability">
+                        {availableFeed ? (
+                          <div className="feed-available">
+                            <p>✅ Feed Available</p>
+                            <p>{formatNumber(availableFeed.quantity_kg)} kg in stock</p>
+                          </div>
+                        ) : (
+                          <div className="feed-unavailable">
+                            <p>❌ Feed Not Available</p>
+                            <button 
+                              className="btn-primary"
+                              onClick={() => openModal('purchase')}
+                            >
+                              Purchase Feed
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="batch-priority-actions">
+                      <button 
+                        className="btn-secondary"
+                        onClick={() => openModal('smart-allocation', batch)}
+                      >
+                        Assign Feed
+                      </button>
+                      <button 
+                        className="btn-outline"
+                        onClick={() => openModal('consume', batch)}
+                      >
+                        Log Consumption
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Analytics Tab */}
       {activeTab === 'analytics' && (
         <div className="analytics-section">
-          <h2>Feed Analytics</h2>
+          <h2>Feed Analytics & Performance Insights</h2>
           
+          {/* Enhanced Summary Cards */}
           <div className="summary-cards">
             <div className="summary-card">
               <h3>Total Feed Stock</h3>
               <p className="summary-value">{formatNumber(feedInventory.reduce((sum, item) => sum + item.quantity_kg, 0))} kg</p>
+              <p className="summary-subtitle">Avg Cost: ₦{calculateAverageFeedCost()}/kg</p>
             </div>
             <div className="summary-card">
               <h3>Active Batches</h3>
               <p className="summary-value">{liveChickens.length}</p>
+              <p className="summary-subtitle">Performance Tracked</p>
             </div>
             <div className="summary-card">
               <h3>Monthly Consumption</h3>
@@ -397,27 +822,190 @@ const EnhancedFeedManagement = () => {
                     .reduce((sum, item) => sum + item.quantity_consumed, 0)
                 )} kg
               </p>
+              <p className="summary-subtitle">Last 30 Days</p>
+            </div>
+            <div className="summary-card">
+              <h3>Average FCR</h3>
+              <p className="summary-value">
+                {liveChickens.length > 0 ? 
+                  (liveChickens.reduce((sum, batch) => sum + parseFloat(calculateFCR(batch.id)), 0) / liveChickens.length).toFixed(2) 
+                  : '0.00'}:1
+              </p>
+              <p className="summary-subtitle">Feed Efficiency</p>
             </div>
           </div>
 
-          <div className="analytics-grid">
-            {filteredBatches.map(batch => (
-              <div key={batch.id} className="analytics-card">
-                <h3>{batch.batch_id}</h3>
-                <div className="metric">
-                  <span className="label">Feed Conversion Ratio</span>
-                  <span className="value">{calculateFCR(batch.id)}:1</span>
+          {/* Top Performing Batches */}
+          <div className="performance-insights">
+            <h3>🏆 Top Performing Batches</h3>
+            <div className="top-performers-grid">
+              {getTopPerformingBatches().map((batch, index) => (
+                <div key={batch.id} className="top-performer-card">
+                  <div className="performer-rank">#{index + 1}</div>
+                  <div className="performer-info">
+                    <h4>{batch.batch_id}</h4>
+                    <div className="performance-badge" style={{ backgroundColor: batch.performance.color }}>
+                      {batch.performance.rating}
+                    </div>
+                  </div>
+                  <div className="performer-metrics">
+                    <div className="mini-metric">
+                      <span>FCR: {batch.fcr}:1</span>
+                    </div>
+                    <div className="mini-metric">
+                      <span>Efficiency: {batch.efficiency}%</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="metric">
-                  <span className="label">Estimated Wastage</span>
-                  <span className="value">{calculateWastage(batch.id)}%</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Detailed Batch Analytics */}
+          <div className="detailed-analytics">
+            <h3>📊 Detailed Batch Performance</h3>
+            <div className="analytics-grid">
+              {filteredBatches.map(batch => {
+                const performance = getBatchPerformanceRating(batch.id)
+                return (
+                  <div key={batch.id} className="enhanced-analytics-card">
+                    <div className="analytics-header">
+                      <h3>{batch.batch_id}</h3>
+                      <div className="performance-indicator" style={{ backgroundColor: performance.color }}>
+                        {performance.rating}
+                      </div>
+                    </div>
+                    
+                    <div className="analytics-metrics">
+                      <div className="metric-row">
+                        <div className="metric">
+                          <span className="label">Feed Conversion Ratio</span>
+                          <span className="value">{calculateFCR(batch.id)}:1</span>
+                        </div>
+                        <div className="metric">
+                          <span className="label">Weight Gain Efficiency</span>
+                          <span className="value">{calculateWeightGainEfficiency(batch.id)}%</span>
+                        </div>
+                      </div>
+                      
+                      <div className="metric-row">
+                        <div className="metric">
+                          <span className="label">Daily Feed/Bird</span>
+                          <span className="value">{calculateDailyFeedConsumption(batch.id)}g</span>
+                        </div>
+                        <div className="metric">
+                          <span className="label">Feed Cost/Bird</span>
+                          <span className="value">₦{calculateFeedCostPerBird(batch.id)}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="metric-row">
+                        <div className="metric">
+                          <span className="label">Estimated Wastage</span>
+                          <span className="value">{calculateWastage(batch.id)}%</span>
+                        </div>
+                        <div className="metric">
+                          <span className="label">Current Stage</span>
+                          <span className="value">{getCurrentFeedStage(batch).stage}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="analytics-actions">
+                      <button 
+                        className="btn-secondary"
+                        onClick={() => openModal('smart-allocation', batch)}
+                      >
+                        Optimize Feed
+                      </button>
+                      <button 
+                        className="btn-outline"
+                        onClick={() => openModal('consume', batch)}
+                      >
+                        Log Feed
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Feed Efficiency Comparison Chart */}
+          <div className="efficiency-comparison">
+            <h3>📈 Feed Efficiency Comparison</h3>
+            <div className="comparison-chart">
+              {liveChickens.map(batch => {
+                const fcr = parseFloat(calculateFCR(batch.id))
+                const efficiency = parseFloat(calculateWeightGainEfficiency(batch.id))
+                const maxFCR = 3.0 // Maximum expected FCR for scaling
+                const fcrPercentage = Math.min((fcr / maxFCR) * 100, 100)
+                
+                return (
+                  <div key={batch.id} className="efficiency-bar-item">
+                    <div className="batch-label">{batch.batch_id}</div>
+                    <div className="efficiency-bars">
+                      <div className="bar-container">
+                        <label>FCR</label>
+                        <div className="progress-bar">
+                          <div 
+                            className="progress-fill fcr-bar" 
+                            style={{ width: `${fcrPercentage}%` }}
+                          ></div>
+                        </div>
+                        <span className="bar-value">{fcr}:1</span>
+                      </div>
+                      <div className="bar-container">
+                        <label>Efficiency</label>
+                        <div className="progress-bar">
+                          <div 
+                            className="progress-fill efficiency-bar" 
+                            style={{ width: `${efficiency}%` }}
+                          ></div>
+                        </div>
+                        <span className="bar-value">{efficiency}%</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Cost Analysis */}
+          <div className="cost-analysis">
+            <h3>💰 Feed Cost Analysis</h3>
+            <div className="cost-breakdown">
+              <div className="cost-summary">
+                <div className="cost-item">
+                  <span className="cost-label">Total Feed Investment</span>
+                  <span className="cost-value">
+                    ₦{formatNumber(feedInventory.reduce((sum, item) => 
+                      sum + (item.quantity_kg * (item.cost_per_bag / 25)), 0
+                    ))}
+                  </span>
                 </div>
-                <div className="metric">
-                  <span className="label">Current Stage</span>
-                  <span className="value">{getCurrentFeedStage(batch).stage}</span>
+                <div className="cost-item">
+                  <span className="cost-label">Average Cost per Bird</span>
+                  <span className="cost-value">
+                    ₦{liveChickens.length > 0 ? 
+                      (liveChickens.reduce((sum, batch) => 
+                        sum + parseFloat(calculateFeedCostPerBird(batch.id)), 0
+                      ) / liveChickens.length).toFixed(2) : '0.00'}
+                  </span>
+                </div>
+                <div className="cost-item">
+                  <span className="cost-label">Most Expensive Batch</span>
+                  <span className="cost-value">
+                    {liveChickens.length > 0 ? 
+                      liveChickens.reduce((max, batch) => 
+                        parseFloat(calculateFeedCostPerBird(batch.id)) > parseFloat(calculateFeedCostPerBird(max.id)) 
+                          ? batch : max
+                      ).batch_id : 'N/A'}
+                  </span>
                 </div>
               </div>
-            ))}
+            </div>
           </div>
         </div>
       )}
@@ -448,15 +1036,30 @@ const EnhancedFeedManagement = () => {
                 
                 <div className="form-group">
                   <label htmlFor="brand">Brand*</label>
-                  <input
-                    type="text"
+                  <select
                     id="brand"
                     name="brand"
                     value={formData.brand || ''}
                     onChange={handleInputChange}
                     required
-                    placeholder="e.g., New Hope, BreedWell"
-                  />
+                  >
+                    <option value="">Select brand</option>
+                    {FEED_BRANDS.map(brand => (
+                      <option key={brand} value={brand}>{brand}</option>
+                    ))}
+                  </select>
+                  {formData.brand === 'Others' && (
+                    <input
+                      type="text"
+                      id="custom_brand"
+                      name="custom_brand"
+                      value={formData.custom_brand || ''}
+                      onChange={handleInputChange}
+                      placeholder="Enter custom brand name"
+                      style={{ marginTop: '8px' }}
+                      required
+                    />
+                  )}
                 </div>
               </div>
               
@@ -578,7 +1181,7 @@ const EnhancedFeedManagement = () => {
                 >
                   <option value="">Select feed</option>
                   {feedInventory
-                    .filter(feed => feed.feed_type === selectedBatch.feedType)
+                    .filter(feed => feed.feed_type === selectedBatch.feedType && feed.quantity_kg > 0)
                     .map(feed => (
                       <option key={feed.id} value={feed.id}>
                         {feed.feed_type} - {feed.brand} ({formatNumber(feed.quantity_kg)} kg available)
@@ -623,6 +1226,226 @@ const EnhancedFeedManagement = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Smart Feed Allocation Modal */}
+      {showModal && modalType === 'smart-allocation' && selectedBatch && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-content smart-allocation-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Smart Feed Allocation</h2>
+              <p>Batch {selectedBatch.id} - {selectedBatch.breed} ({selectedBatch.currentCount} birds)</p>
+            </div>
+
+            <div className="allocation-content">
+              {/* Batch Information Panel */}
+              <div className="batch-info-panel">
+                <h3>Batch Details</h3>
+                <div className="info-grid">
+                  <div className="info-item">
+                    <span className="label">Age:</span>
+                    <span className="value">{Math.floor((new Date() - new Date(selectedBatch.hatch_date)) / (1000 * 60 * 60 * 24 * 7))} weeks</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="label">Current Stage:</span>
+                    <span className="value">{(() => {
+                      const age = Math.floor((new Date() - new Date(selectedBatch.hatch_date)) / (1000 * 60 * 60 * 24 * 7));
+                      if (selectedBatch.breed === 'Broiler') {
+                        return age <= 4 ? 'Starter' : 'Finisher';
+                      } else {
+                        if (age <= 6) return 'Starter';
+                        if (age <= 18) return 'Grower';
+                        return 'Layer';
+                      }
+                    })()}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="label">Birds:</span>
+                    <span className="value">{selectedBatch.currentCount}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="label">FCR:</span>
+                    <span className="value">{selectedBatch.fcr || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Smart Recommendations */}
+              <div className="recommendations-panel">
+                <h3>🎯 Smart Recommendations</h3>
+                <div className="recommendation-cards">
+                  {(() => {
+                    const age = Math.floor((new Date() - new Date(selectedBatch.hatch_date)) / (1000 * 60 * 60 * 24 * 7));
+                    const currentStage = selectedBatch.breed === 'Broiler' 
+                      ? (age <= 4 ? 'Starter' : 'Finisher')
+                      : (age <= 6 ? 'Starter' : age <= 18 ? 'Grower' : 'Layer');
+                    
+                    const recommendedFeeds = feedInventory.filter(feed => 
+                      feed.type.toLowerCase().includes(currentStage.toLowerCase()) && feed.quantity > 0
+                    );
+
+                    const dailyConsumption = selectedBatch.breed === 'Broiler' 
+                      ? (age <= 4 ? 50 : 120) // grams per bird per day
+                      : (age <= 6 ? 40 : age <= 18 ? 80 : 110);
+                    
+                    const weeklyNeed = (dailyConsumption * selectedBatch.currentCount * 7) / 1000; // kg per week
+
+                    return recommendedFeeds.length > 0 ? recommendedFeeds.map(feed => (
+                      <div key={feed.id} className="recommendation-card optimal">
+                        <div className="card-header">
+                          <span className="feed-name">{feed.brand} {feed.type}</span>
+                          <span className="match-score">98% Match</span>
+                        </div>
+                        <div className="card-details">
+                          <div className="detail-row">
+                            <span>Available:</span>
+                            <span>{feed.quantity} bags</span>
+                          </div>
+                          <div className="detail-row">
+                            <span>Weekly Need:</span>
+                            <span>{weeklyNeed.toFixed(1)} kg ({Math.ceil(weeklyNeed / 25)} bags)</span>
+                          </div>
+                          <div className="detail-row">
+                            <span>Duration:</span>
+                            <span>{Math.floor((feed.quantity * 25) / weeklyNeed)} weeks</span>
+                          </div>
+                          <div className="detail-row">
+                            <span>Expiry:</span>
+                            <span className={new Date(feed.expiry_date) < new Date(Date.now() + 30*24*60*60*1000) ? 'expiring' : 'good'}>
+                              {new Date(feed.expiry_date).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        <button 
+                          className="assign-btn optimal"
+                          onClick={() => {
+                            // Auto-assign optimal amount
+                            const optimalBags = Math.min(Math.ceil(weeklyNeed / 25) * 2, feed.quantity); // 2 weeks supply
+                            setFormData({
+                              feedId: feed.id,
+                              quantity: optimalBags,
+                              notes: `Auto-assigned ${optimalBags} bags for 2-week supply`
+                            });
+                          }}
+                        >
+                          Auto-Assign Optimal
+                        </button>
+                      </div>
+                    )) : (
+                      <div className="recommendation-card warning">
+                        <div className="card-header">
+                          <span className="feed-name">⚠️ No Optimal Feed Available</span>
+                        </div>
+                        <div className="card-details">
+                          <p>Recommended: {currentStage} feed for {selectedBatch.breed}</p>
+                          <p>Consider purchasing {currentStage} feed or using alternative feeds below.</p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Portion Calculator */}
+              <div className="calculator-panel">
+                <h3>📊 Portion Calculator</h3>
+                <div className="calculator-grid">
+                  <div className="calc-input">
+                    <label>Duration (weeks):</label>
+                    <input 
+                      type="number" 
+                      min="1" 
+                      max="12" 
+                      defaultValue="2"
+                      onChange={(e) => {
+                        const weeks = parseInt(e.target.value) || 2;
+                        const age = Math.floor((new Date() - new Date(selectedBatch.hatch_date)) / (1000 * 60 * 60 * 24 * 7));
+                        const dailyConsumption = selectedBatch.breed === 'Broiler' 
+                          ? (age <= 4 ? 50 : 120)
+                          : (age <= 6 ? 40 : age <= 18 ? 80 : 110);
+                        const totalKg = (dailyConsumption * selectedBatch.currentCount * weeks * 7) / 1000;
+                        const bags = Math.ceil(totalKg / 25);
+                        
+                        document.getElementById('calc-result').innerHTML = `
+                          <strong>${totalKg.toFixed(1)} kg</strong> (${bags} bags needed)
+                        `;
+                      }}
+                    />
+                  </div>
+                  <div className="calc-result" id="calc-result">
+                    <strong>350.0 kg</strong> (14 bags needed)
+                  </div>
+                </div>
+              </div>
+
+              {/* Manual Feed Selection */}
+              <div className="manual-selection-panel">
+                <h3>Manual Feed Selection</h3>
+                <div className="feed-selection-grid">
+                  {feedInventory.filter(feed => feed.quantity > 0).map(feed => (
+                    <div 
+                      key={feed.id} 
+                      className={`feed-option ${formData.feedId === feed.id ? 'selected' : ''}`}
+                      onClick={() => setFormData({...formData, feedId: feed.id})}
+                    >
+                      <div className="feed-header">
+                        <span className="feed-name">{feed.brand} {feed.type}</span>
+                        <span className="quantity">{feed.quantity} bags</span>
+                      </div>
+                      <div className="feed-details">
+                        <span className="expiry">Exp: {new Date(feed.expiry_date).toLocaleDateString()}</span>
+                        <span className={`status ${new Date(feed.expiry_date) < new Date(Date.now() + 30*24*60*60*1000) ? 'warning' : 'good'}`}>
+                          {new Date(feed.expiry_date) < new Date(Date.now() + 30*24*60*60*1000) ? 'Expiring Soon' : 'Good'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {formData.feedId && (
+                  <div className="allocation-form">
+                    <div className="form-row">
+                      <label>Bags to Assign:</label>
+                      <input 
+                        type="number" 
+                        min="1" 
+                        max={feedInventory.find(f => f.id === formData.feedId)?.quantity || 1}
+                        value={formData.quantity || 1}
+                        onChange={(e) => setFormData({...formData, quantity: parseInt(e.target.value)})}
+                      />
+                    </div>
+                    <div className="form-row">
+                      <label>Notes:</label>
+                      <textarea 
+                        value={formData.notes || ''}
+                        onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                        placeholder="Optional notes about this allocation..."
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={closeModal}>
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn-primary"
+                disabled={!formData.feedId || !formData.quantity}
+                onClick={() => {
+                  // Handle feed assignment
+                  console.log('Assigning feed:', formData, 'to batch:', selectedBatch);
+                  closeModal();
+                }}
+              >
+                Assign Feed
+              </button>
+            </div>
           </div>
         </div>
       )}

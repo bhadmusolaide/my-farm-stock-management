@@ -49,9 +49,21 @@ export function AppProvider({ children }) {
     setFeedInventoryState(newFeedInventory)
     localStorage.setItem('feedInventory', JSON.stringify(newFeedInventory))
   }
-  const [feedConsumption, setFeedConsumption] = useState([])
+  const [feedConsumption, setFeedConsumptionState] = useState([])
+
+  // Helper function to update feedConsumption and save to localStorage as fallback
+  const setFeedConsumption = (newFeedConsumption) => {
+    setFeedConsumptionState(newFeedConsumption)
+    // Save to localStorage as fallback
+    try {
+      localStorage.setItem('feedConsumption', JSON.stringify(newFeedConsumption))
+    } catch (e) {
+      console.warn('Failed to save feedConsumption to localStorage:', e)
+    }
+  }
   const [feedBatchAssignments, setFeedBatchAssignments] = useState([])
   const [chickenInventoryTransactions, setChickenInventoryTransactions] = useState([])
+  const [weightHistory, setWeightHistory] = useState([]) // Add weight history state
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [migrationStatus, setMigrationStatus] = useState({
@@ -90,206 +102,122 @@ export function AppProvider({ children }) {
             .from('chickens')
             .select('*')
             .order('created_at', { ascending: false })
-          
-          if (chickensError) throw chickensError
-          setChickens(chickensData || [])
-          
-          // Load stock
-          const { data: stockData, error: stockError } = await supabase
-            .from('stock')
-            .select('*')
-            .order('date', { ascending: false })
-          
-          if (stockError) throw stockError
-          setStock(stockData || [])
-          
-          // Load live chickens
-          const { data: liveChickensData, error: liveChickensError } = await supabase
-            .from('live_chickens')
-            .select('*')
-            .order('hatch_date', { ascending: false })
-          
-          if (liveChickensError && !liveChickensError.message.includes('relation "live_chickens" does not exist')) {
-            throw liveChickensError
-          }
-          
-          // Prioritize database data over localStorage for data consistency
-          if (liveChickensData && liveChickensData.length > 0) {
-            setLiveChickens(liveChickensData)
-          } else {
-            // Only use localStorage as fallback if no database data exists
-            const localLiveChickens = localStorage.getItem('liveChickens')
-            if (localLiveChickens) {
-              try {
-                const parsedLocalData = JSON.parse(localLiveChickens)
-                setLiveChickens(parsedLocalData)
-              } catch (e) {
-                console.warn('Invalid liveChickens data in localStorage:', e)
-                setLiveChickens([])
-              }
+        
+        if (chickensError) throw chickensError
+        setChickens(chickensData || [])
+        
+        // Load stock
+        const { data: stockData, error: stockError } = await supabase
+          .from('stock')
+          .select('*')
+          .order('date', { ascending: false })
+        
+        if (stockError) throw stockError
+        setStock(stockData || [])
+        
+        // Load live chickens
+        const { data: liveChickensData, error: liveChickensError } = await supabase
+          .from('live_chickens')
+          .select('*')
+          .order('hatch_date', { ascending: false })
+        
+        if (liveChickensError && !liveChickensError.message.includes('relation "live_chickens" does not exist')) {
+          throw liveChickensError
+        }
+        
+        // Prioritize database data over localStorage for data consistency
+        if (liveChickensData && liveChickensData.length > 0) {
+          setLiveChickens(liveChickensData)
+        } else {
+          // Only use localStorage as fallback if no database data exists
+          const localLiveChickens = localStorage.getItem('liveChickens')
+          if (localLiveChickens) {
+            try {
+              const parsedLocalData = JSON.parse(localLiveChickens)
+              setLiveChickens(parsedLocalData)
+            } catch (e) {
+              console.warn('Invalid liveChickens data in localStorage:', e)
+              setLiveChickens([])
             }
           }
-          
-          // Load feed inventory
-          const { data: feedInventoryData, error: feedInventoryError } = await supabase
-            .from('feed_inventory')
-            .select('*')
-            .order('date', { ascending: false })
-          
-          if (feedInventoryError && !feedInventoryError.message.includes('relation "feed_inventory" does not exist')) {
-            throw feedInventoryError
-          }
-          
-          // Only set from Supabase if we have actual data, otherwise keep localStorage data
-          if (feedInventoryData && feedInventoryData.length > 0) {
-            setFeedInventory(feedInventoryData)
-          }
-          
-          // Load feed consumption
-          const { data: feedConsumptionData, error: feedConsumptionError } = await supabase
-            .from('feed_consumption')
-            .select('*')
-            .order('consumption_date', { ascending: false })
-          
-          if (feedConsumptionError && !feedConsumptionError.message.includes('relation "feed_consumption" does not exist')) {
-            throw feedConsumptionError
-          }
-          
-          // Only set from Supabase if we have actual data, otherwise keep localStorage data
-          if (feedConsumptionData && feedConsumptionData.length > 0) {
-            setFeedConsumption(feedConsumptionData)
-          }
-          
-          // Load feed batch assignments (handle gracefully if table doesn't exist)
-          try {
-            const { data: feedBatchAssignmentsData, error: feedBatchAssignmentsError } = await supabase
-              .from('feed_batch_assignments')
-              .select('*')
-              .order('assigned_date', { ascending: false })
-            
-            if (feedBatchAssignmentsError) {
-              console.warn('Feed batch assignments table not found - this is expected for new installations:', feedBatchAssignmentsError)
-              setFeedBatchAssignments([])
-            } else {
-              setFeedBatchAssignments(feedBatchAssignmentsData || [])
+        }
+        
+        // Load feed inventory
+        const { data: feedInventoryData, error: feedInventoryError } = await supabase
+          .from('feed_inventory')
+          .select('*')
+          .order('purchase_date', { ascending: false })
+        
+        if (feedInventoryError && !feedInventoryError.message.includes('relation "feed_inventory" does not exist')) {
+          throw feedInventoryError
+        }
+        
+        // Only set from Supabase if we have actual data, otherwise keep localStorage data
+        if (feedInventoryData && feedInventoryData.length > 0) {
+          setFeedInventory(feedInventoryData)
+        }
+        
+        // Load feed consumption
+        const { data: feedConsumptionData, error: feedConsumptionError } = await supabase
+          .from('feed_consumption')
+          .select('*')
+          .order('consumption_date', { ascending: false })
+        
+        if (feedConsumptionError && !feedConsumptionError.message.includes('relation "feed_consumption" does not exist')) {
+          throw feedConsumptionError
+        }
+        
+        // Only set from Supabase if we have actual data, otherwise keep localStorage data
+        if (feedConsumptionData && feedConsumptionData.length > 0) {
+          setFeedConsumption(feedConsumptionData)
+        } else {
+          // Fallback to localStorage if no database data exists
+          const localFeedConsumption = localStorage.getItem('feedConsumption')
+          if (localFeedConsumption && localFeedConsumption !== 'undefined') {
+            try {
+              const parsedFeedConsumption = JSON.parse(localFeedConsumption)
+              setFeedConsumption(parsedFeedConsumption)
+            } catch (e) {
+              console.warn('Invalid feedConsumption data in localStorage:', e)
+              setFeedConsumption([])
             }
-          } catch (err) {
-            console.warn('Feed batch assignments feature not available yet:', err)
+          }
+        }
+        
+        // Load feed batch assignments (handle gracefully if table doesn't exist)
+        try {
+          const { data: feedBatchAssignmentsData, error: feedBatchAssignmentsError } = await supabase
+            .from('feed_batch_assignments')
+            .select('*')
+            .order('assigned_date', { ascending: false })
+          
+          if (feedBatchAssignmentsError) {
+            console.warn('Feed batch assignments table not found - this is expected for new installations:', feedBatchAssignmentsError)
             setFeedBatchAssignments([])
+          } else {
+            setFeedBatchAssignments(feedBatchAssignmentsData || [])
           }
+        } catch (err) {
+          console.warn('Feed batch assignments feature not available yet:', err)
+          setFeedBatchAssignments([])
+        }
 
-          // Load chicken inventory transactions (handle gracefully if table doesn't exist)
-          try {
-            const { data: chickenTransactionsData, error: chickenTransactionsError } = await supabase
-              .from('chicken_inventory_transactions')
-              .select('*')
-              .order('created_at', { ascending: false })
-            
-            if (chickenTransactionsError && !chickenTransactionsError.message.includes('relation "chicken_inventory_transactions" does not exist')) {
-              throw chickenTransactionsError
-            }
-            
-            // Prioritize database data over localStorage
-            if (chickenTransactionsData && chickenTransactionsData.length > 0) {
-              setChickenInventoryTransactions(chickenTransactionsData)
-            } else {
-              // Fallback to localStorage
-              const localChickenTransactions = localStorage.getItem('chickenInventoryTransactions')
-              if (localChickenTransactions && localChickenTransactions !== 'undefined') {
-                try {
-                  const parsedTransactions = JSON.parse(localChickenTransactions)
-                  setChickenInventoryTransactions(parsedTransactions)
-                } catch (e) {
-                  console.warn('Invalid chickenInventoryTransactions data in localStorage:', e)
-                  setChickenInventoryTransactions([])
-                }
-              }
-            }
-          } catch (err) {
-            console.warn('Chicken inventory transactions table not available yet:', err)
-            setChickenInventoryTransactions([])
-          }
-          
-          // Load transactions
-          const { data: transactionsData, error: transactionsError } = await supabase
-            .from('transactions')
+        // Load chicken inventory transactions (handle gracefully if table doesn't exist)
+        try {
+          const { data: chickenTransactionsData, error: chickenTransactionsError } = await supabase
+            .from('chicken_inventory_transactions')
             .select('*')
-            .order('date', { ascending: false })
+            .order('created_at', { ascending: false })
           
-          if (transactionsError) throw transactionsError
-          setTransactions(transactionsData || [])
-          
-          // Load balance
-          const { data: balanceData, error: balanceError } = await supabase
-            .from('balance')
-            .select('amount')
-            .eq('id', 1)
-            .single()
-          
-          if (balanceError && !balanceError.message.includes('relation "balance" does not exist')) {
-            throw balanceError
+          if (chickenTransactionsError && !chickenTransactionsError.message.includes('relation "chicken_inventory_transactions" does not exist')) {
+            throw chickenTransactionsError
           }
-          const currentBalance = balanceData?.amount || 0
-          setBalance(currentBalance)
-
-        } catch (fetchError) {
-          // If we get a fetch error and we're using the placeholder URL, it's expected
-          // Just log it but don't set the error state
-          console.error('Error fetching from Supabase:', fetchError)
-          if (supabaseUrl.includes('placeholder') || supabaseUrl.includes('your-supabase-project-url')) {
-            // Using placeholder Supabase URL - load from localStorage as fallback
-            const localBalance = localStorage.getItem('balance')
-            if (localBalance && localBalance !== 'undefined') {
-              setBalance(parseFloat(localBalance))
-            }
-            
-            const localChickens = localStorage.getItem('chickens')
-            if (localChickens && localChickens !== 'undefined') {
-              try {
-                setChickens(JSON.parse(localChickens))
-              } catch (e) {
-                console.warn('Invalid chickens data in localStorage:', e)
-              }
-            }
-            
-            const localStock = localStorage.getItem('stock')
-            if (localStock && localStock !== 'undefined') {
-              try {
-                setStock(JSON.parse(localStock))
-              } catch (e) {
-                console.warn('Invalid stock data in localStorage:', e)
-              }
-            }
-            
-            const localTransactions = localStorage.getItem('transactions')
-            if (localTransactions && localTransactions !== 'undefined') {
-              try {
-                const parsedTransactions = JSON.parse(localTransactions)
-                setTransactions([...parsedTransactions].sort((a, b) => new Date(b.date) - new Date(a.date)))
-              } catch (e) {
-                console.warn('Invalid transactions data in localStorage:', e)
-              }
-            }
-            
-            const localFeedInventory = localStorage.getItem('feedInventory')
-            if (localFeedInventory && localFeedInventory !== 'undefined') {
-              try {
-                setFeedInventory(JSON.parse(localFeedInventory))
-              } catch (e) {
-                console.warn('Invalid feedInventory data in localStorage:', e)
-              }
-            }
-            
-            const localLiveChickens = localStorage.getItem('liveChickens')
-            if (localLiveChickens && localLiveChickens !== 'undefined') {
-              try {
-                setLiveChickens(JSON.parse(localLiveChickens))
-              } catch (e) {
-                console.warn('Invalid liveChickens data in localStorage:', e)
-              }
-            }
-
-            // Load chicken inventory transactions from localStorage as fallback
+          
+          // Prioritize database data over localStorage
+          if (chickenTransactionsData && chickenTransactionsData.length > 0) {
+            setChickenInventoryTransactions(chickenTransactionsData)
+          } else {
+            // Fallback to localStorage
             const localChickenTransactions = localStorage.getItem('chickenInventoryTransactions')
             if (localChickenTransactions && localChickenTransactions !== 'undefined') {
               try {
@@ -297,26 +225,174 @@ export function AppProvider({ children }) {
                 setChickenInventoryTransactions(parsedTransactions)
               } catch (e) {
                 console.warn('Invalid chickenInventoryTransactions data in localStorage:', e)
+                setChickenInventoryTransactions([])
               }
             }
-          } else {
-            throw fetchError
           }
+        } catch (err) {
+          console.warn('Chicken inventory transactions table not available yet:', err)
+          setChickenInventoryTransactions([])
         }
         
-      } catch (err) {
-        console.error('Error loading data from Supabase:', err)
-        setError('Failed to load data')
-      } finally {
-        setLoading(false)
-      }
-    }
+        // Load weight history (handle gracefully if table doesn't exist)
+        try {
+          const { data: weightHistoryData, error: weightHistoryError } = await supabase
+            .from('weight_history')
+            .select('*')
+            .order('recorded_date', { ascending: false })
+          
+          if (weightHistoryError && !weightHistoryError.message.includes('relation "weight_history" does not exist')) {
+            throw weightHistoryError
+          }
+          
+          // Prioritize database data over localStorage
+          if (weightHistoryData && weightHistoryData.length > 0) {
+            setWeightHistory(weightHistoryData)
+          } else {
+            // Fallback to localStorage
+            const localWeightHistory = localStorage.getItem('weightHistory')
+            if (localWeightHistory && localWeightHistory !== 'undefined') {
+              try {
+                const parsedWeightHistory = JSON.parse(localWeightHistory)
+                setWeightHistory(parsedWeightHistory)
+              } catch (e) {
+                console.warn('Invalid weightHistory data in localStorage:', e)
+                setWeightHistory([])
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Weight history table not available yet:', err)
+          setWeightHistory([])
+        }
+        
+        // Load transactions
+        const { data: transactionsData, error: transactionsError } = await supabase
+          .from('transactions')
+          .select('*')
+          .order('date', { ascending: false })
+        
+        if (transactionsError) throw transactionsError
+        setTransactions(transactionsData || [])
+        
+        // Load balance
+        const { data: balanceData, error: balanceError } = await supabase
+          .from('balance')
+          .select('amount')
+          .eq('id', 1)
+          .single()
+        
+        if (balanceError && !balanceError.message.includes('relation "balance" does not exist')) {
+          throw balanceError
+        }
+        const currentBalance = balanceData?.amount || 0
+        setBalance(currentBalance)
 
-    // Only load data if migration is not needed or has been completed
-    if (!loading && (!migrationStatus.needed || migrationStatus.completed)) {
-      loadData()
+      } catch (fetchError) {
+        // If we get a fetch error and we're using the placeholder URL, it's expected
+        // Just log it but don't set the error state
+        console.error('Error fetching from Supabase:', fetchError)
+        if (supabaseUrl.includes('placeholder') || supabaseUrl.includes('your-supabase-project-url')) {
+          // Using placeholder Supabase URL - load from localStorage as fallback
+          const localBalance = localStorage.getItem('balance')
+          if (localBalance && localBalance !== 'undefined') {
+            setBalance(parseFloat(localBalance))
+          }
+          
+          const localChickens = localStorage.getItem('chickens')
+          if (localChickens && localChickens !== 'undefined') {
+            try {
+              setChickens(JSON.parse(localChickens))
+            } catch (e) {
+              console.warn('Invalid chickens data in localStorage:', e)
+            }
+          }
+          
+          const localStock = localStorage.getItem('stock')
+          if (localStock && localStock !== 'undefined') {
+            try {
+              setStock(JSON.parse(localStock))
+            } catch (e) {
+              console.warn('Invalid stock data in localStorage:', e)
+            }
+          }
+          
+          const localTransactions = localStorage.getItem('transactions')
+          if (localTransactions && localTransactions !== 'undefined') {
+            try {
+              const parsedTransactions = JSON.parse(localTransactions)
+              setTransactions([...parsedTransactions].sort((a, b) => new Date(b.date) - new Date(a.date)))
+            } catch (e) {
+              console.warn('Invalid transactions data in localStorage:', e)
+            }
+          }
+          
+          const localFeedInventory = localStorage.getItem('feedInventory')
+          if (localFeedInventory && localFeedInventory !== 'undefined') {
+            try {
+              setFeedInventory(JSON.parse(localFeedInventory))
+            } catch (e) {
+              console.warn('Invalid feedInventory data in localStorage:', e)
+            }
+          }
+          
+          const localFeedConsumption = localStorage.getItem('feedConsumption')
+          if (localFeedConsumption && localFeedConsumption !== 'undefined') {
+            try {
+              setFeedConsumption(JSON.parse(localFeedConsumption))
+            } catch (e) {
+              console.warn('Invalid feedConsumption data in localStorage:', e)
+            }
+          }
+          
+          const localLiveChickens = localStorage.getItem('liveChickens')
+          if (localLiveChickens && localLiveChickens !== 'undefined') {
+            try {
+              setLiveChickens(JSON.parse(localLiveChickens))
+            } catch (e) {
+              console.warn('Invalid liveChickens data in localStorage:', e)
+            }
+          }
+
+          // Load chicken inventory transactions from localStorage as fallback
+          const localChickenTransactions = localStorage.getItem('chickenInventoryTransactions')
+          if (localChickenTransactions && localChickenTransactions !== 'undefined') {
+            try {
+              const parsedTransactions = JSON.parse(localChickenTransactions)
+              setChickenInventoryTransactions(parsedTransactions)
+            } catch (e) {
+              console.warn('Invalid chickenInventoryTransactions data in localStorage:', e)
+            }
+          }
+          
+          // Load weight history from localStorage as fallback
+          const localWeightHistory = localStorage.getItem('weightHistory')
+          if (localWeightHistory && localWeightHistory !== 'undefined') {
+            try {
+              const parsedWeightHistory = JSON.parse(localWeightHistory)
+              setWeightHistory(parsedWeightHistory)
+            } catch (e) {
+              console.warn('Invalid weightHistory data in localStorage:', e)
+            }
+          }
+        } else {
+          throw fetchError
+        }
+      }
+      
+    } catch (err) {
+      console.error('Error loading data from Supabase:', err)
+      setError('Failed to load data')
+    } finally {
+      setLoading(false)
     }
-  }, [loading, migrationStatus.needed, migrationStatus.completed])
+  }
+
+  // Only load data if migration is not needed or has been completed
+  if (!loading && (!migrationStatus.needed || migrationStatus.completed)) {
+    loadData()
+  }
+}, [loading, migrationStatus.needed, migrationStatus.completed])
 
   
   // Function to perform migration
@@ -999,6 +1075,19 @@ export function AppProvider({ children }) {
       
       const updatedChicken = { ...oldChicken, ...updates }
       
+      // If weight is being updated, also save to weight history
+      if (updates.current_weight !== undefined && updates.current_weight !== oldChicken.current_weight) {
+        try {
+          await addWeightHistory({
+            chicken_batch_id: id,
+            weight: updates.current_weight,
+            notes: updates.weight_notes || ''
+          })
+        } catch (err) {
+          console.warn('Failed to save weight history:', err)
+        }
+      }
+      
       // Try to update in Supabase first
       try {
         const { error } = await supabase
@@ -1052,6 +1141,45 @@ export function AppProvider({ children }) {
       
     } catch (err) {
       console.error('Error deleting live chicken:', err)
+      throw err
+    }
+  }
+
+  // Function to add weight history record
+  const addWeightHistory = async (weightData) => {
+    try {
+      const weightRecord = {
+        id: Date.now().toString(),
+        chicken_batch_id: weightData.chicken_batch_id,
+        weight: weightData.weight,
+        recorded_date: weightData.recorded_date || new Date().toISOString().split('T')[0],
+        notes: weightData.notes || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+
+      // Save to Supabase first
+      const { error } = await supabase.from('weight_history').insert(weightRecord)
+      if (error) {
+        console.warn('Failed to save weight history to Supabase:', error)
+      }
+
+      // Update local state
+      setWeightHistory(prev => [weightRecord, ...prev])
+      
+      // Save to localStorage as fallback
+      try {
+        localStorage.setItem('weightHistory', JSON.stringify([weightRecord, ...weightHistory]))
+      } catch (e) {
+        console.warn('Failed to save weightHistory to localStorage:', e)
+      }
+
+      // Log audit action
+      await logAuditAction('CREATE', 'weight_history', weightRecord.id, null, weightRecord)
+
+      return weightRecord
+    } catch (err) {
+      console.error('Error adding weight history:', err)
       throw err
     }
   }
@@ -1222,6 +1350,7 @@ export function AppProvider({ children }) {
       
       if (error) throw error
       
+      
       // Update local state
       setFeedInventory(prev => prev.map(feed => 
         feed.id === id ? updatedFeed : feed
@@ -1243,24 +1372,45 @@ export function AppProvider({ children }) {
         ...consumptionData,
         id: Date.now().toString(),
         consumption_date: new Date().toISOString().split('T')[0],
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }
       
-      // Store in local state
-      setFeedConsumption(prev => [consumption, ...prev])
+      // Save to Supabase database first
+      const { error } = await supabase.from('feed_consumption').insert(consumption)
+      if (error) throw error
+      
+      // Get the current feed inventory item
+      const { data: feedData, error: feedError } = await supabase
+        .from('feed_inventory')
+        .select('quantity_kg')
+        .eq('id', consumption.feed_id)
+        .single()
+      
+      if (feedError) throw feedError
+      
+      // Calculate the new quantity
+      const newQuantity = feedData.quantity_kg - consumption.quantity_consumed
       
       // Update feed inventory quantities
-      setFeedInventory(prev => prev.map(feed => {
-        if (feed.id === consumption.feed_id) {
-          const newQuantity = feed.quantity_kg - consumption.quantity_consumed
-      return { ...feed, quantity_kg: Math.max(0, newQuantity) }
-        }
-        return feed
-      }))
+      const { data: updatedFeed, error: updateError } = await supabase
+        .from('feed_inventory')
+        .update({ quantity_kg: newQuantity })
+        .eq('id', consumption.feed_id)
+        .select()
+      
+      if (updateError) throw updateError
+      
+      // Update local state
+      setFeedConsumption(prev => [consumption, ...prev])
+      setFeedInventory(prev => prev.map(feed => 
+        feed.id === consumption.feed_id ? updatedFeed[0] : feed
+      ))
       
       // Log audit action
       await logAuditAction('CREATE', 'feed_consumption', consumption.id, null, consumption)
       
+      return consumption
     } catch (err) {
       console.error('Error adding feed consumption:', err)
       throw err
@@ -1272,17 +1422,40 @@ export function AppProvider({ children }) {
       const consumptionToDelete = feedConsumption.find(consumption => consumption.id === id)
       if (!consumptionToDelete) throw new Error('Feed consumption record not found')
       
-      // Restore feed inventory quantities
-      setFeedInventory(prev => prev.map(feed => {
-        if (feed.id === consumptionToDelete.feed_id) {
-          const restoredQuantity = feed.quantity_kg + consumptionToDelete.quantity_consumed
-      return { ...feed, quantity_kg: restoredQuantity }
-        }
-        return feed
-      }))
+      // Delete from Supabase database
+      const { error } = await supabase
+        .from('feed_consumption')
+        .delete()
+        .eq('id', id)
       
-      // Remove from local state
+      if (error) throw error
+      
+      // Get the current feed inventory item
+      const { data: feedData, error: feedError } = await supabase
+        .from('feed_inventory')
+        .select('quantity_kg')
+        .eq('id', consumptionToDelete.feed_id)
+        .single()
+      
+      if (feedError) throw feedError
+      
+      // Calculate the restored quantity
+      const restoredQuantity = feedData.quantity_kg + consumptionToDelete.quantity_consumed
+      
+      // Restore feed inventory quantities
+      const { data: updatedFeed, error: updateError } = await supabase
+        .from('feed_inventory')
+        .update({ quantity_kg: restoredQuantity })
+        .eq('id', consumptionToDelete.feed_id)
+        .select()
+      
+      if (updateError) throw updateError
+      
+      // Update local state
       setFeedConsumption(prev => prev.filter(consumption => consumption.id !== id))
+      setFeedInventory(prev => prev.map(feed => 
+        feed.id === consumptionToDelete.feed_id ? updatedFeed[0] : feed
+      ))
       
       // Log audit action
       await logAuditAction('DELETE', 'feed_consumption', id, consumptionToDelete, null)
@@ -1320,6 +1493,7 @@ export function AppProvider({ children }) {
       return null
     }
   }
+  
   
   const deleteFeedBatchAssignment = async (id) => {
     try {

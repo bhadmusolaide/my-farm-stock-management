@@ -645,7 +645,7 @@ const ProcessingManagement = () => {
                 <tbody>
                   {(() => {
                     const last7Days = [];
-                    for (let i = 6; i >= 0; i--) {
+                    for (let i = 0; i <= 6; i++) {
                       const date = new Date();
                       date.setDate(date.getDate() - i);
                       last7Days.push(date.toISOString().split('T')[0]);

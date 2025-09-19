@@ -20,6 +20,7 @@ const Transactions = () => {
     endDate: ''
   })
   
+  
   // State for modal
   const [activeModal, setActiveModal] = useState(null)
   const [amount, setAmount] = useState('')
@@ -212,19 +213,20 @@ const Transactions = () => {
           
           <div className="filter-group">
             <label htmlFor="endDate">To Date</label>
-            <input
-              type="date"
-              id="endDate"
-              name="endDate"
-              value={filters.endDate}
-              onChange={handleFilterChange}
-            />
+            <div className="date-reset-group">
+              <input
+                type="date"
+                id="endDate"
+                name="endDate"
+                value={filters.endDate}
+                onChange={handleFilterChange}
+              />
+              <button className="btn-secondary" onClick={resetFilters}>
+                Reset Filters
+              </button>
+            </div>
           </div>
         </div>
-        
-        <button className="btn-secondary" onClick={resetFilters}>
-          Reset Filters
-        </button>
       </div>
       
       <div className="transactions-summary">
