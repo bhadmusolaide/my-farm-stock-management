@@ -98,6 +98,23 @@
   gap: 1rem;
 }
 
+.date-reset-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.date-reset-group input {
+  flex: 1;
+}
+
+.date-reset-group .btn-secondary {
+  height: fit-content;
+  padding: 0.6rem;
+  white-space: nowrap;
+  align-self: flex-end;
+}
+
 .filter-group {
   display: flex;
   flex-direction: column;

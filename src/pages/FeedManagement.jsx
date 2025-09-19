@@ -294,7 +294,7 @@ const FeedManagement = () => {
       number_of_bags: feed.number_of_bags.toString(),
       quantity_kg: feed.quantity_kg.toString(),
       cost_per_bag: feed.cost_per_bag.toString(),
-      purchase_date: feed.purchase_date || feed.date,
+      purchase_date: feed.purchase_date,
       expiry_date: feed.expiry_date,
       notes: feed.notes || '',
       deduct_from_balance: feed.deduct_from_balance || false,
@@ -457,19 +457,20 @@ const FeedManagement = () => {
               
               <div className="filter-group">
                 <label htmlFor="endDate">To Date</label>
-                <input
-                  type="date"
-                  id="endDate"
-                  name="endDate"
-                  value={filters.endDate}
-                  onChange={handleFilterChange}
-                />
+                <div className="date-reset-group">
+                  <input
+                    type="date"
+                    id="endDate"
+                    name="endDate"
+                    value={filters.endDate}
+                    onChange={handleFilterChange}
+                  />
+                  <button className="btn-secondary" onClick={resetFilters}>
+                    Reset Filters
+                  </button>
+                </div>
               </div>
             </div>
-            
-            <button className="btn-secondary" onClick={resetFilters}>
-              Reset Filters
-            </button>
           </div>
           
           {/* Feed Inventory Table */}
@@ -491,8 +492,8 @@ const FeedManagement = () => {
             <table className="feed-table">
               <thead>
                 <tr>
-                  {inventoryColumnConfig.isColumnVisible('date') && (
-                    <SortableTableHeader sortKey="date" onSort={requestInventorySort} getSortIcon={getInventorySortIcon}>
+                  {inventoryColumnConfig.isColumnVisible('purchase_date') && (
+                    <SortableTableHeader sortKey="purchase_date" onSort={requestInventorySort} getSortIcon={getInventorySortIcon}>
                       Purchase Date
                     </SortableTableHeader>
                   )}
@@ -896,7 +897,7 @@ const FeedManagement = () => {
                 <tbody>
                   {(() => {
                     const last7Days = []
-                    for (let i = 6; i >= 0; i--) {
+                    for (let i = 0; i <= 6; i++) {
                       const date = new Date()
                       date.setDate(date.getDate() - i)
                       last7Days.push(date.toISOString().split('T')[0])

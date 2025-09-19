@@ -351,6 +351,51 @@ CREATE INDEX IF NOT EXISTS idx_feed_consumption_feed_id ON public.feed_consumpti
 CREATE INDEX IF NOT EXISTS idx_feed_consumption_chicken_batch_id ON public.feed_consumption(chicken_batch_id);
 CREATE INDEX IF NOT EXISTS idx_feed_consumption_consumption_date ON public.feed_consumption(consumption_date DESC);
 
+-- Create weight_history table for tracking weight measurements over time
+CREATE TABLE IF NOT EXISTS public.weight_history (
+    id TEXT PRIMARY KEY,
+    chicken_batch_id TEXT REFERENCES public.live_chickens(id) ON DELETE CASCADE,
+    weight DECIMAL(10,2) NOT NULL,
+    recorded_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for weight_history table
+CREATE INDEX IF NOT EXISTS idx_weight_history_chicken_batch_id ON public.weight_history(chicken_batch_id);
+CREATE INDEX IF NOT EXISTS idx_weight_history_recorded_date ON public.weight_history(recorded_date DESC);
+
+-- Enable RLS for the weight_history table
+ALTER TABLE public.weight_history ENABLE ROW LEVEL SECURITY;
+
+-- Apply standard RLS policies to the weight_history table
+CREATE OR REPLACE FUNCTION create_standard_rls_policies(table_name TEXT)
+RETURNS VOID AS $$
+BEGIN
+    -- Drop existing policies
+    EXECUTE format('DROP POLICY IF EXISTS "Enable read access for all users" ON public.%I', table_name);
+    EXECUTE format('DROP POLICY IF EXISTS "Enable insert for authenticated users only" ON public.%I', table_name);
+    EXECUTE format('DROP POLICY IF EXISTS "Enable update for authenticated users only" ON public.%I', table_name);
+    EXECUTE format('DROP POLICY IF EXISTS "Enable delete for authenticated users only" ON public.%I', table_name);
+    
+    -- Create standard policies
+    EXECUTE format('CREATE POLICY "Enable read access for all users" ON public.%I FOR SELECT USING (true)', table_name);
+    EXECUTE format('CREATE POLICY "Enable insert for authenticated users only" ON public.%I FOR INSERT WITH CHECK (auth.role() = ''authenticated'')', table_name);
+    EXECUTE format('CREATE POLICY "Enable update for authenticated users only" ON public.%I FOR UPDATE USING (auth.role() = ''authenticated'')', table_name);
+    EXECUTE format('CREATE POLICY "Enable delete for authenticated users only" ON public.%I FOR DELETE USING (auth.role() = ''authenticated'')', table_name);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply standard RLS policies to the weight_history table
+SELECT create_standard_rls_policies('weight_history');
+
+-- Create trigger for updated_at column for weight history
+DROP TRIGGER IF EXISTS update_weight_history_updated_at ON public.weight_history;
+CREATE TRIGGER update_weight_history_updated_at
+    BEFORE UPDATE ON public.weight_history
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
 -- Insert admin user (password: admin123 - change this in production!)
 -- Password hash for 'admin123' using bcrypt
 INSERT INTO public.users (id, email, password_hash, full_name, role, is_active)

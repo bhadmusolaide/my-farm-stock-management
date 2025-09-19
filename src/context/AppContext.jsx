@@ -63,6 +63,7 @@ export function AppProvider({ children }) {
   }
   const [feedBatchAssignments, setFeedBatchAssignments] = useState([])
   const [chickenInventoryTransactions, setChickenInventoryTransactions] = useState([])
+  const [weightHistory, setWeightHistory] = useState([]) // Add weight history state
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [migrationStatus, setMigrationStatus] = useState({
@@ -145,7 +146,7 @@ export function AppProvider({ children }) {
         const { data: feedInventoryData, error: feedInventoryError } = await supabase
           .from('feed_inventory')
           .select('*')
-          .order('date', { ascending: false })
+          .order('purchase_date', { ascending: false })
         
         if (feedInventoryError && !feedInventoryError.message.includes('relation "feed_inventory" does not exist')) {
           throw feedInventoryError
@@ -231,6 +232,38 @@ export function AppProvider({ children }) {
         } catch (err) {
           console.warn('Chicken inventory transactions table not available yet:', err)
           setChickenInventoryTransactions([])
+        }
+        
+        // Load weight history (handle gracefully if table doesn't exist)
+        try {
+          const { data: weightHistoryData, error: weightHistoryError } = await supabase
+            .from('weight_history')
+            .select('*')
+            .order('recorded_date', { ascending: false })
+          
+          if (weightHistoryError && !weightHistoryError.message.includes('relation "weight_history" does not exist')) {
+            throw weightHistoryError
+          }
+          
+          // Prioritize database data over localStorage
+          if (weightHistoryData && weightHistoryData.length > 0) {
+            setWeightHistory(weightHistoryData)
+          } else {
+            // Fallback to localStorage
+            const localWeightHistory = localStorage.getItem('weightHistory')
+            if (localWeightHistory && localWeightHistory !== 'undefined') {
+              try {
+                const parsedWeightHistory = JSON.parse(localWeightHistory)
+                setWeightHistory(parsedWeightHistory)
+              } catch (e) {
+                console.warn('Invalid weightHistory data in localStorage:', e)
+                setWeightHistory([])
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Weight history table not available yet:', err)
+          setWeightHistory([])
         }
         
         // Load transactions
@@ -329,6 +362,17 @@ export function AppProvider({ children }) {
               setChickenInventoryTransactions(parsedTransactions)
             } catch (e) {
               console.warn('Invalid chickenInventoryTransactions data in localStorage:', e)
+            }
+          }
+          
+          // Load weight history from localStorage as fallback
+          const localWeightHistory = localStorage.getItem('weightHistory')
+          if (localWeightHistory && localWeightHistory !== 'undefined') {
+            try {
+              const parsedWeightHistory = JSON.parse(localWeightHistory)
+              setWeightHistory(parsedWeightHistory)
+            } catch (e) {
+              console.warn('Invalid weightHistory data in localStorage:', e)
             }
           }
         } else {
@@ -1031,6 +1075,19 @@ export function AppProvider({ children }) {
       
       const updatedChicken = { ...oldChicken, ...updates }
       
+      // If weight is being updated, also save to weight history
+      if (updates.current_weight !== undefined && updates.current_weight !== oldChicken.current_weight) {
+        try {
+          await addWeightHistory({
+            chicken_batch_id: id,
+            weight: updates.current_weight,
+            notes: updates.weight_notes || ''
+          })
+        } catch (err) {
+          console.warn('Failed to save weight history:', err)
+        }
+      }
+      
       // Try to update in Supabase first
       try {
         const { error } = await supabase
@@ -1084,6 +1141,45 @@ export function AppProvider({ children }) {
       
     } catch (err) {
       console.error('Error deleting live chicken:', err)
+      throw err
+    }
+  }
+
+  // Function to add weight history record
+  const addWeightHistory = async (weightData) => {
+    try {
+      const weightRecord = {
+        id: Date.now().toString(),
+        chicken_batch_id: weightData.chicken_batch_id,
+        weight: weightData.weight,
+        recorded_date: weightData.recorded_date || new Date().toISOString().split('T')[0],
+        notes: weightData.notes || '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+
+      // Save to Supabase first
+      const { error } = await supabase.from('weight_history').insert(weightRecord)
+      if (error) {
+        console.warn('Failed to save weight history to Supabase:', error)
+      }
+
+      // Update local state
+      setWeightHistory(prev => [weightRecord, ...prev])
+      
+      // Save to localStorage as fallback
+      try {
+        localStorage.setItem('weightHistory', JSON.stringify([weightRecord, ...weightHistory]))
+      } catch (e) {
+        console.warn('Failed to save weightHistory to localStorage:', e)
+      }
+
+      // Log audit action
+      await logAuditAction('CREATE', 'weight_history', weightRecord.id, null, weightRecord)
+
+      return weightRecord
+    } catch (err) {
+      console.error('Error adding weight history:', err)
       throw err
     }
   }
@@ -1254,6 +1350,7 @@ export function AppProvider({ children }) {
       
       if (error) throw error
       
+      
       // Update local state
       setFeedInventory(prev => prev.map(feed => 
         feed.id === id ? updatedFeed : feed
@@ -1396,6 +1493,7 @@ export function AppProvider({ children }) {
       return null
     }
   }
+  
   
   const deleteFeedBatchAssignment = async (id) => {
     try {
