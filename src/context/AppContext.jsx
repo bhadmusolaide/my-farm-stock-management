@@ -1151,7 +1151,7 @@ export function AppProvider({ children }) {
       const weightRecord = {
         id: Date.now().toString(),
         chicken_batch_id: weightData.chicken_batch_id,
-        weight: weightData.weight,
+        weight: parseFloat(weightData.weight), // Ensure weight is stored as a number
         recorded_date: weightData.recorded_date || new Date().toISOString().split('T')[0],
         notes: weightData.notes || '',
         created_at: new Date().toISOString(),
@@ -1166,10 +1166,12 @@ export function AppProvider({ children }) {
 
       // Update local state
       setWeightHistory(prev => [weightRecord, ...prev])
-      
+
       // Save to localStorage as fallback
       try {
-        localStorage.setItem('weightHistory', JSON.stringify([weightRecord, ...weightHistory]))
+        const currentWeightHistory = JSON.parse(localStorage.getItem('weightHistory') || '[]')
+        const updatedWeightHistory = [weightRecord, ...currentWeightHistory]
+        localStorage.setItem('weightHistory', JSON.stringify(updatedWeightHistory))
       } catch (e) {
         console.warn('Failed to save weightHistory to localStorage:', e)
       }
@@ -1813,15 +1815,16 @@ export function AppProvider({ children }) {
     feedConsumption,
     feedBatchAssignments,
     chickenInventoryTransactions,
+    weightHistory,
     dressedChickens,
     batchRelationships,
     loading,
     error,
     migrationStatus,
-    
+
     // Migration
     performMigration,
-    
+
     // CRUD operations
     addChicken,
     updateChicken,
@@ -1833,36 +1836,39 @@ export function AppProvider({ children }) {
     withdrawFunds,
     clearBalance,
     deleteTransaction,
-    
+
     // Live Chicken operations
     addLiveChicken,
     updateLiveChicken,
     deleteLiveChicken,
-    
+
+    // Weight History operations
+    addWeightHistory,
+
     // Feed Management operations
     addFeedInventory,
     updateFeedInventory,
     deleteFeedInventory,
     addFeedConsumption,
     deleteFeedConsumption,
-    
+
     // Feed batch assignment operations
     addFeedBatchAssignment,
     deleteFeedBatchAssignment,
-    
+
     // Chicken Inventory Transaction operations
     logChickenTransaction,
-    
+
     // Dressed Chicken operations
     addDressedChicken,
     updateDressedChicken,
     deleteDressedChicken,
-    
+
     // Batch Relationship operations
     addBatchRelationship,
     updateBatchRelationship,
     deleteBatchRelationship,
-    
+
     // Stats and reports
     stats,
     calculateStats,

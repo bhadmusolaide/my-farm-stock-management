@@ -348,22 +348,22 @@ const ChickenLifecycle = () => {
               {(() => {
                 // Ensure weightHistory is an array before filtering
                 const safeWeightHistory = Array.isArray(weightHistory) ? weightHistory : [];
-                
+
                 // Get weight history from database for this batch
                 const batchWeightHistory = safeWeightHistory
                   .filter(record => record.chicken_batch_id === selectedBatch?.id)
                   .sort((a, b) => new Date(a.recorded_date) - new Date(b.recorded_date));
-                
+
                 // Create combined history including current weight if it exists
                 let combinedHistory = [...batchWeightHistory];
-                
+
                 // Add current weight to history if it exists and is not already in history
                 if (selectedBatch?.current_weight && selectedBatch.current_weight > 0) {
                   const currentDate = new Date().toISOString().split('T')[0];
                   const currentWeightExists = batchWeightHistory.some(
-                    record => record.weight === selectedBatch.current_weight && record.recorded_date === currentDate
+                    record => Math.abs(record.weight - selectedBatch.current_weight) < 0.01 && record.recorded_date === currentDate
                   );
-                  
+
                   if (!currentWeightExists) {
                     combinedHistory.push({
                       id: 'current',
@@ -375,8 +375,8 @@ const ChickenLifecycle = () => {
                     });
                   }
                 }
-                
-                // Sort combined history by date
+
+                // Sort combined history by date (oldest first for proper chronological order)
                 combinedHistory.sort((a, b) => new Date(a.recorded_date) - new Date(b.recorded_date));
                 
                 // Prepare data for chart
@@ -445,14 +445,14 @@ const ChickenLifecycle = () => {
                           </thead>
                           <tbody>
                             {combinedHistory
-                              .slice() // Create a copy for reverse sorting
-                              .reverse() // Show newest first
+                              .slice()
+                              .reverse() // Show newest first - most recent weight at top
                               .map(record => {
                                 // Calculate age at the time of recording
                                 const recordingDate = new Date(record.recorded_date);
                                 const hatchDate = selectedBatch ? new Date(selectedBatch.hatch_date) : recordingDate;
                                 const ageAtRecording = Math.floor((recordingDate - hatchDate) / (1000 * 60 * 60 * 24));
-                                
+
                                 return (
                                   <tr key={record.id}>
                                     <td>{formatDate(record.recorded_date)}</td>
