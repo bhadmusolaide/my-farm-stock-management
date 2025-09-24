@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { formatNumber, formatDate } from '../utils/formatters'
+import { FEED_BRANDS, kgToBags, bagsToKg, LOW_STOCK_THRESHOLD } from '../utils/constants'
 import ColumnFilter from '../components/UI/ColumnFilter'
 import SortableTableHeader from '../components/UI/SortableTableHeader'
 import SortControls from '../components/UI/SortControls'
@@ -9,16 +10,6 @@ import useTableSort from '../hooks/useTableSort'
 import Pagination from '../components/UI/Pagination'
 import usePagination from '../hooks/usePagination'
 import './FeedManagement.css'
-
-// Feed brand constants
-const FEED_BRANDS = [
-  'New Hope',
-  'BreedWell', 
-  'Ultima',
-  'Happy Chicken',
-  'Chikum',
-  'Others'
-]
 
 const FeedManagement = () => {
   const { feedInventory, addFeedInventory, updateFeedInventory, deleteFeedInventory, feedConsumption, addFeedConsumption, deleteFeedConsumption, liveChickens } = useAppContext()
@@ -358,7 +349,7 @@ const FeedManagement = () => {
   
   // Calculate low stock items
   const getLowStockItems = () => {
-    return filteredFeed.filter(item => item.quantity_kg < 50) // Less than 50kg is considered low stock
+    return filteredFeed.filter(item => item.quantity_kg < LOW_STOCK_THRESHOLD)
   }
   
   return (
@@ -408,7 +399,13 @@ const FeedManagement = () => {
           <div className="summary-cards">
             <div className="summary-card">
               <h3>Total Feed Stock</h3>
-              <p className="summary-value">{formatNumber(filteredFeed.reduce((sum, item) => sum + item.quantity_kg, 0))} kg</p>
+              <p className="summary-value">
+                {(() => {
+                  const totalKg = filteredFeed.reduce((sum, item) => sum + item.quantity_kg, 0)
+                  const totalBags = kgToBags(totalKg)
+                  return `${formatNumber(totalBags, 1)} bags / ${formatNumber(totalKg)} kg`
+                })()}
+              </p>
             </div>
             <div className="summary-card">
               <h3>Total Value</h3>
@@ -421,6 +418,18 @@ const FeedManagement = () => {
             <div className="summary-card alert">
               <h3>Low Stock Items</h3>
               <p className="summary-value">{getLowStockItems().length}</p>
+            </div>
+            <div className="summary-card">
+              <h3>Remaining Feed</h3>
+              <p className="summary-value">
+                {(() => {
+                  const totalStock = filteredFeed.reduce((sum, item) => sum + item.quantity_kg, 0)
+                  const totalConsumed = feedConsumption.reduce((sum, item) => sum + item.quantity_consumed, 0)
+                  const remaining = totalStock - totalConsumed
+                  const remainingBags = kgToBags(remaining)
+                  return `${formatNumber(remaining)} kg / (${formatNumber(remainingBags, 1)} bags)`
+                })()}
+              </p>
             </div>
           </div>
           
@@ -552,7 +561,7 @@ const FeedManagement = () => {
               <tbody>
                 {feedPagination.currentData.length > 0 ? (
                   feedPagination.currentData.map(item => {
-                    const isLowStock = item.quantity_kg < 50
+                    const isLowStock = item.quantity_kg < LOW_STOCK_THRESHOLD
                 const isExpiringSoon = new Date(item.expiry_date) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
                     
                     return (
@@ -787,6 +796,62 @@ const FeedManagement = () => {
         <>
           {/* Analytics Summary Cards */}
           <div className="summary-cards">
+            <div className="summary-card">
+              <h3>Total Feed Assigned to Batches</h3>
+              <p className="summary-value">
+                {(() => {
+                  const totalAssigned = feedInventory.reduce((sum, item) => {
+                    const assignedQuantity = item.assigned_batches?.reduce((batchSum, batch) => batchSum + (batch.assigned_quantity_kg || 0), 0) || 0
+                    return sum + assignedQuantity
+                  }, 0)
+                  const totalAssignedBags = kgToBags(totalAssigned)
+                  return `${formatNumber(totalAssigned)} kg (${formatNumber(totalAssignedBags, 1)} bags)`
+                })()}
+              </p>
+            </div>
+            <div className="summary-card">
+              <h3>Feed Consumption per Batch</h3>
+              <p className="summary-value">
+                {(() => {
+                  const batchConsumption = {}
+                  feedConsumption.forEach(item => {
+                    const chickenBatch = liveChickens.find(batch => batch.id === item.chicken_batch_id)
+                    if (chickenBatch) {
+                      batchConsumption[chickenBatch.id] = (batchConsumption[chickenBatch.id] || 0) + item.quantity_consumed
+                    }
+                  })
+                  const totalBatches = Object.keys(batchConsumption).length
+                  const totalConsumption = Object.values(batchConsumption).reduce((sum, consumption) => sum + consumption, 0)
+                  const avgPerBatch = totalBatches > 0 ? (totalConsumption / totalBatches).toFixed(1) : '0.0'
+                  const avgBagsPerBatch = totalBatches > 0 ? kgToBags(totalConsumption / totalBatches).toFixed(2) : '0.00'
+                  return `${avgPerBatch} kg/batch (${avgBagsPerBatch} bags/batch)`
+                })()}
+              </p>
+            </div>
+            <div className="summary-card">
+              <h3>Remaining Feed per Batch</h3>
+              <p className="summary-value">
+                {(() => {
+                  const batchRemaining = {}
+                  feedInventory.forEach(item => {
+                    if (item.assigned_batches) {
+                      item.assigned_batches.forEach(batch => {
+                        const consumed = feedConsumption
+                          .filter(consumption => consumption.chicken_batch_id === batch.batch_id)
+                          .reduce((sum, consumption) => sum + consumption.quantity_consumed, 0)
+                        const assigned = batch.assigned_quantity_kg || 0
+                        batchRemaining[batch.batch_id] = (batchRemaining[batch.batch_id] || 0) + (assigned - consumed)
+                      })
+                    }
+                  })
+                  const totalBatches = Object.keys(batchRemaining).length
+                  const totalRemaining = Object.values(batchRemaining).reduce((sum, remaining) => sum + remaining, 0)
+                  const avgPerBatch = totalBatches > 0 ? (totalRemaining / totalBatches).toFixed(1) : '0.0'
+                  const avgBagsPerBatch = totalBatches > 0 ? kgToBags(totalRemaining / totalBatches).toFixed(2) : '0.00'
+                  return `${avgPerBatch} kg/batch (${avgBagsPerBatch} bags/batch)`
+                })()}
+              </p>
+            </div>
             <div className="summary-card">
               <h3>Feed Conversion Ratio</h3>
               <p className="summary-value">
