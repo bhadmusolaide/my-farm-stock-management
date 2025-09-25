@@ -142,19 +142,36 @@ export function AppProvider({ children }) {
           }
         }
         
-        // Load feed inventory
+        // Load feed inventory with batch assignments
         const { data: feedInventoryData, error: feedInventoryError } = await supabase
           .from('feed_inventory')
-          .select('*')
+          .select(`
+            *,
+            feed_batch_assignments (
+              id,
+              chicken_batch_id,
+              assigned_quantity_kg,
+              assigned_date
+            )
+          `)
           .order('purchase_date', { ascending: false })
-        
+
         if (feedInventoryError && !feedInventoryError.message.includes('relation "feed_inventory" does not exist')) {
           throw feedInventoryError
         }
-        
+
+        // Transform the data to match frontend expectations
+        const transformedFeedData = feedInventoryData?.map(feed => ({
+          ...feed,
+          assigned_batches: feed.feed_batch_assignments?.map(assignment => ({
+            batch_id: assignment.chicken_batch_id,
+            assigned_quantity_kg: assignment.assigned_quantity_kg
+          })) || []
+        })) || []
+
         // Only set from Supabase if we have actual data, otherwise keep localStorage data
-        if (feedInventoryData && feedInventoryData.length > 0) {
-          setFeedInventory(feedInventoryData)
+        if (transformedFeedData && transformedFeedData.length > 0) {
+          setFeedInventory(transformedFeedData)
         }
         
         // Load feed consumption
@@ -1243,20 +1260,20 @@ export function AppProvider({ children }) {
       // Handle batch assignments if provided (gracefully handle missing table)
       if (assigned_batches && assigned_batches.length > 0) {
         try {
-          const assignments = assigned_batches.map(batchId => ({
-            id: `${Date.now()}_${batchId}`,
+          const assignments = assigned_batches.map(batch => ({
+            id: `${Date.now()}_${batch.batch_id}`,
             feed_id: feed.id,
-            chicken_batch_id: batchId,
-            assigned_quantity_kg: feedData.quantity_kg / assigned_batches.length, // Distribute equally
+            chicken_batch_id: batch.batch_id,
+            assigned_quantity_kg: batch.assigned_quantity_kg || 0, // Use the specific quantity assigned to each batch
             assigned_date: feed.purchase_date,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           }))
-          
+
           const { error: assignmentError } = await supabase
             .from('feed_batch_assignments')
             .insert(assignments)
-          
+
           if (assignmentError) {
             console.warn('Feed batch assignments table not available yet:', assignmentError)
           } else {
@@ -1289,48 +1306,53 @@ export function AppProvider({ children }) {
     try {
       const feedToDelete = feedInventory.find(feed => feed.id === id)
       if (!feedToDelete) throw new Error('Feed inventory not found')
-      
-      // Calculate refund amount (number of bags * cost per bag)
-      const refundAmount = feedToDelete.number_of_bags * feedToDelete.cost_per_bag
-      
-      // Create refund transaction for feed deletion
-      const refundTransaction = {
-        id: Date.now().toString(),
-        type: 'income',
-        amount: refundAmount,
-        description: `Feed Refund: ${feedToDelete.feed_type} - ${feedToDelete.brand}`,
-        date: new Date().toISOString().split('T')[0]
-      }
-      
-      // Update balance
-      const newBalance = balance + refundAmount
-      
+
       // Delete from Supabase database
       const { error } = await supabase
         .from('feed_inventory')
         .delete()
         .eq('id', id)
-      
+
       if (error) throw error
-      
-      // Add refund transaction to database
-      const { error: transactionError } = await supabase.from('transactions').insert(refundTransaction)
-      if (transactionError) throw transactionError
-      
-      // Update balance in database
-      const { error: balanceError } = await supabase
-        .from('balance')
-        .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
-      if (balanceError) throw balanceError
-      
-      // Update local state
+
+      // Only process refund if balance was originally deducted
+      if (feedToDelete.balance_deducted) {
+        // Calculate refund amount (number of bags * cost per bag)
+        const refundAmount = feedToDelete.number_of_bags * feedToDelete.cost_per_bag
+
+        // Create refund transaction for feed deletion
+        const refundTransaction = {
+          id: Date.now().toString(),
+          type: 'income',
+          amount: refundAmount,
+          description: `Feed Refund: ${feedToDelete.feed_type} - ${feedToDelete.brand}`,
+          date: new Date().toISOString().split('T')[0]
+        }
+
+        // Update balance
+        const newBalance = balance + refundAmount
+
+        // Add refund transaction to database
+        const { error: transactionError } = await supabase.from('transactions').insert(refundTransaction)
+        if (transactionError) throw transactionError
+
+        // Update balance in database
+        const { error: balanceError } = await supabase
+          .from('balance')
+          .upsert({ id: 1, amount: newBalance }, { onConflict: 'id' })
+        if (balanceError) throw balanceError
+
+        // Update local state for balance and transactions
+        setTransactions(prev => [refundTransaction, ...prev])
+        setBalance(newBalance)
+      }
+
+      // Update local state for feed inventory (always remove the feed)
       setFeedInventory(prev => prev.filter(feed => feed.id !== id))
-      setTransactions(prev => [refundTransaction, ...prev])
-      setBalance(newBalance)
-      
+
       // Log audit action
       await logAuditAction('DELETE', 'feed_inventory', id, feedToDelete, null)
-      
+
     } catch (err) {
       console.error('Error deleting feed inventory:', err)
       throw err
@@ -1341,26 +1363,74 @@ export function AppProvider({ children }) {
     try {
       const feedToUpdate = feedInventory.find(feed => feed.id === id)
       if (!feedToUpdate) throw new Error('Feed inventory not found')
-      
+
+      // Extract batch assignments from updated data
+      const { assigned_batches, ...feedDataForDB } = updatedData
+
       const updatedFeed = { ...feedToUpdate, ...updatedData }
-      
+
       // Update in Supabase database
       const { error } = await supabase
         .from('feed_inventory')
-        .update(updatedData)
+        .update(feedDataForDB)
         .eq('id', id)
-      
+
       if (error) throw error
-      
-      
+
+      // Handle batch assignments if provided
+      if (assigned_batches !== undefined) {
+        try {
+          // First, delete existing assignments for this feed
+          const { error: deleteError } = await supabase
+            .from('feed_batch_assignments')
+            .delete()
+            .eq('feed_id', id)
+
+          if (deleteError) {
+            console.warn('Failed to delete existing batch assignments:', deleteError)
+          }
+
+          // Then, add new assignments if any
+          if (assigned_batches && assigned_batches.length > 0) {
+            const assignments = assigned_batches.map(batch => ({
+              id: `${Date.now()}_${batch.batch_id}`,
+              feed_id: id,
+              chicken_batch_id: batch.batch_id,
+              assigned_quantity_kg: batch.assigned_quantity_kg || 0,
+              assigned_date: new Date().toISOString().split('T')[0],
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }))
+
+            const { error: assignmentError } = await supabase
+              .from('feed_batch_assignments')
+              .insert(assignments)
+
+            if (assignmentError) {
+              console.warn('Feed batch assignments table not available yet:', assignmentError)
+            } else {
+              // Update local assignments state
+              setFeedBatchAssignments(prev => {
+                // Remove old assignments for this feed
+                const filtered = prev.filter(assignment => assignment.feed_id !== id)
+                // Add new assignments
+                return [...assignments, ...filtered]
+              })
+            }
+          }
+        } catch (err) {
+          console.warn('Feed batch assignment feature not available yet:', err)
+        }
+      }
+
       // Update local state
-      setFeedInventory(prev => prev.map(feed => 
+      setFeedInventory(prev => prev.map(feed =>
         feed.id === id ? updatedFeed : feed
       ))
-      
+
       // Log audit action
       await logAuditAction('UPDATE', 'feed_inventory', id, feedToUpdate, updatedFeed)
-      
+
       return updatedFeed
     } catch (err) {
       console.error('Error updating feed inventory:', err)

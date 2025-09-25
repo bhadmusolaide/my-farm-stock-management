@@ -24,7 +24,6 @@ const UserManagement = lazy(() => import('./pages/UserManagement'))
 const AuditTrail = lazy(() => import('./pages/AuditTrail'))
 const SiteSettings = lazy(() => import('./pages/SiteSettings'))
 const ChickenLifecycle = lazy(() => import('./pages/ChickenLifecycle'))
-const EnhancedFeedManagement = lazy(() => import('./pages/EnhancedFeedManagement'))
 const ProcessingManagement = lazy(() => import('./pages/ProcessingManagement'))
 const BatchRelationshipMapping = lazy(() => import('./pages/BatchRelationshipMapping'))
 const UnifiedInventoryDashboard = lazy(() => import('./pages/UnifiedInventoryDashboard'))
@@ -122,13 +121,6 @@ function AppContent() {
           <ProtectedRoute>
             <Layout>
               <FeedManagement />
-            </Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/enhanced-feed" element={
-          <ProtectedRoute>
-            <Layout>
-              <EnhancedFeedManagement />
             </Layout>
           </ProtectedRoute>
         } />

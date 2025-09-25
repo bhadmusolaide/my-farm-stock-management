@@ -857,3 +857,116 @@
 [data-theme="dark"] .no-batches-message {
   color: var(--text-light);
 }
+
+/* Chart Styles */
+.chart-container {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1.5rem;
+}
+
+.chart-header {
+  text-align: center;
+  margin-bottom: 1rem;
+  font-weight: 600;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.bar-chart {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  height: 250px;
+  padding: 1rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+.chart-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  max-width: 60px;
+}
+
+.bar-container {
+  display: flex;
+  align-items: flex-end;
+  height: 200px;
+  width: 100%;
+  justify-content: center;
+}
+
+.bar {
+  background-color: #4caf50;
+  width: 40px;
+  min-height: 5px;
+  border-radius: 2px 2px 0 0;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.bar:hover {
+  background-color: #43a047;
+  transform: scaleY(1.05);
+}
+
+.chart-label {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #666;
+  text-align: center;
+}
+
+/* Dark Mode Chart Styles */
+[data-theme="dark"] .chart-container {
+  background-color: var(--card-background);
+  box-shadow: var(--shadow);
+}
+
+[data-theme="dark"] .chart-header {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .bar-chart {
+  border-color: var(--border-color);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .chart-label {
+  color: var(--text-light);
+}
+
+[data-theme="dark"] .bar {
+  background-color: #4caf50;
+}
+
+[data-theme="dark"] .bar:hover {
+  background-color: #66bb6a;
+}
+
+/* Responsive Chart */
+@media (max-width: 768px) {
+  .bar-chart {
+    height: 200px;
+    padding: 0.5rem;
+  }
+
+  .bar-container {
+    height: 150px;
+  }
+
+  .bar {
+    width: 30px;
+  }
+
+  .chart-label {
+    font-size: 0.7rem;
+  }
+}
