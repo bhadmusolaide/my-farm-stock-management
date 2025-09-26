@@ -994,6 +994,33 @@ const FeedManagement = () => {
             </div>
           </div>
 
+          {/* Projected Feed Needs */}
+          <div className="analytics-section">
+            <h3>Projected Feed Needs</h3>
+            <div className="table-container">
+              <table className="feed-table">
+                <thead>
+                  <tr>
+                    <th>Batch</th>
+                    <th>Current Count</th>
+                    <th>Age (weeks)</th>
+                    <th>Remaining Feed (kg)</th>
+                    <th>Projected Needs (kg)</th>
+                    <th>Additional Needed (kg)</th>
+                    <th>Recommended Feed Type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td colSpan="7" className="no-data">
+                      Projected feed needs calculation would appear here
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           {/* Daily Consumption Trend Chart */}
           <div className="analytics-section">
             <h3>Daily Feed Consumption Trend (Last 7 Days)</h3>

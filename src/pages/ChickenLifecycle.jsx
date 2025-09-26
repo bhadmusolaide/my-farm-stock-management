@@ -5,7 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import './ChickenLifecycle.css'
 
 const ChickenLifecycle = () => {
-  const { liveChickens, updateLiveChicken, chickenInventoryTransactions, weightHistory, feedConsumption } = useAppContext()
+  const { liveChickens, updateLiveChicken, chickenInventoryTransactions, weightHistory, feedConsumption, addDressedChicken, addBatchRelationship } = useAppContext()
   const [selectedBatch, setSelectedBatch] = useState(null)
   const [lifecycleData, setLifecycleData] = useState({})
   const [showModal, setShowModal] = useState(false)
@@ -50,6 +50,47 @@ const ChickenLifecycle = () => {
     if (currentStageIndex < lifecycleStages.length - 1) {
       const nextStage = lifecycleStages[currentStageIndex + 1]
       try {
+        // If moving to processing stage, automatically create a dressed chicken record
+        if (nextStage.id === 'processing') {
+          // Create a dressed chicken record
+          const dressedChickenData = {
+            batch_id: batch.batch_id,
+            processing_date: new Date().toISOString().split('T')[0],
+            initial_count: batch.current_count,
+            current_count: batch.current_count,
+            average_weight: batch.current_weight || 1.5, // Use current weight or default to 1.5kg
+            size_category: 'medium', // Default size category
+            status: 'in-storage',
+            storage_location: 'Freezer Unit A',
+            expiry_date: new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().split('T')[0], // 3 months expiry
+            parts_count: {
+              neck: Math.floor(batch.current_count * 0.1), // 10% for necks
+              feet: batch.current_count * 2, // 2 feet per chicken
+              gizzard: batch.current_count, // 1 gizzard per chicken
+              dog_food: batch.current_count // 1 dog food portion per chicken
+            },
+            parts_weight: {
+              neck: parseFloat((batch.current_count * 0.1 * 0.2).toFixed(2)), // 0.2kg per neck
+              feet: parseFloat((batch.current_count * 2 * 0.1).toFixed(2)), // 0.1kg per foot
+              gizzard: parseFloat((batch.current_count * 0.05).toFixed(2)), // 0.05kg per gizzard
+              dog_food: parseFloat((batch.current_count * 0.3).toFixed(2)) // 0.3kg per dog food portion
+            }
+          }
+          
+          // Add the dressed chicken record
+          const dressedChicken = await addDressedChicken(dressedChickenData)
+          
+          // Create a batch relationship
+          const relationshipData = {
+            source_batch_id: batch.batch_id,
+            target_batch_id: batch.batch_id, // Use the same batch ID for the processed record
+            relationship_type: 'processed_from',
+            quantity: batch.current_count
+          }
+          
+          await addBatchRelationship(relationshipData)
+        }
+        
         await updateLiveChicken(batch.id, { 
           ...batch, 
           lifecycle_stage: nextStage.id,
@@ -357,24 +398,9 @@ const ChickenLifecycle = () => {
                 // Create combined history including current weight if it exists
                 let combinedHistory = [...batchWeightHistory];
 
-                // Add current weight to history if it exists and is not already in history
-                if (selectedBatch?.current_weight && selectedBatch.current_weight > 0) {
-                  const currentDate = new Date().toISOString().split('T')[0];
-                  const currentWeightExists = batchWeightHistory.some(
-                    record => Math.abs(record.weight - selectedBatch.current_weight) < 0.01 && record.recorded_date === currentDate
-                  );
-
-                  if (!currentWeightExists) {
-                    combinedHistory.push({
-                      id: 'current',
-                      chicken_batch_id: selectedBatch.id,
-                      weight: selectedBatch.current_weight,
-                      recorded_date: currentDate,
-                      notes: 'Current weight',
-                      created_at: new Date().toISOString()
-                    });
-                  }
-                }
+                // Note: We don't add current weight to history here to avoid date confusion
+                // The current weight is already tracked in the live_chickens table
+                // and will be added to weight_history when a new weight is recorded
 
                 // Sort combined history by date (oldest first for proper chronological order)
                 combinedHistory.sort((a, b) => new Date(a.recorded_date) - new Date(b.recorded_date));

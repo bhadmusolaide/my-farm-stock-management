@@ -7,7 +7,7 @@ import useTableSort from '../hooks/useTableSort';
 import './LiveChickenStock.css';
 
 const LiveChickenStock = () => {
-  const { liveChickens, addLiveChicken, deleteLiveChicken, updateLiveChicken, chickenInventoryTransactions } = useAppContext();
+  const { liveChickens, addLiveChicken, deleteLiveChicken, updateLiveChicken, chickenInventoryTransactions, getLowFeedAlerts } = useAppContext();
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showVaccinationModal, setShowVaccinationModal] = useState(false);
@@ -26,6 +26,11 @@ const LiveChickenStock = () => {
     ageRange: '',
     searchTerm: ''
   });
+
+  // Get low feed alerts
+  const feedAlerts = useMemo(() => {
+    return getLowFeedAlerts();
+  }, [liveChickens]);
 
   const [formData, setFormData] = useState({
     batch_id: '',
@@ -659,6 +664,18 @@ const LiveChickenStock = () => {
 
       {activeTab === 'batches' && (
         <>
+          {/* Feed Alerts */}
+          {feedAlerts.length > 0 && (
+            <div className="alerts-section">
+              <h3>⚠️ Feed Stock Alerts</h3>
+              {feedAlerts.map(alert => (
+                <div key={alert.id} className={`alert-card ${alert.severity}`}>
+                  <p>{alert.message}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="summary-cards">
             <div className="summary-card">
               <h3>Total Batches</h3>

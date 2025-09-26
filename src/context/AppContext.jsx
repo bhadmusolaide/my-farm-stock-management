@@ -64,8 +64,28 @@ export function AppProvider({ children }) {
   const [feedBatchAssignments, setFeedBatchAssignments] = useState([])
   const [chickenInventoryTransactions, setChickenInventoryTransactions] = useState([])
   const [weightHistory, setWeightHistory] = useState([]) // Add weight history state
-  const [dressedChickens, setDressedChickens] = useState([])
-  const [batchRelationships, setBatchRelationships] = useState([])
+  const [dressedChickens, setDressedChickensState] = useState([])
+  const [batchRelationships, setBatchRelationshipsState] = useState([])
+  
+  // Helper function to update dressedChickens state and save to localStorage
+  const setDressedChickens = (newDressedChickens) => {
+    setDressedChickensState(newDressedChickens)
+    try {
+      localStorage.setItem('dressedChickens', JSON.stringify(newDressedChickens))
+    } catch (e) {
+      console.warn('Failed to save dressedChickens to localStorage:', e)
+    }
+  }
+  
+  // Helper function to update batchRelationships state and save to localStorage
+  const setBatchRelationships = (newBatchRelationships) => {
+    setBatchRelationshipsState(newBatchRelationships)
+    try {
+      localStorage.setItem('batchRelationships', JSON.stringify(newBatchRelationships))
+    } catch (e) {
+      console.warn('Failed to save batchRelationships to localStorage:', e)
+    }
+  }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [migrationStatus, setMigrationStatus] = useState({
@@ -88,9 +108,26 @@ export function AppProvider({ children }) {
         setLoading(false)
       }
     }
-
     checkMigration()
   }, [])
+
+  // Perform migration if needed
+  useEffect(() => {
+    async function performMigration() {
+      try {
+        setMigrationStatus(prev => ({ ...prev, inProgress: true }))
+        await migrateFromLocalStorage()
+        setMigrationStatus(prev => ({ ...prev, inProgress: false, completed: true }))
+      } catch (err) {
+        console.error('Error performing migration:', err)
+        setMigrationStatus(prev => ({ ...prev, inProgress: false, error: err }))
+      }
+    }
+
+    if (migrationStatus.needed && !migrationStatus.completed && !migrationStatus.inProgress) {
+      performMigration()
+    }
+  }, [migrationStatus])
 
   // Load data from Supabase
   useEffect(() => {
@@ -1536,36 +1573,30 @@ export function AppProvider({ children }) {
         updated_at: new Date().toISOString()
       }
       
-      // Save to Supabase database first
+      // Save to Supabase first
       const { error } = await supabase.from('feed_consumption').insert(consumption)
-      if (error) throw error
-      
-      // Get the current feed inventory item
-      const { data: feedData, error: feedError } = await supabase
-        .from('feed_inventory')
-        .select('quantity_kg')
-        .eq('id', consumption.feed_id)
-        .single()
-      
-      if (feedError) throw feedError
-      
-      // Calculate the new quantity
-      const newQuantity = feedData.quantity_kg - consumption.quantity_consumed
-      
-      // Update feed inventory quantities
-      const { data: updatedFeed, error: updateError } = await supabase
-        .from('feed_inventory')
-        .update({ quantity_kg: newQuantity })
-        .eq('id', consumption.feed_id)
-        .select()
-      
-      if (updateError) throw updateError
+      if (error) {
+        console.warn('Failed to save to Supabase, saving locally only:', error)
+      }
       
       // Update local state
       setFeedConsumption(prev => [consumption, ...prev])
-      setFeedInventory(prev => prev.map(feed => 
-        feed.id === consumption.feed_id ? updatedFeed[0] : feed
-      ))
+      
+      // Automatically deduct consumed feed from inventory
+      if (consumption.feed_id && consumption.quantity_consumed) {
+        const feedItem = feedInventory.find(item => item.id === consumption.feed_id);
+        if (feedItem) {
+          const updatedQuantity = Math.max(0, feedItem.quantity_kg - consumption.quantity_consumed);
+          const updatedFeedItem = {
+            ...feedItem,
+            quantity_kg: updatedQuantity,
+            status: updatedQuantity <= 0 ? 'consumed' : feedItem.status
+          };
+          
+          // Update feed inventory
+          await updateFeedInventory(consumption.feed_id, updatedFeedItem);
+        }
+      }
       
       // Log audit action
       await logAuditAction('CREATE', 'feed_consumption', consumption.id, null, consumption)
@@ -1654,6 +1685,87 @@ export function AppProvider({ children }) {
     }
   }
   
+  // Function to check for low feed stock based on assignments
+  const getLowFeedAlerts = () => {
+    const alerts = [];
+    
+    feedInventory.forEach(feed => {
+      // Calculate total assigned quantity for this feed item
+      const totalAssigned = feedBatchAssignments
+        .filter(assignment => assignment.feed_id === feed.id)
+        .reduce((sum, assignment) => sum + assignment.assigned_quantity_kg, 0);
+      
+      // Calculate total consumed for this feed item
+      const totalConsumed = feedConsumption
+        .filter(consumption => consumption.feed_id === feed.id)
+        .reduce((sum, consumption) => sum + consumption.quantity_consumed, 0);
+      
+      // Calculate remaining available quantity
+      const remaining = feed.quantity_kg - totalConsumed;
+      
+      // Check if remaining feed is less than assigned quantities
+      if (remaining < totalAssigned * 0.2) { // Less than 20% of assigned quantities remaining
+        alerts.push({
+          id: `low-feed-${feed.id}`,
+          type: 'low-feed',
+          severity: remaining < totalAssigned * 0.1 ? 'critical' : 'warning',
+          message: `Low feed stock: ${feed.feed_type} (${formatNumber(remaining, 1)} kg remaining, ${formatNumber(totalAssigned, 1)} kg assigned)`,
+          feedId: feed.id
+        });
+      }
+    });
+    
+    return alerts;
+  }
+  
+  // Function to calculate projected feed needs based on chicken batch growth
+  const calculateProjectedFeedNeeds = () => {
+    const projections = [];
+    
+    liveChickens.forEach(batch => {
+      // Get assigned feed for this batch
+      const assignedFeed = feedInventory.reduce((sum, feedItem) => {
+        const assignment = feedItem.assigned_batches?.find(a => a.batch_id === batch.id);
+        return sum + (assignment ? assignment.assigned_quantity_kg : 0);
+      }, 0);
+      
+      // Get consumed feed for this batch
+      const consumedFeed = feedConsumption
+        .filter(consumption => consumption.chicken_batch_id === batch.id)
+        .reduce((sum, consumption) => sum + consumption.quantity_consumed, 0);
+      
+      // Calculate remaining assigned feed
+      const remainingFeed = assignedFeed - consumedFeed;
+      
+      // Calculate age in weeks
+      const hatchDate = new Date(batch.hatch_date);
+      const ageInWeeks = Math.floor((new Date() - hatchDate) / (7 * 24 * 60 * 60 * 1000));
+      
+      // Project feed needs for next 2 weeks (standard broiler cycle is 6-8 weeks)
+      const weeksRemaining = Math.max(0, 8 - ageInWeeks);
+      const dailyConsumptionPerBird = 0.15; // kg per bird per day (standard for broilers)
+      const projectedDailyConsumption = batch.current_count * dailyConsumptionPerBird;
+      const projectedFeedNeeds = weeksRemaining * 7 * projectedDailyConsumption;
+      
+      // Check if additional feed is needed
+      const additionalFeedNeeded = Math.max(0, projectedFeedNeeds - remainingFeed);
+      
+      if (additionalFeedNeeded > 0) {
+        projections.push({
+          batchId: batch.id,
+          batchNumber: batch.batch_id,
+          currentCount: batch.current_count,
+          ageInWeeks,
+          remainingFeed: remainingFeed.toFixed(1),
+          projectedFeedNeeds: projectedFeedNeeds.toFixed(1),
+          additionalFeedNeeded: additionalFeedNeeded.toFixed(1),
+          feedType: batch.feed_type || 'Starter'
+        });
+      }
+    });
+    
+    return projections;
+  }
   
   const deleteFeedBatchAssignment = async (id) => {
     try {
@@ -1799,8 +1911,8 @@ export function AppProvider({ children }) {
         console.warn('Failed to save to Supabase, saving locally only:', error)
       }
       
-      // Update local state
-      setDressedChickens(prev => [dressedChicken, ...prev])
+      // Update local state using helper function that also saves to localStorage
+      setDressedChickens([dressedChicken, ...dressedChickens])
       
       // Log audit action
       await logAuditAction('CREATE', 'dressed_chickens', dressedChicken.id, null, dressedChicken)
@@ -1829,8 +1941,8 @@ export function AppProvider({ children }) {
         console.warn('Failed to update in Supabase, updating locally only:', error)
       }
       
-      // Update local state
-      setDressedChickens(prev => prev.map(item =>
+      // Update local state using helper function that also saves to localStorage
+      setDressedChickens(dressedChickens.map(item =>
         item.id === id ? updatedDressedChicken : item
       ))
       
@@ -1859,8 +1971,8 @@ export function AppProvider({ children }) {
         console.warn('Failed to delete from Supabase, deleting locally only:', error)
       }
       
-      // Update local state
-      setDressedChickens(prev => prev.filter(item => item.id !== id))
+      // Update local state using helper function that also saves to localStorage
+      setDressedChickens(dressedChickens.filter(item => item.id !== id))
       
       // Log audit action
       await logAuditAction('DELETE', 'dressed_chickens', id, dressedChickenToDelete, null)
@@ -1886,8 +1998,8 @@ export function AppProvider({ children }) {
         console.warn('Failed to save to Supabase, saving locally only:', error)
       }
       
-      // Update local state
-      setBatchRelationships(prev => [relationship, ...prev])
+      // Update local state using helper function that also saves to localStorage
+      setBatchRelationships([relationship, ...batchRelationships])
       
       // Log audit action
       await logAuditAction('CREATE', 'batch_relationships', relationship.id, null, relationship)
@@ -1916,8 +2028,8 @@ export function AppProvider({ children }) {
         console.warn('Failed to update in Supabase, updating locally only:', error)
       }
       
-      // Update local state
-      setBatchRelationships(prev => prev.map(item =>
+      // Update local state using helper function that also saves to localStorage
+      setBatchRelationships(batchRelationships.map(item =>
         item.id === id ? updatedRelationship : item
       ))
       
@@ -1946,8 +2058,8 @@ export function AppProvider({ children }) {
         console.warn('Failed to delete from Supabase, deleting locally only:', error)
       }
       
-      // Update local state
-      setBatchRelationships(prev => prev.filter(item => item.id !== id))
+      // Update local state using helper function that also saves to localStorage
+      setBatchRelationships(batchRelationships.filter(item => item.id !== id))
       
       // Log audit action
       await logAuditAction('DELETE', 'batch_relationships', id, relationshipToDelete, null)
@@ -2008,6 +2120,10 @@ export function AppProvider({ children }) {
     // Feed batch assignment operations
     addFeedBatchAssignment,
     deleteFeedBatchAssignment,
+
+    // Feed analysis functions
+    getLowFeedAlerts,
+    calculateProjectedFeedNeeds,
 
     // Chicken Inventory Transaction operations
     logChickenTransaction,
