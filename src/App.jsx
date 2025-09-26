@@ -24,9 +24,8 @@ const UserManagement = lazy(() => import('./pages/UserManagement'))
 const AuditTrail = lazy(() => import('./pages/AuditTrail'))
 const SiteSettings = lazy(() => import('./pages/SiteSettings'))
 const ChickenLifecycle = lazy(() => import('./pages/ChickenLifecycle'))
-const ProcessingManagement = lazy(() => import('./pages/ProcessingManagement'))
-const BatchRelationshipMapping = lazy(() => import('./pages/BatchRelationshipMapping'))
-const UnifiedInventoryDashboard = lazy(() => import('./pages/UnifiedInventoryDashboard'))
+// Replace deprecated pages with consolidated DressedChickenStock
+const DressedChickenStock = lazy(() => import('./pages/DressedChickenStock'))
 
 // Import theme styles
 import './styles/theme.css'
@@ -124,24 +123,10 @@ function AppContent() {
             </Layout>
           </ProtectedRoute>
         } />
-        <Route path="/processing" element={
+        <Route path="/dressed-chicken" element={
           <ProtectedRoute>
             <Layout>
-              <ProcessingManagement />
-            </Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/batch-relationships" element={
-          <ProtectedRoute>
-            <Layout>
-              <BatchRelationshipMapping />
-            </Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/unified-inventory" element={
-          <ProtectedRoute>
-            <Layout>
-              <UnifiedInventoryDashboard />
+              <DressedChickenStock />
             </Layout>
           </ProtectedRoute>
         } />

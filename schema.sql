@@ -238,6 +238,8 @@ CREATE TABLE IF NOT EXISTS public.dressed_chickens (
     storage_location TEXT,
     expiry_date DATE,
     notes TEXT,
+    parts_count JSONB DEFAULT '{}', -- Tracks count of specific parts: {"neck": 85, "feet": 85, "gizzard": 85, "dog_food": 85}
+    parts_weight JSONB DEFAULT '{}', -- Tracks weight of specific parts: {"neck": 2.1, "feet": 1.8, "gizzard": 3.2, "dog_food": 4.5}
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -432,10 +434,7 @@ INSERT INTO public.site_settings (settings_data) VALUES ('{
       {"id": "live-chickens", "label": "Live Chicken Stock", "path": "/live-chickens", "enabled": true},
       {"id": "lifecycle", "label": "Lifecycle Tracking", "path": "/lifecycle", "enabled": true},
       {"id": "feed", "label": "Feed Management", "path": "/feed", "enabled": true},
-      {"id": "enhanced-feed", "label": "Enhanced Feed Management", "path": "/enhanced-feed", "enabled": true},
-      {"id": "processing", "label": "Processing Management", "path": "/processing", "enabled": true},
-      {"id": "batch-relationships", "label": "Batch Relationships", "path": "/batch-relationships", "enabled": true},
-      {"id": "unified-inventory", "label": "Unified Inventory", "path": "/unified-inventory", "enabled": true}
+      {"id": "dressed-chicken", "label": "Dressed Chicken Stock", "path": "/dressed-chicken", "enabled": true}
     ]},
     {"id": "transactions", "label": "Transactions", "path": "/transactions", "icon": "💰", "enabled": true, "order": 4},
     {"id": "reports", "label": "Reports", "path": "/reports", "icon": "📈", "enabled": true, "order": 5}

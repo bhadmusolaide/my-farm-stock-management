@@ -12,9 +12,35 @@ import usePagination from '../hooks/usePagination'
 import './FeedManagement.css'
 
 const FeedManagement = () => {
-  const { feedInventory, addFeedInventory, updateFeedInventory, deleteFeedInventory, feedConsumption, addFeedConsumption, deleteFeedConsumption, liveChickens } = useAppContext()
+  const { feedInventory, addFeedInventory, updateFeedInventory, deleteFeedInventory, feedConsumption, addFeedConsumption, deleteFeedConsumption, liveChickens, feedBatchAssignments, deleteFeedBatchAssignment } = useAppContext()
   
-
+  // Add resetFeedData function here
+  const resetFeedData = async () => {
+    if (window.confirm('⚠️ CAUTION: This will permanently delete ALL feed data from the database including inventory, consumption records, and batch assignments. This action cannot be undone. Do you want to proceed?')) {
+      try {
+        // Delete all feed consumption records one by one
+        for (const consumption of feedConsumption) {
+          await deleteFeedConsumption(consumption.id);
+        }
+        
+        // Delete all feed batch assignments one by one
+        for (const assignment of feedBatchAssignments) {
+          await deleteFeedBatchAssignment(assignment.id);
+        }
+        
+        // Delete all feed inventory records one by one
+        for (const feed of feedInventory) {
+          await deleteFeedInventory(feed.id);
+        }
+        
+        // Refresh the page to ensure UI is updated
+        window.location.reload();
+      } catch (error) {
+        console.error('Error resetting feed data:', error)
+        alert('❌ Error resetting feed data: ' + error.message)
+      }
+    }
+  }
   
   // State for active tab
   const [activeTab, setActiveTab] = useState('inventory')
@@ -358,6 +384,20 @@ const FeedManagement = () => {
       <div className="page-header">
         <h1>Feed Management</h1>
         <div className="header-actions">
+          {/* Add Database Reset button here */}
+          <button 
+            className="btn-danger" 
+            onClick={resetFeedData}
+            style={{ 
+              backgroundColor: '#dc3545', 
+              color: 'white',
+              fontWeight: 'bold',
+              border: '2px solid #bd2130',
+              marginRight: '10px'
+            }}
+          >
+            🚨 Database Reset
+          </button>
           {activeTab === 'inventory' && (
             <button className="btn-primary" onClick={openFeedModal}>
               Add Feed Stock

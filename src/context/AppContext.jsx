@@ -64,6 +64,8 @@ export function AppProvider({ children }) {
   const [feedBatchAssignments, setFeedBatchAssignments] = useState([])
   const [chickenInventoryTransactions, setChickenInventoryTransactions] = useState([])
   const [weightHistory, setWeightHistory] = useState([]) // Add weight history state
+  const [dressedChickens, setDressedChickens] = useState([])
+  const [batchRelationships, setBatchRelationships] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [migrationStatus, setMigrationStatus] = useState({
@@ -283,6 +285,70 @@ export function AppProvider({ children }) {
           setWeightHistory([])
         }
         
+        // Load dressed chickens (handle gracefully if table doesn't exist)
+        try {
+          const { data: dressedChickensData, error: dressedChickensError } = await supabase
+            .from('dressed_chickens')
+            .select('*')
+            .order('processing_date', { ascending: false })
+          
+          if (dressedChickensError && !dressedChickensError.message.includes('relation "dressed_chickens" does not exist')) {
+            throw dressedChickensError
+          }
+          
+          // Prioritize database data over localStorage
+          if (dressedChickensData && dressedChickensData.length > 0) {
+            setDressedChickens(dressedChickensData)
+          } else {
+            // Fallback to localStorage
+            const localDressedChickens = localStorage.getItem('dressedChickens')
+            if (localDressedChickens && localDressedChickens !== 'undefined') {
+              try {
+                const parsedDressedChickens = JSON.parse(localDressedChickens)
+                setDressedChickens(parsedDressedChickens)
+              } catch (e) {
+                console.warn('Invalid dressedChickens data in localStorage:', e)
+                setDressedChickens([])
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Dressed chickens table not available yet:', err)
+          setDressedChickens([])
+        }
+        
+        // Load batch relationships (handle gracefully if table doesn't exist)
+        try {
+          const { data: batchRelationshipsData, error: batchRelationshipsError } = await supabase
+            .from('batch_relationships')
+            .select('*')
+            .order('created_at', { ascending: false })
+          
+          if (batchRelationshipsError && !batchRelationshipsError.message.includes('relation "batch_relationships" does not exist')) {
+            throw batchRelationshipsError
+          }
+          
+          // Prioritize database data over localStorage
+          if (batchRelationshipsData && batchRelationshipsData.length > 0) {
+            setBatchRelationships(batchRelationshipsData)
+          } else {
+            // Fallback to localStorage
+            const localBatchRelationships = localStorage.getItem('batchRelationships')
+            if (localBatchRelationships && localBatchRelationships !== 'undefined') {
+              try {
+                const parsedBatchRelationships = JSON.parse(localBatchRelationships)
+                setBatchRelationships(parsedBatchRelationships)
+              } catch (e) {
+                console.warn('Invalid batchRelationships data in localStorage:', e)
+                setBatchRelationships([])
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Batch relationships table not available yet:', err)
+          setBatchRelationships([])
+        }
+        
         // Load transactions
         const { data: transactionsData, error: transactionsError } = await supabase
           .from('transactions')
@@ -390,6 +456,28 @@ export function AppProvider({ children }) {
               setWeightHistory(parsedWeightHistory)
             } catch (e) {
               console.warn('Invalid weightHistory data in localStorage:', e)
+            }
+          }
+          
+          // Load dressed chickens from localStorage as fallback
+          const localDressedChickens = localStorage.getItem('dressedChickens')
+          if (localDressedChickens && localDressedChickens !== 'undefined') {
+            try {
+              const parsedDressedChickens = JSON.parse(localDressedChickens)
+              setDressedChickens(parsedDressedChickens)
+            } catch (e) {
+              console.warn('Invalid dressedChickens data in localStorage:', e)
+            }
+          }
+          
+          // Load batch relationships from localStorage as fallback
+          const localBatchRelationships = localStorage.getItem('batchRelationships')
+          if (localBatchRelationships && localBatchRelationships !== 'undefined') {
+            try {
+              const parsedBatchRelationships = JSON.parse(localBatchRelationships)
+              setBatchRelationships(parsedBatchRelationships)
+            } catch (e) {
+              console.warn('Invalid batchRelationships data in localStorage:', e)
             }
           }
         } else {
@@ -1643,63 +1731,58 @@ export function AppProvider({ children }) {
     }
   }
 
-  // Dressed Chicken CRUD operations
-  const [dressedChickens, setDressedChickens] = useState([])
-
   // Load dressed chickens from Supabase
-  useEffect(() => {
-    async function loadDressedChickens() {
-      try {
-        const { data, error } = await supabase
-          .from('dressed_chickens')
-          .select('*')
-          .order('processing_date', { ascending: false })
-        
-        if (error && !error.message.includes('relation "dressed_chickens" does not exist')) {
-          throw error
-        }
-        
-        if (data) {
-          setDressedChickens(data)
-        }
-      } catch (err) {
-        console.warn('Dressed chickens table not available yet:', err)
-      }
-    }
-    
-    if (!loading && (!migrationStatus.needed || migrationStatus.completed)) {
-      loadDressedChickens()
-    }
-  }, [loading, migrationStatus.needed, migrationStatus.completed])
+  // useEffect(() => {
+  //   async function loadDressedChickens() {
+  //     try {
+  //       const { data, error } = await supabase
+  //         .from('dressed_chickens')
+  //         .select('*')
+  //         .order('processing_date', { ascending: false })
+  //       
+  //       if (error && !error.message.includes('relation "dressed_chickens" does not exist')) {
+  //         throw error
+  //       }
+  //       
+  //       if (data) {
+  //         setDressedChickens(data)
+  //       }
+  //     } catch (err) {
+  //       console.warn('Dressed chickens table not available yet:', err)
+  //     }
+  //   }
+  //   
+  //   if (!loading && (!migrationStatus.needed || migrationStatus.completed)) {
+  //     loadDressedChickens()
+  //   }
+  // }, [loading, migrationStatus.needed, migrationStatus.completed])
 
   // Batch Relationships state and functions
-  const [batchRelationships, setBatchRelationships] = useState([])
-
   // Load batch relationships from Supabase
-  useEffect(() => {
-    async function loadBatchRelationships() {
-      try {
-        const { data, error } = await supabase
-          .from('batch_relationships')
-          .select('*')
-          .order('created_at', { ascending: false })
-        
-        if (error && !error.message.includes('relation "batch_relationships" does not exist')) {
-          throw error
-        }
-        
-        if (data) {
-          setBatchRelationships(data)
-        }
-      } catch (err) {
-        console.warn('Batch relationships table not available yet:', err)
-      }
-    }
-    
-    if (!loading && (!migrationStatus.needed || migrationStatus.completed)) {
-      loadBatchRelationships()
-    }
-  }, [loading, migrationStatus.needed, migrationStatus.completed])
+  // useEffect(() => {
+  //   async function loadBatchRelationships() {
+  //     try {
+  //       const { data, error } = await supabase
+  //         .from('batch_relationships')
+  //         .select('*')
+  //         .order('created_at', { ascending: false })
+  //       
+  //       if (error && !error.message.includes('relation "batch_relationships" does not exist')) {
+  //         throw error
+  //       }
+  //       
+  //       if (data) {
+  //         setBatchRelationships(data)
+  //       }
+  //     } catch (err) {
+  //       console.warn('Batch relationships table not available yet:', err)
+  //     }
+  //   }
+  //   
+  //   if (!loading && (!migrationStatus.needed || migrationStatus.completed)) {
+  //     loadBatchRelationships()
+  //   }
+  // }, [loading, migrationStatus.needed, migrationStatus.completed])
 
   const addDressedChicken = async (dressedChickenData) => {
     try {
