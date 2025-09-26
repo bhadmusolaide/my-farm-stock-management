@@ -267,7 +267,7 @@ const BatchRelationshipMapping = () => {
   const getBatchOptions = (batchType) => {
     switch (batchType) {
       case 'live_chickens':
-        return liveChickens?.map(batch => ({
+        return liveChickens?.filter(batch => batch.status !== 'completed').map(batch => ({
           value: batch.id,
           label: `${batch.batch_id} (${batch.breed}, ${batch.current_count} birds)`
         })) || [];

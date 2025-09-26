@@ -328,11 +328,19 @@ export function AppProvider({ children }) {
             .from('dressed_chickens')
             .select('*')
             .order('processing_date', { ascending: false })
-          
-          if (dressedChickensError && !dressedChickensError.message.includes('relation "dressed_chickens" does not exist')) {
+
+          if (dressedChickensError) {
+            console.error('Error loading dressed chickens from Supabase:', dressedChickensError)
+            if (dressedChickensError.message.includes('relation "dressed_chickens" does not exist')) {
+              console.warn('Dressed chickens table does not exist in database. Please run the schema.sql file in your Supabase SQL editor.')
+            } else {
+              console.error('Database error:', dressedChickensError.message)
+            }
             throw dressedChickensError
           }
-          
+
+          console.log('Loaded dressed chickens from Supabase:', dressedChickensData?.length || 0, 'records')
+
           // Prioritize database data over localStorage
           if (dressedChickensData && dressedChickensData.length > 0) {
             setDressedChickens(dressedChickensData)
@@ -342,6 +350,7 @@ export function AppProvider({ children }) {
             if (localDressedChickens && localDressedChickens !== 'undefined') {
               try {
                 const parsedDressedChickens = JSON.parse(localDressedChickens)
+                console.log('Loaded dressed chickens from localStorage:', parsedDressedChickens.length, 'records')
                 setDressedChickens(parsedDressedChickens)
               } catch (e) {
                 console.warn('Invalid dressedChickens data in localStorage:', e)
@@ -1223,6 +1232,7 @@ export function AppProvider({ children }) {
           await addWeightHistory({
             chicken_batch_id: id,
             weight: updates.current_weight,
+            recorded_date: new Date().toISOString().split('T')[0], // Use current date for weight history
             notes: updates.weight_notes || ''
           })
         } catch (err) {
@@ -1904,19 +1914,32 @@ export function AppProvider({ children }) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
-      
+
+      console.log('Attempting to save dressed chicken to Supabase:', dressedChicken)
+
       // Save to Supabase first
-      const { error } = await supabase.from('dressed_chickens').insert(dressedChicken)
+      const { data, error } = await supabase.from('dressed_chickens').insert(dressedChicken).select()
       if (error) {
-        console.warn('Failed to save to Supabase, saving locally only:', error)
+        console.error('Failed to save to Supabase:', error)
+        console.error('Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+
+        // Instead of just warning, let's throw the error so the user knows
+        throw new Error(`Database error: ${error.message}. Please check if the database tables are properly set up.`)
       }
-      
+
+      console.log('Successfully saved to Supabase:', data)
+
       // Update local state using helper function that also saves to localStorage
       setDressedChickens([dressedChicken, ...dressedChickens])
-      
+
       // Log audit action
       await logAuditAction('CREATE', 'dressed_chickens', dressedChicken.id, null, dressedChicken)
-      
+
       return dressedChicken
     } catch (err) {
       console.error('Error adding dressed chicken:', err)
@@ -1926,29 +1949,55 @@ export function AppProvider({ children }) {
 
   const updateDressedChicken = async (id, updates) => {
     try {
+      console.log('updateDressedChicken called with:', { id, updates });
+
       const oldDressedChicken = dressedChickens.find(item => item.id === id)
-      if (!oldDressedChicken) throw new Error('Dressed chicken not found')
-      
+      if (!oldDressedChicken) {
+        console.error('Dressed chicken not found with ID:', id);
+        console.error('Available IDs:', dressedChickens.map(item => item.id));
+        throw new Error('Dressed chicken not found')
+      }
+
+      console.log('Found old chicken data:', oldDressedChicken);
+
       const updatedDressedChicken = { ...oldDressedChicken, ...updates, updated_at: new Date().toISOString() }
-      
+
+      console.log('Attempting to update in Supabase:', updatedDressedChicken);
+
       // Update in Supabase
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('dressed_chickens')
         .update(updatedDressedChicken)
         .eq('id', id)
-      
+        .select()
+
       if (error) {
-        console.warn('Failed to update in Supabase, updating locally only:', error)
+        console.error('Supabase update error:', error);
+        console.error('Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+
+        // Instead of just warning, let's throw the error so the user knows
+        throw new Error(`Database update failed: ${error.message}. Please check your database connection and table permissions.`)
       }
-      
+
+      console.log('Supabase update successful:', data);
+
       // Update local state using helper function that also saves to localStorage
       setDressedChickens(dressedChickens.map(item =>
         item.id === id ? updatedDressedChicken : item
       ))
-      
+
+      console.log('Local state updated successfully');
+
       // Log audit action
       await logAuditAction('UPDATE', 'dressed_chickens', id, oldDressedChicken, updatedDressedChicken)
-      
+
+      console.log('Audit action logged successfully');
+
       return updatedDressedChicken
     } catch (err) {
       console.error('Error updating dressed chicken:', err)

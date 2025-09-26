@@ -1,8 +1,17 @@
-.notification {
+.notification-container {
   position: fixed;
   top: 1rem;
   right: 1rem;
   z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: auto;
+  max-width: 500px;
+}
+
+.notification {
+  position: relative;
   min-width: 320px;
   max-width: 500px;
   padding: 1rem;
@@ -15,6 +24,7 @@
   animation: slideIn 0.3s ease-out;
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  margin-bottom: 0.5rem;
 }
 
 .notification-content {
@@ -108,6 +118,11 @@
 
 /* Responsive Design */
 @media (max-width: 640px) {
+  .notification-container {
+    left: 1rem;
+    right: 1rem;
+  }
+  
   .notification {
     left: 1rem;
     right: 1rem;

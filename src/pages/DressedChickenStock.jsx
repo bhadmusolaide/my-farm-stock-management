@@ -8,6 +8,9 @@ const ProcessingModal = React.memo(({ show, onClose, onSubmit, liveChickens }) =
   const [selectedBatch, setSelectedBatch] = useState('');
   const [processingDate, setProcessingDate] = useState(new Date().toISOString().split('T')[0]);
   const [sizeCategory, setSizeCategory] = useState('medium');
+  const [processingQuantity, setProcessingQuantity] = useState('');
+  const [createNewBatchForRemaining, setCreateNewBatchForRemaining] = useState(false);
+  const [remainingBatchId, setRemainingBatchId] = useState('');
   const [neckCount, setNeckCount] = useState('');
   const [neckWeight, setNeckWeight] = useState('');
   const [feetCount, setFeetCount] = useState('');
@@ -20,6 +23,81 @@ const ProcessingModal = React.memo(({ show, onClose, onSubmit, liveChickens }) =
   // Handle form submission
   const handleSubmit = useCallback((e) => {
     e.preventDefault();
+
+    // Validate batch selection
+    if (!selectedBatch) {
+      alert('Please select a live chicken batch');
+      return;
+    }
+
+    // Validate processing quantity
+    const selectedBatchData = liveChickens.find(batch => batch.id === selectedBatch);
+    const availableBirds = selectedBatchData?.current_count || 0;
+    const quantityToProcess = parseInt(processingQuantity) || 0;
+
+    if (quantityToProcess <= 0) {
+      alert('Please enter a valid quantity to process (must be greater than 0)');
+      return;
+    }
+
+    if (quantityToProcess > availableBirds) {
+      alert(`Cannot process ${quantityToProcess} birds. Only ${availableBirds} birds available in this batch.`);
+      return;
+    }
+
+    // Validate remaining batch ID if creating new batch
+    if (createNewBatchForRemaining && !remainingBatchId.trim()) {
+      alert('Please enter a batch ID for the remaining birds');
+      return;
+    }
+
+    // Validate that remaining batch ID is unique
+    if (createNewBatchForRemaining && remainingBatchId.trim()) {
+      const isDuplicate = liveChickens.some(batch => batch.batch_id === remainingBatchId.trim());
+      if (isDuplicate) {
+        alert(`Batch ID "${remainingBatchId}" already exists. Please choose a different ID.`);
+        return;
+      }
+    }
+
+    // Validate parts data - each part type should not exceed the correct maximum per bird
+    const neckCountVal = parseInt(neckCount) || 0;
+    const feetCountVal = parseInt(feetCount) || 0;
+    const gizzardCountVal = parseInt(gizzardCount) || 0;
+    const dogFoodCountVal = parseInt(dogFoodCount) || 0;
+
+    // Check if at least one part has a count
+    if (neckCountVal === 0 && feetCountVal === 0 && gizzardCountVal === 0 && dogFoodCountVal === 0) {
+      alert('Please enter at least one part count');
+      return;
+    }
+
+    // Check individual part counts based on parts per bird
+    // Neck: 1 per bird, Gizzard: 1 per bird
+    const maxNecks = quantityToProcess; // 1 neck per bird
+    const maxGizzards = quantityToProcess; // 1 gizzard per bird
+
+    if (neckCountVal > maxNecks) {
+      alert(`Neck count (${neckCountVal}) cannot exceed ${maxNecks} (1 neck per bird)`);
+      return;
+    }
+    if (gizzardCountVal > maxGizzards) {
+      alert(`Gizzard count (${gizzardCountVal}) cannot exceed ${maxGizzards} (1 gizzard per bird)`);
+      return;
+    }
+
+    // Feet: 2 per bird, Dog food: 2 per bird (head + liver)
+    const maxFeet = quantityToProcess * 2; // 2 feet per bird
+    const maxDogFood = quantityToProcess * 2; // 2 dog food items per bird
+
+    if (feetCountVal > maxFeet) {
+      alert(`Feet count (${feetCountVal}) cannot exceed ${maxFeet} (2 feet per bird)`);
+      return;
+    }
+    if (dogFoodCountVal > maxDogFood) {
+      alert(`Dog food count (${dogFoodCountVal}) cannot exceed ${maxDogFood} (2 items per bird)`);
+      return;
+    }
 
     const partsCount = {
       neck: parseInt(neckCount) || 0,
@@ -40,6 +118,8 @@ const ProcessingModal = React.memo(({ show, onClose, onSubmit, liveChickens }) =
     const totalWeight = Object.values(partsWeight).reduce((a, b) => a + b, 0);
     const averageWeight = totalCount > 0 ? (totalWeight / totalCount) : 0;
 
+    const remainingBirds = availableBirds - quantityToProcess;
+
     onSubmit({
       id: Date.now().toString(),
       batch_id: selectedBatch,
@@ -52,11 +132,15 @@ const ProcessingModal = React.memo(({ show, onClose, onSubmit, liveChickens }) =
       storage_location: '',
       expiry_date: new Date(new Date(processingDate).setMonth(new Date(processingDate).getMonth() + 3)).toISOString().split('T')[0], // 3 months expiry
       parts_count: partsCount,
-      parts_weight: partsWeight
+      parts_weight: partsWeight,
+      processing_quantity: quantityToProcess,
+      remaining_birds: remainingBirds,
+      create_new_batch_for_remaining: createNewBatchForRemaining,
+      remaining_batch_id: remainingBatchId
     });
 
     onClose();
-  }, [neckCount, feetCount, gizzardCount, dogFoodCount, neckWeight, feetWeight, gizzardWeight, dogFoodWeight, selectedBatch, processingDate, sizeCategory, onSubmit, onClose]);
+  }, [neckCount, feetCount, gizzardCount, dogFoodCount, neckWeight, feetWeight, gizzardWeight, dogFoodWeight, selectedBatch, processingDate, sizeCategory, processingQuantity, createNewBatchForRemaining, remainingBatchId, liveChickens, onSubmit, onClose]);
 
   // Handle clicks on the modal overlay
   const handleOverlayClick = useCallback((e) => {
@@ -92,13 +176,93 @@ const ProcessingModal = React.memo(({ show, onClose, onSubmit, liveChickens }) =
               className="form-control"
             >
               <option value="">Select Live Chicken Batch</option>
-              {liveChickens.map((batch) => (
-                <option key={batch.id} value={batch.batch_id}>
-                  {batch.batch_id} ({batch.current_count} chickens)
+              {liveChickens
+                .filter(batch => batch.status !== 'completed' && batch.current_count > 0) // Filter out completed batches and empty batches
+                .map((batch) => (
+                <option key={batch.id} value={batch.id}>
+                  {batch.batch_id} ({batch.breed}) - {batch.current_count} birds available
                 </option>
               ))}
             </select>
           </div>
+
+          {selectedBatch && (
+            <div className="form-group">
+              <label>Processing Quantity</label>
+              <input
+                type="number"
+                placeholder="Number of birds to process"
+                value={processingQuantity}
+                onChange={(e) => setProcessingQuantity(e.target.value)}
+                className="form-control"
+                min="1"
+                max={liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0}
+                required
+              />
+              <small className="form-help">
+                Available: {liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0} birds
+              </small>
+            </div>
+          )}
+
+          {selectedBatch && parseInt(processingQuantity) > 0 && (
+            <div className="processing-summary">
+              <h4>Processing Summary</h4>
+              <div className="summary-grid">
+                <div className="summary-item">
+                  <span className="summary-label">Available Birds:</span>
+                  <span className="summary-value">{liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0}</span>
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">Processing:</span>
+                  <span className="summary-value">{processingQuantity}</span>
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">Remaining:</span>
+                  <span className="summary-value">{Math.max(0, (liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0) - parseInt(processingQuantity || 0))}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedBatch && parseInt(processingQuantity) > 0 && (
+            <div className="batch-management-section">
+              <h4>Remaining Birds Management</h4>
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={createNewBatchForRemaining}
+                    onChange={(e) => setCreateNewBatchForRemaining(e.target.checked)}
+                  />
+                  Create new batch for remaining birds
+                </label>
+              </div>
+
+              {createNewBatchForRemaining && (
+                <div className="form-group">
+                  <label>Remaining Batch ID</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., BCH-2024-001-R"
+                    value={remainingBatchId}
+                    onChange={(e) => setRemainingBatchId(e.target.value)}
+                    className="form-control"
+                    required
+                  />
+                  <small className="form-help">
+                    Remaining birds: {Math.max(0, (liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0) - parseInt(processingQuantity || 0))}
+                  </small>
+                </div>
+              )}
+
+              {!createNewBatchForRemaining && parseInt(processingQuantity) > 0 && (
+                <div className="form-help">
+                  <strong>Note:</strong> Remaining birds will stay in the current batch with updated count.
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="form-group">
             <label>Processing Date</label>
@@ -257,20 +421,77 @@ const ProcessingModal = React.memo(({ show, onClose, onSubmit, liveChickens }) =
   );
 });
 
-const EditModal = React.memo(({ show, chicken, onClose, onSubmit }) => {
-  const [batchId, setBatchId] = useState(chicken?.batch_id || '');
-  const [sizeCategory, setSizeCategory] = useState(chicken?.size_category || '');
-  const [status, setStatus] = useState(chicken?.status || '');
-  const [storageLocation, setStorageLocation] = useState(chicken?.storage_location || '');
-  const [expiryDate, setExpiryDate] = useState(chicken?.expiry_date || '');
-  const [neckCount, setNeckCount] = useState(chicken?.parts_count?.neck || '');
-  const [neckWeight, setNeckWeight] = useState(chicken?.parts_weight?.neck || '');
-  const [feetCount, setFeetCount] = useState(chicken?.parts_count?.feet || '');
-  const [feetWeight, setFeetWeight] = useState(chicken?.parts_weight?.feet || '');
-  const [gizzardCount, setGizzardCount] = useState(chicken?.parts_count?.gizzard || '');
-  const [gizzardWeight, setGizzardWeight] = useState(chicken?.parts_weight?.gizzard || '');
-  const [dogFoodCount, setDogFoodCount] = useState(chicken?.parts_count?.dog_food || '');
-  const [dogFoodWeight, setDogFoodWeight] = useState(chicken?.parts_weight?.dog_food || '');
+const EditModal = ({ show, chicken, onClose, onSubmit }) => {
+  const [batchId, setBatchId] = useState('');
+  const [sizeCategory, setSizeCategory] = useState('');
+  const [status, setStatus] = useState('');
+  const [storageLocation, setStorageLocation] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [neckCount, setNeckCount] = useState('');
+  const [neckWeight, setNeckWeight] = useState('');
+  const [feetCount, setFeetCount] = useState('');
+  const [feetWeight, setFeetWeight] = useState('');
+  const [gizzardCount, setGizzardCount] = useState('');
+  const [gizzardWeight, setGizzardWeight] = useState('');
+  const [dogFoodCount, setDogFoodCount] = useState('');
+  const [dogFoodWeight, setDogFoodWeight] = useState('');
+
+  // Initialize state when chicken data changes
+  useEffect(() => {
+    console.log('EditModal useEffect triggered:', { show, chicken: !!chicken });
+
+    if (chicken && show) {
+      console.log('EditModal received chicken data:', chicken);
+      console.log('Chicken data structure:', {
+        id: chicken.id,
+        batch_id: chicken.batch_id,
+        size_category: chicken.size_category,
+        status: chicken.status,
+        storage_location: chicken.storage_location,
+        expiry_date: chicken.expiry_date,
+        parts_count: chicken.parts_count,
+        parts_weight: chicken.parts_weight
+      });
+
+      // Set form values with proper fallbacks
+      setBatchId(chicken.batch_id || '');
+      setSizeCategory(chicken.size_category || 'medium');
+      setStatus(chicken.status || 'in-storage');
+      setStorageLocation(chicken.storage_location || '');
+      setExpiryDate(chicken.expiry_date || '');
+
+      // Handle parts_count and parts_weight - ensure they are objects
+      const partsCount = chicken.parts_count || {};
+      const partsWeight = chicken.parts_weight || {};
+
+      console.log('Parts data:', { partsCount, partsWeight });
+
+      setNeckCount(partsCount.neck !== undefined ? String(partsCount.neck) : '');
+      setNeckWeight(partsWeight.neck !== undefined ? String(partsWeight.neck) : '');
+      setFeetCount(partsCount.feet !== undefined ? String(partsCount.feet) : '');
+      setFeetWeight(partsWeight.feet !== undefined ? String(partsWeight.feet) : '');
+      setGizzardCount(partsCount.gizzard !== undefined ? String(partsCount.gizzard) : '');
+      setGizzardWeight(partsWeight.gizzard !== undefined ? String(partsWeight.gizzard) : '');
+      setDogFoodCount(partsCount.dog_food !== undefined ? String(partsCount.dog_food) : '');
+      setDogFoodWeight(partsWeight.dog_food !== undefined ? String(partsWeight.dog_food) : '');
+    } else if (!show) {
+      // Reset form when modal is closed
+      console.log('EditModal: Resetting form (modal closed)');
+      setBatchId('');
+      setSizeCategory('');
+      setStatus('');
+      setStorageLocation('');
+      setExpiryDate('');
+      setNeckCount('');
+      setNeckWeight('');
+      setFeetCount('');
+      setFeetWeight('');
+      setGizzardCount('');
+      setGizzardWeight('');
+      setDogFoodCount('');
+      setDogFoodWeight('');
+    }
+  }, [chicken, show]);
 
   // Handle form submission
   const handleSubmit = useCallback((e) => {
@@ -298,8 +519,8 @@ const EditModal = React.memo(({ show, chicken, onClose, onSubmit }) => {
     onSubmit({
       id: chicken.id,
       batch_id: batchId,
-      processing_date: chicken.processing_date,
-      initial_count: chicken.initial_count,
+      processing_date: chicken.processing_date || chicken.processingDate,
+      initial_count: chicken.initial_count || chicken.initialCount,
       current_count: totalCount,
       average_weight: averageWeight,
       size_category: sizeCategory,
@@ -320,7 +541,24 @@ const EditModal = React.memo(({ show, chicken, onClose, onSubmit }) => {
     }
   }, [onClose]);
 
-  if (!show || !chicken) return null;
+  console.log('EditModal render condition:', { show, chicken: !!chicken });
+
+  if (!show) {
+    console.log('EditModal: Not showing because show is false');
+    return null;
+  }
+
+  if (!chicken) {
+    console.log('EditModal: Not showing because chicken is null/undefined');
+    return null;
+  }
+
+  console.log('EditModal: Rendering modal with chicken data:', {
+    id: chicken.id,
+    batch_id: chicken.batch_id,
+    size_category: chicken.size_category,
+    status: chicken.status
+  });
 
   return (
     <div className="modal-overlay" onClick={handleOverlayClick}>
@@ -530,22 +768,35 @@ const EditModal = React.memo(({ show, chicken, onClose, onSubmit }) => {
       </div>
     </div>
   );
-});
+};
 
 const DressedChickenStock = () => {
-  const { 
-    dressedChickens, 
+  const {
+    dressedChickens,
     liveChickens,
     addDressedChicken,
     updateDressedChicken,
     deleteDressedChicken,
     batchRelationships,
-    addBatchRelationship
+    addBatchRelationship,
+    updateLiveChicken,
+    addLiveChicken
   } = useContext(AppContext);
 
   const [activeTab, setActiveTab] = useState('inventory');
   const [showProcessingModal, setShowProcessingModal] = useState(false);
   const [selectedChicken, setSelectedChicken] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Debug logging for selectedChicken state changes
+  useEffect(() => {
+    console.log('DressedChickenStock: selectedChicken changed:', {
+      selectedChicken: !!selectedChicken,
+      chickenId: selectedChicken?.id,
+      showModal: !!selectedChicken,
+      isUpdating
+    });
+  }, [selectedChicken, isUpdating]);
 
   // Format weight using existing formatter
   const formatPartWeight = (weight) => formatWeight(weight);
@@ -560,14 +811,112 @@ const DressedChickenStock = () => {
     return Object.values(partsWeight || {}).reduce((sum, weight) => sum + weight, 0);
   };
 
-  const handleProcessChicken = (data) => {
-    addDressedChicken(data);
-    setShowProcessingModal(false);
+  const handleProcessChicken = async (data) => {
+    try {
+      console.log('Starting chicken processing with data:', data);
+
+      // Add the dressed chicken record first
+      const savedDressedChicken = await addDressedChicken(data);
+      console.log('Dressed chicken saved successfully:', savedDressedChicken);
+
+      // Update live chicken count
+      const sourceBatch = liveChickens.find(batch => batch.id === data.batch_id);
+      if (sourceBatch) {
+        const newCount = Math.max(0, sourceBatch.current_count - data.processing_quantity);
+        console.log(`Updating source batch ${sourceBatch.batch_id} from ${sourceBatch.current_count} to ${newCount} birds`);
+
+        // Update the source batch
+        await updateLiveChicken(data.batch_id, {
+          ...sourceBatch,
+          current_count: newCount,
+          updated_at: new Date().toISOString()
+        });
+
+        // If there are remaining birds and user wants to create a new batch
+        if (data.remaining_birds > 0 && data.create_new_batch_for_remaining && data.remaining_batch_id) {
+          console.log(`Creating new batch ${data.remaining_batch_id} with ${data.remaining_birds} remaining birds`);
+
+          // Create a new batch for remaining birds
+          const newBatch = {
+            id: Date.now().toString() + '_remaining',
+            batch_id: data.remaining_batch_id,
+            breed: sourceBatch.breed,
+            initial_count: data.remaining_birds,
+            current_count: data.remaining_birds,
+            hatch_date: sourceBatch.hatch_date,
+            expected_weight: sourceBatch.expected_weight,
+            current_weight: sourceBatch.current_weight,
+            feed_type: sourceBatch.feed_type,
+            status: 'healthy',
+            mortality: 0,
+            notes: `Split from batch ${sourceBatch.batch_id} - Remaining birds after processing ${data.processing_quantity} birds`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+
+          await addLiveChicken(newBatch);
+
+          // Create batch relationship for the split
+          await addBatchRelationship({
+            id: Date.now().toString() + '_split',
+            source_batch_id: data.batch_id,
+            source_batch_type: 'live_chickens',
+            target_batch_id: newBatch.id,
+            target_batch_type: 'live_chickens',
+            relationship_type: 'split_from',
+            quantity: data.remaining_birds,
+            notes: `Split ${data.remaining_birds} birds from original batch`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        }
+
+        // Create batch relationship for processing
+        await addBatchRelationship({
+          id: Date.now().toString() + '_processed',
+          source_batch_id: data.batch_id,
+          source_batch_type: 'live_chickens',
+          target_batch_id: data.id,
+          target_batch_type: 'dressed_chickens',
+          relationship_type: 'partial_processed_from',
+          quantity: data.processing_quantity,
+          notes: `Processed ${data.processing_quantity} birds from batch ${sourceBatch.batch_id}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      }
+
+      console.log('Chicken processing completed successfully');
+      // Close modal after all operations complete
+      setShowProcessingModal(false);
+    } catch (error) {
+      console.error('Error processing chicken:', error);
+      alert(`Error processing chicken: ${error.message}\n\nPlease check:\n1. Database connection\n2. Table permissions\n3. Required database tables exist\n\nCheck the browser console for more details.`);
+      setShowProcessingModal(false);
+    }
   };
 
-  const handleUpdateChicken = (data) => {
-    updateDressedChicken(data.id, data);
-    setSelectedChicken(null);
+  const handleUpdateChicken = async (data) => {
+    try {
+      console.log('handleUpdateChicken called with data:', data);
+      console.log('Updating chicken with ID:', data.id);
+      console.log('Current selectedChicken state:', selectedChicken);
+
+      // Don't close modal immediately - wait for successful update
+      const result = await updateDressedChicken(data.id, data);
+      console.log('Chicken updated successfully:', result);
+
+      // Only close modal after successful update
+      setTimeout(() => {
+        console.log('Closing modal after successful update');
+        setSelectedChicken(null);
+      }, 100); // Small delay to ensure state is properly updated
+
+    } catch (error) {
+      console.error('Error updating chicken:', error);
+      alert(`Error updating chicken: ${error.message}`);
+      // Don't close modal on error so user can retry
+    }
   };
 
   // Inventory View Component
@@ -622,14 +971,29 @@ const DressedChickenStock = () => {
                   <td>
                     <div className="action-buttons">
                       <button
-                        onClick={() => onEdit(chicken)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log('Edit button clicked, chicken data:', chicken);
+                          console.log('Chicken ID:', chicken.id);
+                          console.log('Chicken has required fields:', {
+                            batch_id: !!chicken.batch_id,
+                            size_category: !!chicken.size_category,
+                            status: !!chicken.status,
+                            parts_count: !!chicken.parts_count,
+                            parts_weight: !!chicken.parts_weight
+                          });
+                          onEdit(chicken);
+                        }}
                         className="btn btn-secondary"
+                        type="button"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => onDelete(chicken.id)}
                         className="btn btn-danger"
+                        type="button"
                       >
                         Delete
                       </button>

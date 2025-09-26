@@ -567,6 +567,133 @@
   }
 }
 
+/* Processing summary styles */
+.processing-summary {
+  background-color: #e8f5e9;
+  border: 1px solid #4caf50;
+  border-radius: 6px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.processing-summary h4 {
+  margin: 0 0 1rem 0;
+  color: #2e7d32;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.summary-label {
+  font-size: 0.8rem;
+  color: #558b2f;
+  margin-bottom: 0.25rem;
+}
+
+.summary-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+/* Batch management section styles */
+.batch-management-section {
+  background-color: var(--background-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.batch-management-section h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text-color);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-weight: normal;
+}
+
+.checkbox-label input[type="checkbox"] {
+  margin: 0;
+  width: auto;
+}
+
+.form-help {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-light);
+}
+
+/* Processing quantity styles */
+.processing-quantity-info {
+  background-color: #e3f2fd;
+  border: 1px solid #2196f3;
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.processing-quantity-info.urgent {
+  background-color: #ffebee;
+  border-color: #f44336;
+  color: #c62828;
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .processing-summary {
+  background-color: #1b5e20;
+  border-color: #4caf50;
+}
+
+[data-theme="dark"] .processing-summary h4 {
+  color: #c8e6c9;
+}
+
+[data-theme="dark"] .summary-label {
+  color: #a5d6a7;
+}
+
+[data-theme="dark"] .summary-value {
+  color: #c8e6c9;
+}
+
+[data-theme="dark"] .processing-quantity-info {
+  background-color: #1a237e;
+  border-color: #3949ab;
+  color: #c7c7c7;
+}
+
+[data-theme="dark"] .processing-quantity-info.urgent {
+  background-color: #b71c1c;
+  border-color: #d32f2f;
+  color: #ffcdd2;
+}
+
+[data-theme="dark"] .batch-management-section {
+  background-color: var(--card-background);
+  border-color: var(--border-color);
+}
+
 /* Tailwind-like utility classes that were missing */
 .overflow-x-auto {
   overflow-x: auto;

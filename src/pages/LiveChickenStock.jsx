@@ -718,7 +718,9 @@ const LiveChickenStock = () => {
                   className="batch-select"
                 >
                   <option value="">Select Batch for Transaction History</option>
-                  {liveChickens.map(batch => (
+                  {liveChickens
+                    .filter(batch => batch.status !== 'completed') // Filter out completed batches
+                    .map(batch => (
                     <option key={batch.id} value={batch.id}>
                       {batch.batch_id} - {batch.breed} ({batch.current_count} birds)
                     </option>
@@ -1000,8 +1002,8 @@ const LiveChickenStock = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="9" className="no-data">
-                      No chicken batches found. Add your first batch to get started.
+                    <td colSpan="10" className="no-data">
+                      No chicken batches found
                     </td>
                   </tr>
                 )}

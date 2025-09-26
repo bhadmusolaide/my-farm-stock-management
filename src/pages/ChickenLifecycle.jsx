@@ -76,10 +76,10 @@ const ChickenLifecycle = () => {
               dog_food: parseFloat((batch.current_count * 0.3).toFixed(2)) // 0.3kg per dog food portion
             }
           }
-          
+
           // Add the dressed chicken record
           const dressedChicken = await addDressedChicken(dressedChickenData)
-          
+
           // Create a batch relationship
           const relationshipData = {
             source_batch_id: batch.batch_id,
@@ -87,18 +87,31 @@ const ChickenLifecycle = () => {
             relationship_type: 'processed_from',
             quantity: batch.current_count
           }
-          
+
           await addBatchRelationship(relationshipData)
         }
-        
-        await updateLiveChicken(batch.id, { 
-          ...batch, 
+
+        await updateLiveChicken(batch.id, {
+          ...batch,
           lifecycle_stage: nextStage.id,
           [`stage_${nextStage.id}_date`]: new Date().toISOString().split('T')[0]
         })
       } catch (error) {
         console.error('Error updating lifecycle stage:', error)
       }
+    }
+  }
+
+  // Mark batch as complete (for freezer storage batches)
+  const markBatchAsComplete = async (batch) => {
+    try {
+      await updateLiveChicken(batch.id, {
+        ...batch,
+        status: 'completed',
+        completed_date: new Date().toISOString().split('T')[0]
+      })
+    } catch (error) {
+      console.error('Error marking batch as complete:', error)
     }
   }
 
@@ -198,7 +211,9 @@ const ChickenLifecycle = () => {
         </div>
       ) : (
         <div className="batches-grid">
-          {liveChickens.map(batch => (
+          {liveChickens
+            .filter(batch => batch.status !== 'completed') // Filter out completed batches
+            .map(batch => (
             <div key={batch.id} className="batch-card">
               <div className="batch-header">
                 <h3>{batch.batch_id}</h3>
@@ -216,10 +231,10 @@ const ChickenLifecycle = () => {
                 {lifecycleStages.map((stage, index) => {
                   const isCompleted = isStageCompleted(batch, stage.id)
                   const isCurrent = isStageCurrent(batch, stage.id)
-                  
+
                   return (
-                    <div 
-                      key={stage.id} 
+                    <div
+                      key={stage.id}
                       className={`stage ${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}`}
                     >
                       <div className="stage-icon">
@@ -228,12 +243,21 @@ const ChickenLifecycle = () => {
                       </div>
                       <div className="stage-name">{stage.name}</div>
                       {isCurrent && (
-                        <button 
+                        <button
                           className="btn-next-stage"
                           onClick={() => moveToNextStage(batch)}
                           disabled={index === lifecycleStages.length - 1}
                         >
                           Next Stage
+                        </button>
+                      )}
+                      {isCurrent && stage.id === 'freezer' && (
+                        <button
+                          className="btn-complete"
+                          onClick={() => markBatchAsComplete(batch)}
+                          title="Mark this batch as complete and remove from active tracking"
+                        >
+                          Mark Complete
                         </button>
                       )}
                     </div>
@@ -285,6 +309,37 @@ const ChickenLifecycle = () => {
               </div>
             </div>
           ))}
+
+          {/* Show completed batches section - Always render this section */}
+          <div className="completed-batches-section">
+            <h3>Completed Batches</h3>
+            {liveChickens.filter(batch => batch.status === 'completed').length > 0 ? (
+              <div className="completed-batches-grid">
+                {liveChickens
+                  .filter(batch => batch.status === 'completed')
+                  .map(batch => (
+                  <div key={batch.id} className="batch-card completed-batch">
+                    <div className="batch-header">
+                      <h3>{batch.batch_id}</h3>
+                      <span className="status-badge completed">Completed</span>
+                    </div>
+
+                    <div className="batch-info">
+                      <p><strong>Breed:</strong> {batch.breed}</p>
+                      <p><strong>Final Count:</strong> {formatNumber(batch.current_count)}</p>
+                      <p><strong>Completed:</strong> {formatDate(batch.completed_date)}</p>
+                    </div>
+
+                    <div className="completed-batch-actions">
+                      <small>Batch completed and archived for record purposes</small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="no-completed-batches">No batches have been completed yet.</p>
+            )}
+          </div>
         </div>
       )}
 
