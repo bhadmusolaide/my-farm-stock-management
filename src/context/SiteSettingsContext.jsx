@@ -89,7 +89,7 @@ export const SiteSettingsProvider = ({ children }) => {
 
       if (data?.settings_data) {
         // Prioritize database data over defaults for saved values
-        setSettings({ ...data.settings_data, ...defaultSettings })
+        setSettings({ ...defaultSettings, ...data.settings_data })
       } else {
         // No settings found, initialize with defaults
         await initializeSettingsTable()
