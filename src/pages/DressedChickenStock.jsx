@@ -1,10 +1,31 @@
-import React, { useState, useContext, useEffect, useCallback } from 'react';
+import React, { useState, useContext, useEffect, useCallback, memo } from 'react';
 import { AppContext } from '../context/AppContext';
 import { formatWeight } from '../utils/formatters';
+import Modal from '../components/Modal';
+import ActionButtons from '../components/ActionButtons';
 import './DressedChickenStock.css';
 
-// Memoized modal components to prevent re-creation on every render
-const ProcessingModal = React.memo(({ show, onClose, onSubmit, liveChickens }) => {
+
+
+const DressedChickenStock = () => {
+  const {
+    dressedChickens,
+    liveChickens,
+    addDressedChicken,
+    updateDressedChicken,
+    deleteDressedChicken,
+    batchRelationships,
+    addBatchRelationship,
+    updateLiveChicken,
+    addLiveChicken
+  } = useContext(AppContext);
+
+  const [activeTab, setActiveTab] = useState('inventory');
+  const [showProcessingModal, setShowProcessingModal] = useState(false);
+  const [editingChicken, setEditingChicken] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Processing modal state
   const [selectedBatch, setSelectedBatch] = useState('');
   const [processingDate, setProcessingDate] = useState(new Date().toISOString().split('T')[0]);
   const [sizeCategory, setSizeCategory] = useState('medium');
@@ -20,8 +41,42 @@ const ProcessingModal = React.memo(({ show, onClose, onSubmit, liveChickens }) =
   const [dogFoodCount, setDogFoodCount] = useState('');
   const [dogFoodWeight, setDogFoodWeight] = useState('');
 
-  // Handle form submission
-  const handleSubmit = useCallback((e) => {
+  // Edit modal state
+  const [editBatchId, setEditBatchId] = useState('');
+  const [editSizeCategory, setEditSizeCategory] = useState('medium');
+  const [editStatus, setEditStatus] = useState('in-storage');
+  const [editStorageLocation, setEditStorageLocation] = useState('');
+  const [editExpiryDate, setEditExpiryDate] = useState('');
+  const [editNeckCount, setEditNeckCount] = useState('');
+  const [editNeckWeight, setEditNeckWeight] = useState('');
+  const [editFeetCount, setEditFeetCount] = useState('');
+  const [editFeetWeight, setEditFeetWeight] = useState('');
+  const [editGizzardCount, setEditGizzardCount] = useState('');
+  const [editGizzardWeight, setEditGizzardWeight] = useState('');
+  const [editDogFoodCount, setEditDogFoodCount] = useState('');
+  const [editDogFoodWeight, setEditDogFoodWeight] = useState('');
+
+  // Memoized edit handler to prevent inline function churn
+  const handleEditChicken = useCallback((chicken) => {
+    setEditingChicken(chicken);
+  }, []);
+
+  // Removed debug logging useEffect to prevent potential render loops
+
+  // Format weight using existing formatter
+  const formatPartWeight = (weight) => formatWeight(weight);
+
+  // Calculate total parts count
+  const getTotalPartsCount = (partsCount) => {
+    return Object.values(partsCount || {}).reduce((sum, count) => sum + count, 0);
+  };
+
+  // Calculate total parts weight
+  const getTotalPartsWeight = (partsWeight) => {
+    return Object.values(partsWeight || {}).reduce((sum, weight) => sum + weight, 0);
+  };
+
+  const handleProcessChickenForm = async (e) => {
     e.preventDefault();
 
     // Validate batch selection
@@ -60,7 +115,7 @@ const ProcessingModal = React.memo(({ show, onClose, onSubmit, liveChickens }) =
       }
     }
 
-    // Validate parts data - each part type should not exceed the correct maximum per bird
+    // Validate parts data - each part type should not exceed the processing quantity
     const neckCountVal = parseInt(neckCount) || 0;
     const feetCountVal = parseInt(feetCount) || 0;
     const gizzardCountVal = parseInt(gizzardCount) || 0;
@@ -72,30 +127,21 @@ const ProcessingModal = React.memo(({ show, onClose, onSubmit, liveChickens }) =
       return;
     }
 
-    // Check individual part counts based on parts per bird
-    // Neck: 1 per bird, Gizzard: 1 per bird
-    const maxNecks = quantityToProcess; // 1 neck per bird
-    const maxGizzards = quantityToProcess; // 1 gizzard per bird
-
-    if (neckCountVal > maxNecks) {
-      alert(`Neck count (${neckCountVal}) cannot exceed ${maxNecks} (1 neck per bird)`);
+    // Check individual part counts don't exceed processing quantity
+    if (neckCountVal > quantityToProcess) {
+      alert(`Neck count (${neckCountVal}) cannot exceed processing quantity (${quantityToProcess})`);
       return;
     }
-    if (gizzardCountVal > maxGizzards) {
-      alert(`Gizzard count (${gizzardCountVal}) cannot exceed ${maxGizzards} (1 gizzard per bird)`);
+    if (feetCountVal > quantityToProcess) {
+      alert(`Feet count (${feetCountVal}) cannot exceed processing quantity (${quantityToProcess})`);
       return;
     }
-
-    // Feet: 2 per bird, Dog food: 2 per bird (head + liver)
-    const maxFeet = quantityToProcess * 2; // 2 feet per bird
-    const maxDogFood = quantityToProcess * 2; // 2 dog food items per bird
-
-    if (feetCountVal > maxFeet) {
-      alert(`Feet count (${feetCountVal}) cannot exceed ${maxFeet} (2 feet per bird)`);
+    if (gizzardCountVal > quantityToProcess) {
+      alert(`Gizzard count (${gizzardCountVal}) cannot exceed processing quantity (${quantityToProcess})`);
       return;
     }
-    if (dogFoodCountVal > maxDogFood) {
-      alert(`Dog food count (${dogFoodCountVal}) cannot exceed ${maxDogFood} (2 items per bird)`);
+    if (dogFoodCountVal > quantityToProcess) {
+      alert(`Dog food count (${dogFoodCountVal}) cannot exceed processing quantity (${quantityToProcess})`);
       return;
     }
 
@@ -120,7 +166,7 @@ const ProcessingModal = React.memo(({ show, onClose, onSubmit, liveChickens }) =
 
     const remainingBirds = availableBirds - quantityToProcess;
 
-    onSubmit({
+    const data = {
       id: Date.now().toString(),
       batch_id: selectedBatch,
       processing_date: processingDate,
@@ -137,693 +183,16 @@ const ProcessingModal = React.memo(({ show, onClose, onSubmit, liveChickens }) =
       remaining_birds: remainingBirds,
       create_new_batch_for_remaining: createNewBatchForRemaining,
       remaining_batch_id: remainingBatchId
-    });
-
-    onClose();
-  }, [neckCount, feetCount, gizzardCount, dogFoodCount, neckWeight, feetWeight, gizzardWeight, dogFoodWeight, selectedBatch, processingDate, sizeCategory, processingQuantity, createNewBatchForRemaining, remainingBatchId, liveChickens, onSubmit, onClose]);
-
-  // Handle clicks on the modal overlay
-  const handleOverlayClick = useCallback((e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  }, [onClose]);
-
-  if (!show) return null;
-
-  return (
-    <div className="modal-overlay" onClick={handleOverlayClick}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Record Chicken Processing</h2>
-          <button
-            onClick={onClose}
-            className="modal-close"
-            type="button"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Live Chicken Batch</label>
-            <select
-              value={selectedBatch}
-              onChange={(e) => setSelectedBatch(e.target.value)}
-              className="form-control"
-            >
-              <option value="">Select Live Chicken Batch</option>
-              {liveChickens
-                .filter(batch => batch.status !== 'completed' && batch.current_count > 0) // Filter out completed batches and empty batches
-                .map((batch) => (
-                <option key={batch.id} value={batch.id}>
-                  {batch.batch_id} ({batch.breed}) - {batch.current_count} birds available
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {selectedBatch && (
-            <div className="form-group">
-              <label>Processing Quantity</label>
-              <input
-                type="number"
-                placeholder="Number of birds to process"
-                value={processingQuantity}
-                onChange={(e) => setProcessingQuantity(e.target.value)}
-                className="form-control"
-                min="1"
-                max={liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0}
-                required
-              />
-              <small className="form-help">
-                Available: {liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0} birds
-              </small>
-            </div>
-          )}
-
-          {selectedBatch && parseInt(processingQuantity) > 0 && (
-            <div className="processing-summary">
-              <h4>Processing Summary</h4>
-              <div className="summary-grid">
-                <div className="summary-item">
-                  <span className="summary-label">Available Birds:</span>
-                  <span className="summary-value">{liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0}</span>
-                </div>
-                <div className="summary-item">
-                  <span className="summary-label">Processing:</span>
-                  <span className="summary-value">{processingQuantity}</span>
-                </div>
-                <div className="summary-item">
-                  <span className="summary-label">Remaining:</span>
-                  <span className="summary-value">{Math.max(0, (liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0) - parseInt(processingQuantity || 0))}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {selectedBatch && parseInt(processingQuantity) > 0 && (
-            <div className="batch-management-section">
-              <h4>Remaining Birds Management</h4>
-              <div className="form-group">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={createNewBatchForRemaining}
-                    onChange={(e) => setCreateNewBatchForRemaining(e.target.checked)}
-                  />
-                  Create new batch for remaining birds
-                </label>
-              </div>
-
-              {createNewBatchForRemaining && (
-                <div className="form-group">
-                  <label>Remaining Batch ID</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., BCH-2024-001-R"
-                    value={remainingBatchId}
-                    onChange={(e) => setRemainingBatchId(e.target.value)}
-                    className="form-control"
-                    required
-                  />
-                  <small className="form-help">
-                    Remaining birds: {Math.max(0, (liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0) - parseInt(processingQuantity || 0))}
-                  </small>
-                </div>
-              )}
-
-              {!createNewBatchForRemaining && parseInt(processingQuantity) > 0 && (
-                <div className="form-help">
-                  <strong>Note:</strong> Remaining birds will stay in the current batch with updated count.
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="form-group">
-            <label>Processing Date</label>
-            <input
-              type="date"
-              value={processingDate}
-              onChange={(e) => setProcessingDate(e.target.value)}
-              className="form-control"
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Size Category</label>
-            <select
-              value={sizeCategory}
-              onChange={(e) => setSizeCategory(e.target.value)}
-              className="form-control"
-            >
-              <option value="small">Small</option>
-              <option value="medium">Medium</option>
-              <option value="large">Large</option>
-              <option value="extra-large">Extra Large</option>
-            </select>
-          </div>
-
-          <div className="form-section">
-            <h3>Part Details</h3>
-
-            {/* Neck */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>Neck Count</label>
-                <input
-                  type="number"
-                  placeholder="Count"
-                  value={neckCount}
-                  onChange={(e) => setNeckCount(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-              <div className="form-group">
-                <label>Neck Weight (kg)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Weight"
-                  value={neckWeight}
-                  onChange={(e) => setNeckWeight(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-            </div>
-
-            {/* Feet */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>Feet Count</label>
-                <input
-                  type="number"
-                  placeholder="Count"
-                  value={feetCount}
-                  onChange={(e) => setFeetCount(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-              <div className="form-group">
-                <label>Feet Weight (kg)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Weight"
-                  value={feetWeight}
-                  onChange={(e) => setFeetWeight(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-            </div>
-
-            {/* Gizzard */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>Gizzard Count</label>
-                <input
-                  type="number"
-                  placeholder="Count"
-                  value={gizzardCount}
-                  onChange={(e) => setGizzardCount(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-              <div className="form-group">
-                <label>Gizzard Weight (kg)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Weight"
-                  value={gizzardWeight}
-                  onChange={(e) => setGizzardWeight(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-            </div>
-
-            {/* Dog Food (Head & Liver) */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>Dog Food Count</label>
-                <input
-                  type="number"
-                  placeholder="Count"
-                  value={dogFoodCount}
-                  onChange={(e) => setDogFoodCount(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-              <div className="form-group">
-                <label>Dog Food Weight (kg)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Weight"
-                  value={dogFoodWeight}
-                  onChange={(e) => setDogFoodWeight(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="form-actions">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn btn-secondary"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-            >
-              Save Processing
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-});
-
-const EditModal = ({ show, chicken, onClose, onSubmit }) => {
-  const [batchId, setBatchId] = useState('');
-  const [sizeCategory, setSizeCategory] = useState('');
-  const [status, setStatus] = useState('');
-  const [storageLocation, setStorageLocation] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [neckCount, setNeckCount] = useState('');
-  const [neckWeight, setNeckWeight] = useState('');
-  const [feetCount, setFeetCount] = useState('');
-  const [feetWeight, setFeetWeight] = useState('');
-  const [gizzardCount, setGizzardCount] = useState('');
-  const [gizzardWeight, setGizzardWeight] = useState('');
-  const [dogFoodCount, setDogFoodCount] = useState('');
-  const [dogFoodWeight, setDogFoodWeight] = useState('');
-
-  // Initialize state when chicken data changes
-  useEffect(() => {
-    console.log('EditModal useEffect triggered:', { show, chicken: !!chicken });
-
-    if (chicken && show) {
-      console.log('EditModal received chicken data:', chicken);
-      console.log('Chicken data structure:', {
-        id: chicken.id,
-        batch_id: chicken.batch_id,
-        size_category: chicken.size_category,
-        status: chicken.status,
-        storage_location: chicken.storage_location,
-        expiry_date: chicken.expiry_date,
-        parts_count: chicken.parts_count,
-        parts_weight: chicken.parts_weight
-      });
-
-      // Set form values with proper fallbacks
-      setBatchId(chicken.batch_id || '');
-      setSizeCategory(chicken.size_category || 'medium');
-      setStatus(chicken.status || 'in-storage');
-      setStorageLocation(chicken.storage_location || '');
-      setExpiryDate(chicken.expiry_date || '');
-
-      // Handle parts_count and parts_weight - ensure they are objects
-      const partsCount = chicken.parts_count || {};
-      const partsWeight = chicken.parts_weight || {};
-
-      console.log('Parts data:', { partsCount, partsWeight });
-
-      setNeckCount(partsCount.neck !== undefined ? String(partsCount.neck) : '');
-      setNeckWeight(partsWeight.neck !== undefined ? String(partsWeight.neck) : '');
-      setFeetCount(partsCount.feet !== undefined ? String(partsCount.feet) : '');
-      setFeetWeight(partsWeight.feet !== undefined ? String(partsWeight.feet) : '');
-      setGizzardCount(partsCount.gizzard !== undefined ? String(partsCount.gizzard) : '');
-      setGizzardWeight(partsWeight.gizzard !== undefined ? String(partsWeight.gizzard) : '');
-      setDogFoodCount(partsCount.dog_food !== undefined ? String(partsCount.dog_food) : '');
-      setDogFoodWeight(partsWeight.dog_food !== undefined ? String(partsWeight.dog_food) : '');
-    } else if (!show) {
-      // Reset form when modal is closed
-      console.log('EditModal: Resetting form (modal closed)');
-      setBatchId('');
-      setSizeCategory('');
-      setStatus('');
-      setStorageLocation('');
-      setExpiryDate('');
-      setNeckCount('');
-      setNeckWeight('');
-      setFeetCount('');
-      setFeetWeight('');
-      setGizzardCount('');
-      setGizzardWeight('');
-      setDogFoodCount('');
-      setDogFoodWeight('');
-    }
-  }, [chicken, show]);
-
-  // Handle form submission
-  const handleSubmit = useCallback((e) => {
-    e.preventDefault();
-
-    const partsCount = {
-      neck: parseInt(neckCount) || 0,
-      feet: parseInt(feetCount) || 0,
-      gizzard: parseInt(gizzardCount) || 0,
-      dog_food: parseInt(dogFoodCount) || 0
     };
 
-    const partsWeight = {
-      neck: parseFloat(neckWeight) || 0,
-      feet: parseFloat(feetWeight) || 0,
-      gizzard: parseFloat(gizzardWeight) || 0,
-      dog_food: parseFloat(dogFoodWeight) || 0
-    };
-
-    // Calculate total count and average weight
-    const totalCount = Object.values(partsCount).reduce((a, b) => a + b, 0);
-    const totalWeight = Object.values(partsWeight).reduce((a, b) => a + b, 0);
-    const averageWeight = totalCount > 0 ? (totalWeight / totalCount) : 0;
-
-    onSubmit({
-      id: chicken.id,
-      batch_id: batchId,
-      processing_date: chicken.processing_date || chicken.processingDate,
-      initial_count: chicken.initial_count || chicken.initialCount,
-      current_count: totalCount,
-      average_weight: averageWeight,
-      size_category: sizeCategory,
-      status: status,
-      storage_location: storageLocation,
-      expiry_date: expiryDate,
-      parts_count: partsCount,
-      parts_weight: partsWeight
-    });
-
-    onClose();
-  }, [chicken, batchId, sizeCategory, status, storageLocation, expiryDate, neckCount, neckWeight, feetCount, feetWeight, gizzardCount, gizzardWeight, dogFoodCount, dogFoodWeight, onSubmit, onClose]);
-
-  // Handle clicks on the modal overlay
-  const handleOverlayClick = useCallback((e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  }, [onClose]);
-
-  console.log('EditModal render condition:', { show, chicken: !!chicken });
-
-  if (!show) {
-    console.log('EditModal: Not showing because show is false');
-    return null;
-  }
-
-  if (!chicken) {
-    console.log('EditModal: Not showing because chicken is null/undefined');
-    return null;
-  }
-
-  console.log('EditModal: Rendering modal with chicken data:', {
-    id: chicken.id,
-    batch_id: chicken.batch_id,
-    size_category: chicken.size_category,
-    status: chicken.status
-  });
-
-  return (
-    <div className="modal-overlay" onClick={handleOverlayClick}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Edit Dressed Chicken</h2>
-          <button
-            onClick={onClose}
-            className="modal-close"
-            type="button"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
-        </div>
-
-        <div className="form-group">
-          <label>Batch ID</label>
-          <input
-            type="text"
-            placeholder="Batch ID"
-            value={batchId}
-            onChange={(e) => setBatchId(e.target.value)}
-            className="form-control"
-            disabled
-          />
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Size Category</label>
-            <select
-              value={sizeCategory}
-              onChange={(e) => setSizeCategory(e.target.value)}
-              className="form-control"
-            >
-              <option value="small">Small</option>
-              <option value="medium">Medium</option>
-              <option value="large">Large</option>
-              <option value="extra-large">Extra Large</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="form-control"
-            >
-              <option value="in-storage">In Storage</option>
-              <option value="sold">Sold</option>
-              <option value="discarded">Discarded</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Storage Location</label>
-            <input
-              type="text"
-              placeholder="Storage Location"
-              value={storageLocation}
-              onChange={(e) => setStorageLocation(e.target.value)}
-              className="form-control"
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Expiry Date</label>
-            <input
-              type="date"
-              value={expiryDate}
-              onChange={(e) => setExpiryDate(e.target.value)}
-              className="form-control"
-            />
-          </div>
-
-          <div className="form-section">
-            <h3>Part Details</h3>
-
-            {/* Neck */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>Neck Count</label>
-                <input
-                  type="number"
-                  placeholder="Count"
-                  value={neckCount}
-                  onChange={(e) => setNeckCount(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-              <div className="form-group">
-                <label>Neck Weight (kg)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Weight"
-                  value={neckWeight}
-                  onChange={(e) => setNeckWeight(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-            </div>
-
-            {/* Feet */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>Feet Count</label>
-                <input
-                  type="number"
-                  placeholder="Count"
-                  value={feetCount}
-                  onChange={(e) => setFeetCount(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-              <div className="form-group">
-                <label>Feet Weight (kg)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Weight"
-                  value={feetWeight}
-                  onChange={(e) => setFeetWeight(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-            </div>
-
-            {/* Gizzard */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>Gizzard Count</label>
-                <input
-                  type="number"
-                  placeholder="Count"
-                  value={gizzardCount}
-                  onChange={(e) => setGizzardCount(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-              <div className="form-group">
-                <label>Gizzard Weight (kg)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Weight"
-                  value={gizzardWeight}
-                  onChange={(e) => setGizzardWeight(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-            </div>
-
-            {/* Dog Food (Head & Liver) */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>Dog Food Count</label>
-                <input
-                  type="number"
-                  placeholder="Count"
-                  value={dogFoodCount}
-                  onChange={(e) => setDogFoodCount(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-              <div className="form-group">
-                <label>Dog Food Weight (kg)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Weight"
-                  value={dogFoodWeight}
-                  onChange={(e) => setDogFoodWeight(e.target.value)}
-                  className="form-control"
-                  min="0"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="form-actions">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn btn-secondary"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-            >
-              Save Changes
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-const DressedChickenStock = () => {
-  const {
-    dressedChickens,
-    liveChickens,
-    addDressedChicken,
-    updateDressedChicken,
-    deleteDressedChicken,
-    batchRelationships,
-    addBatchRelationship,
-    updateLiveChicken,
-    addLiveChicken
-  } = useContext(AppContext);
-
-  const [activeTab, setActiveTab] = useState('inventory');
-  const [showProcessingModal, setShowProcessingModal] = useState(false);
-  const [selectedChicken, setSelectedChicken] = useState(null);
-  const [isUpdating, setIsUpdating] = useState(false);
-
-  // Debug logging for selectedChicken state changes
-  useEffect(() => {
-    console.log('DressedChickenStock: selectedChicken changed:', {
-      selectedChicken: !!selectedChicken,
-      chickenId: selectedChicken?.id,
-      showModal: !!selectedChicken,
-      isUpdating
-    });
-  }, [selectedChicken, isUpdating]);
-
-  // Format weight using existing formatter
-  const formatPartWeight = (weight) => formatWeight(weight);
-
-  // Calculate total parts count
-  const getTotalPartsCount = (partsCount) => {
-    return Object.values(partsCount || {}).reduce((sum, count) => sum + count, 0);
-  };
-
-  // Calculate total parts weight
-  const getTotalPartsWeight = (partsWeight) => {
-    return Object.values(partsWeight || {}).reduce((sum, weight) => sum + weight, 0);
-  };
-
-  const handleProcessChicken = async (data) => {
     try {
-      console.log('Starting chicken processing with data:', data);
-
       // Add the dressed chicken record first
       const savedDressedChicken = await addDressedChicken(data);
-      console.log('Dressed chicken saved successfully:', savedDressedChicken);
 
       // Update live chicken count
       const sourceBatch = liveChickens.find(batch => batch.id === data.batch_id);
       if (sourceBatch) {
         const newCount = Math.max(0, sourceBatch.current_count - data.processing_quantity);
-        console.log(`Updating source batch ${sourceBatch.batch_id} from ${sourceBatch.current_count} to ${newCount} birds`);
 
         // Update the source batch
         await updateLiveChicken(data.batch_id, {
@@ -834,8 +203,6 @@ const DressedChickenStock = () => {
 
         // If there are remaining birds and user wants to create a new batch
         if (data.remaining_birds > 0 && data.create_new_batch_for_remaining && data.remaining_batch_id) {
-          console.log(`Creating new batch ${data.remaining_batch_id} with ${data.remaining_birds} remaining birds`);
-
           // Create a new batch for remaining birds
           const newBatch = {
             id: Date.now().toString() + '_remaining',
@@ -886,30 +253,166 @@ const DressedChickenStock = () => {
         });
       }
 
-      console.log('Chicken processing completed successfully');
+      // Reset form
+      setSelectedBatch('');
+      setProcessingQuantity('');
+      setCreateNewBatchForRemaining(false);
+      setRemainingBatchId('');
+      setNeckCount('');
+      setNeckWeight('');
+      setFeetCount('');
+      setFeetWeight('');
+      setGizzardCount('');
+      setGizzardWeight('');
+      setDogFoodCount('');
+      setDogFoodWeight('');
+
       // Close modal after all operations complete
       setShowProcessingModal(false);
     } catch (error) {
       console.error('Error processing chicken:', error);
-      alert(`Error processing chicken: ${error.message}\n\nPlease check:\n1. Database connection\n2. Table permissions\n3. Required database tables exist\n\nCheck the browser console for more details.`);
+      alert(`Error processing chicken: ${error.message}
+
+Please check:
+1. Database connection
+2. Table permissions
+3. Required database tables exist
+
+Check the browser console for more details.`);
       setShowProcessingModal(false);
     }
   };
 
-  const handleUpdateChicken = async (data) => {
+  const handleProcessChicken = async (data) => {
     try {
-      console.log('handleUpdateChicken called with data:', data);
-      console.log('Updating chicken with ID:', data.id);
-      console.log('Current selectedChicken state:', selectedChicken);
+      // Add the dressed chicken record first
+      const savedDressedChicken = await addDressedChicken(data);
 
+      // Update live chicken count
+      const sourceBatch = liveChickens.find(batch => batch.id === data.batch_id);
+      if (sourceBatch) {
+        const newCount = Math.max(0, sourceBatch.current_count - data.processing_quantity);
+
+        // Update the source batch
+        await updateLiveChicken(data.batch_id, {
+          ...sourceBatch,
+          current_count: newCount,
+          updated_at: new Date().toISOString()
+        });
+
+        // If there are remaining birds and user wants to create a new batch
+        if (data.remaining_birds > 0 && data.create_new_batch_for_remaining && data.remaining_batch_id) {
+          // Create a new batch for remaining birds
+          const newBatch = {
+            id: Date.now().toString() + '_remaining',
+            batch_id: data.remaining_batch_id,
+            breed: sourceBatch.breed,
+            initial_count: data.remaining_birds,
+            current_count: data.remaining_birds,
+            hatch_date: sourceBatch.hatch_date,
+            expected_weight: sourceBatch.expected_weight,
+            current_weight: sourceBatch.current_weight,
+            feed_type: sourceBatch.feed_type,
+            status: 'healthy',
+            mortality: 0,
+            notes: `Split from batch ${sourceBatch.batch_id} - Remaining birds after processing ${data.processing_quantity} birds`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+
+          await addLiveChicken(newBatch);
+
+          // Create batch relationship for the split
+          await addBatchRelationship({
+            id: Date.now().toString() + '_split',
+            source_batch_id: data.batch_id,
+            source_batch_type: 'live_chickens',
+            target_batch_id: newBatch.id,
+            target_batch_type: 'live_chickens',
+            relationship_type: 'split_from',
+            quantity: data.remaining_birds,
+            notes: `Split ${data.remaining_birds} birds from original batch`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        }
+
+        // Create batch relationship for processing
+        await addBatchRelationship({
+          id: Date.now().toString() + '_processed',
+          source_batch_id: data.batch_id,
+          source_batch_type: 'live_chickens',
+          target_batch_id: data.id,
+          target_batch_type: 'dressed_chickens',
+          relationship_type: 'partial_processed_from',
+          quantity: data.processing_quantity,
+          notes: `Processed ${data.processing_quantity} birds from batch ${sourceBatch.batch_id}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      }
+      // Close modal after all operations complete
+      setShowProcessingModal(false);
+    } catch (error) {
+      console.error('Error processing chicken:', error);
+      alert(`Error processing chicken: ${error.message}
+
+Please check:
+1. Database connection
+2. Table permissions
+3. Required database tables exist
+
+Check the browser console for more details.`);
+      setShowProcessingModal(false);
+    }
+  };
+
+  const handleUpdateChickenForm = async (e) => {
+    e.preventDefault();
+
+    if (!editingChicken) return;
+
+    const partsCount = {
+      neck: parseInt(editingChicken.parts_count?.neck) || 0,
+      feet: parseInt(editingChicken.parts_count?.feet) || 0,
+      gizzard: parseInt(editingChicken.parts_count?.gizzard) || 0,
+      dog_food: parseInt(editingChicken.parts_count?.dog_food) || 0
+    };
+
+    const partsWeight = {
+      neck: parseFloat(editingChicken.parts_weight?.neck) || 0,
+      feet: parseFloat(editingChicken.parts_weight?.feet) || 0,
+      gizzard: parseFloat(editingChicken.parts_weight?.gizzard) || 0,
+      dog_food: parseFloat(editingChicken.parts_weight?.dog_food) || 0
+    };
+
+    // Calculate total count and average weight
+    const totalCount = Object.values(partsCount).reduce((a, b) => a + b, 0);
+    const totalWeight = Object.values(partsWeight).reduce((a, b) => a + b, 0);
+    const averageWeight = totalCount > 0 ? (totalWeight / totalCount) : 0;
+
+    const data = {
+      id: editingChicken.id,
+      batch_id: editingChicken.batch_id,
+      processing_date: editingChicken.processing_date || editingChicken.processingDate,
+      initial_count: editingChicken.initial_count || editingChicken.initialCount,
+      current_count: totalCount,
+      average_weight: averageWeight,
+      size_category: editingChicken.size_category,
+      status: editingChicken.status,
+      storage_location: editingChicken.storage_location,
+      expiry_date: editingChicken.expiry_date,
+      parts_count: partsCount,
+      parts_weight: partsWeight
+    };
+
+    try {
       // Don't close modal immediately - wait for successful update
       const result = await updateDressedChicken(data.id, data);
-      console.log('Chicken updated successfully:', result);
 
       // Only close modal after successful update
       setTimeout(() => {
-        console.log('Closing modal after successful update');
-        setSelectedChicken(null);
+        setEditingChicken(null);
       }, 100); // Small delay to ensure state is properly updated
 
     } catch (error) {
@@ -918,6 +421,24 @@ const DressedChickenStock = () => {
       // Don't close modal on error so user can retry
     }
   };
+
+  const handleUpdateChicken = async (data) => {
+    try {
+      // Don't close modal immediately - wait for successful update
+      const result = await updateDressedChicken(data.id, data);
+
+      // Only close modal after successful update
+      setTimeout(() => {
+        setEditingChicken(null);
+      }, 100); // Small delay to ensure state is properly updated
+
+    } catch (error) {
+      console.error('Error updating chicken:', error);
+      alert(`Error updating chicken: ${error.message}`);
+      // Don't close modal on error so user can retry
+    }
+  };
+
 
   // Inventory View Component
   const InventoryView = ({ dressedChickens, onEdit, onDelete }) => {
@@ -969,35 +490,11 @@ const DressedChickenStock = () => {
                     </span>
                   </td>
                   <td>
-                    <div className="action-buttons">
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          console.log('Edit button clicked, chicken data:', chicken);
-                          console.log('Chicken ID:', chicken.id);
-                          console.log('Chicken has required fields:', {
-                            batch_id: !!chicken.batch_id,
-                            size_category: !!chicken.size_category,
-                            status: !!chicken.status,
-                            parts_count: !!chicken.parts_count,
-                            parts_weight: !!chicken.parts_weight
-                          });
-                          onEdit(chicken);
-                        }}
-                        className="btn btn-secondary"
-                        type="button"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => onDelete(chicken.id)}
-                        className="btn btn-danger"
-                        type="button"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <ActionButtons
+                      row={chicken}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                    />
                   </td>
                 </tr>
               ))}
@@ -1010,16 +507,16 @@ const DressedChickenStock = () => {
 
   // Processing History View Component
   const ProcessingHistoryView = ({ batchRelationships, liveChickens, dressedChickens }) => {
-    const getLiveChickenByBatchId = (batchId) => {
-      return liveChickens.find(lc => lc.batch_id === batchId) || {};
+    const getLiveChickenById = (id) => {
+      return liveChickens.find(lc => lc.id === id) || {};
     };
 
-    const getDressedChickenByBatchId = (batchId) => {
-      return dressedChickens.find(dc => dc.batch_id === batchId) || {};
+    const getDressedChickenById = (id) => {
+      return dressedChickens.find(dc => dc.id === id) || {};
     };
 
     // Filter for processing relationships only
-    const processingRelationships = batchRelationships.filter(br => br.relationship_type === 'processed_from');
+    const processingRelationships = batchRelationships.filter(br => br.relationship_type === 'partial_processed_from');
 
     return (
       <div className="table-container">
@@ -1037,16 +534,16 @@ const DressedChickenStock = () => {
             </thead>
             <tbody>
               {processingRelationships.map((relationship) => {
-                const source = getLiveChickenByBatchId(relationship.source_batch_id);
-                const target = getDressedChickenByBatchId(relationship.target_batch_id);
-                const yieldRate = source.current_count && target.current_count ? 
+                const source = getLiveChickenById(relationship.source_batch_id);
+                const target = getDressedChickenById(relationship.target_batch_id);
+                const yieldRate = source.current_count && target.current_count ?
                   ((target.current_count / source.current_count) * 100).toFixed(1) : '0';
-                
+
                 return (
                   <tr key={relationship.id}>
-                    <td className="font-medium">{relationship.source_batch_id}</td>
+                    <td className="font-medium">{source.batch_id || 'N/A'}</td>
                     <td>{source.current_count || 0}</td>
-                    <td className="font-medium">{relationship.target_batch_id}</td>
+                    <td className="font-medium">{target.batch_id || 'N/A'}</td>
                     <td>{target.current_count || 0}</td>
                     <td>
                       {target.processing_date ? new Date(target.processing_date).toLocaleDateString() : 'N/A'}
@@ -1306,9 +803,9 @@ const DressedChickenStock = () => {
 
       {/* Inventory Tab */}
       {activeTab === 'inventory' && (
-        <InventoryView 
+        <InventoryView
           dressedChickens={dressedChickens}
-          onEdit={setSelectedChicken}
+          onEdit={handleEditChicken}
           onDelete={deleteDressedChicken}
         />
       )}
@@ -1328,20 +825,545 @@ const DressedChickenStock = () => {
       )}
 
       {/* Processing Modal */}
-      <ProcessingModal
-        show={showProcessingModal}
+      <Modal
+        isOpen={showProcessingModal}
         onClose={() => setShowProcessingModal(false)}
-        onSubmit={handleProcessChicken}
-        liveChickens={liveChickens}
-      />
+      >
+        <div className="modal-header">
+          <h2>Record Chicken Processing</h2>
+          <button
+            onClick={() => setShowProcessingModal(false)}
+            className="modal-close"
+            type="button"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          handleProcessChickenForm(e);
+        }}>
+          <div className="form-group">
+            <label>Live Chicken Batch</label>
+            <select
+              value={selectedBatch}
+              onChange={(e) => setSelectedBatch(e.target.value)}
+              className="form-control"
+            >
+              <option value="">Select Live Chicken Batch</option>
+              {liveChickens
+                .filter(batch => batch.status !== 'completed' && batch.current_count > 0) // Filter out completed batches and empty batches
+                .map((batch) => (
+                <option key={batch.id} value={batch.id}>
+                  {batch.batch_id} ({batch.breed}) - {batch.current_count} birds available
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedBatch && (
+            <div className="form-group">
+              <label>Processing Quantity</label>
+              <input
+                type="number"
+                placeholder="Number of birds to process"
+                value={processingQuantity}
+                onChange={(e) => setProcessingQuantity(e.target.value)}
+                className="form-control"
+                min="1"
+                max={liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0}
+                required
+              />
+              <small className="form-help">
+                Available: {liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0} birds
+              </small>
+            </div>
+          )}
+
+          {selectedBatch && parseInt(processingQuantity) > 0 && (
+            <div className="processing-summary">
+              <h4>Processing Summary</h4>
+              <div className="summary-grid">
+                <div className="summary-item">
+                  <span className="summary-label">Available Birds:</span>
+                  <span className="summary-value">{liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0}</span>
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">Processing:</span>
+                  <span className="summary-value">{processingQuantity}</span>
+                </div>
+                <div className="summary-item">
+                  <span className="summary-label">Remaining:</span>
+                  <span className="summary-value">{Math.max(0, (liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0) - parseInt(processingQuantity || 0))}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedBatch && parseInt(processingQuantity) > 0 && (
+            <div className="batch-management-section">
+              <h4>Remaining Birds Management</h4>
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={createNewBatchForRemaining}
+                    onChange={(e) => setCreateNewBatchForRemaining(e.target.checked)}
+                  />
+                  Create new batch for remaining birds
+                </label>
+              </div>
+
+              {createNewBatchForRemaining && (
+                <div className="form-group">
+                  <label>Remaining Batch ID</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., BCH-2024-001-R"
+                    value={remainingBatchId}
+                    onChange={(e) => setRemainingBatchId(e.target.value)}
+                    className="form-control"
+                    required
+                  />
+                  <small className="form-help">
+                    Remaining birds: {Math.max(0, (liveChickens.find(batch => batch.id === selectedBatch)?.current_count || 0) - parseInt(processingQuantity || 0))}
+                  </small>
+                </div>
+              )}
+
+              {!createNewBatchForRemaining && parseInt(processingQuantity) > 0 && (
+                <div className="form-help">
+                  <strong>Note:</strong> Remaining birds will stay in the current batch with updated count.
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="form-group">
+            <label>Processing Date</label>
+            <input
+              type="date"
+              value={processingDate}
+              onChange={(e) => setProcessingDate(e.target.value)}
+              className="form-control"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Size Category</label>
+            <select
+              value={sizeCategory}
+              onChange={(e) => setSizeCategory(e.target.value)}
+              className="form-control"
+            >
+              <option value="small">Small</option>
+              <option value="medium">Medium</option>
+              <option value="large">Large</option>
+              <option value="extra-large">Extra Large</option>
+            </select>
+          </div>
+
+          <div className="form-section">
+            <h3>Part Details</h3>
+
+            {/* Neck */}
+            <div className="form-row">
+              <div className="form-group">
+                <label>Neck Count</label>
+                <input
+                  type="number"
+                  placeholder="Count"
+                  value={neckCount}
+                  onChange={(e) => setNeckCount(e.target.value)}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+              <div className="form-group">
+                <label>Neck Weight (kg)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Weight"
+                  value={neckWeight}
+                  onChange={(e) => setNeckWeight(e.target.value)}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            {/* Feet */}
+            <div className="form-row">
+              <div className="form-group">
+                <label>Feet Count</label>
+                <input
+                  type="number"
+                  placeholder="Count"
+                  value={feetCount}
+                  onChange={(e) => setFeetCount(e.target.value)}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+              <div className="form-group">
+                <label>Feet Weight (kg)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Weight"
+                  value={feetWeight}
+                  onChange={(e) => setFeetWeight(e.target.value)}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            {/* Gizzard */}
+            <div className="form-row">
+              <div className="form-group">
+                <label>Gizzard Count</label>
+                <input
+                  type="number"
+                  placeholder="Count"
+                  value={gizzardCount}
+                  onChange={(e) => setGizzardCount(e.target.value)}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+              <div className="form-group">
+                <label>Gizzard Weight (kg)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Weight"
+                  value={gizzardWeight}
+                  onChange={(e) => setGizzardWeight(e.target.value)}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            {/* Dog Food (Head & Liver) */}
+            <div className="form-row">
+              <div className="form-group">
+                <label>Dog Food Count</label>
+                <input
+                  type="number"
+                  placeholder="Count"
+                  value={dogFoodCount}
+                  onChange={(e) => setDogFoodCount(e.target.value)}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+              <div className="form-group">
+                <label>Dog Food Weight (kg)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Weight"
+                  value={dogFoodWeight}
+                  onChange={(e) => setDogFoodWeight(e.target.value)}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button
+              type="button"
+              onClick={() => setShowProcessingModal(false)}
+              className="btn btn-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+            >
+              Save Processing
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Edit Modal */}
-      <EditModal
-        show={!!selectedChicken}
-        chicken={selectedChicken}
-        onClose={() => setSelectedChicken(null)}
-        onSubmit={handleUpdateChicken}
-      />
+      {editingChicken && (
+        <>
+          <Modal
+            isOpen={true}
+            onClose={() => {
+              setEditingChicken(null);
+            }}
+          >
+        <div className="modal-header">
+          <h2>Edit Dressed Chicken</h2>
+          <button
+            onClick={() => {
+              setEditingChicken(null);
+            }}
+            className="modal-close"
+            type="button"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div className="form-group">
+          <label>Batch ID</label>
+          <input
+            type="text"
+            placeholder="Batch ID"
+            value={editingChicken?.batch_id || ''}
+            className="form-control"
+            disabled
+          />
+        </div>
+
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          handleUpdateChickenForm(e);
+        }}>
+          <div className="form-group">
+            <label>Size Category</label>
+            <select
+              value={editingChicken?.size_category || 'medium'}
+              onChange={(e) => setEditingChicken({...editingChicken, size_category: e.target.value})}
+              className="form-control"
+            >
+              <option value="small">Small</option>
+              <option value="medium">Medium</option>
+              <option value="large">Large</option>
+              <option value="extra-large">Extra Large</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>Status</label>
+            <select
+              value={editingChicken?.status || 'in-storage'}
+              onChange={(e) => setEditingChicken({...editingChicken, status: e.target.value})}
+              className="form-control"
+            >
+              <option value="in-storage">In Storage</option>
+              <option value="sold">Sold</option>
+              <option value="discarded">Discarded</option>
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>Storage Location</label>
+            <input
+              type="text"
+              placeholder="Storage Location"
+              value={editingChicken?.storage_location || ''}
+              onChange={(e) => setEditingChicken({...editingChicken, storage_location: e.target.value})}
+              className="form-control"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Expiry Date</label>
+            <input
+              type="date"
+              value={editingChicken?.expiry_date || ''}
+              onChange={(e) => setEditingChicken({...editingChicken, expiry_date: e.target.value})}
+              className="form-control"
+            />
+          </div>
+
+          <div className="form-section">
+            <h3>Part Details</h3>
+
+            {/* Neck */}
+            <div className="form-row">
+              <div className="form-group">
+                <label>Neck Count</label>
+                <input
+                  type="number"
+                  placeholder="Count"
+                  value={editingChicken?.parts_count?.neck || ''}
+                  onChange={(e) => setEditingChicken({
+                    ...editingChicken,
+                    parts_count: {
+                      ...editingChicken.parts_count,
+                      neck: parseInt(e.target.value) || 0
+                    }
+                  })}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+              <div className="form-group">
+                <label>Neck Weight (kg)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Weight"
+                  value={editingChicken?.parts_weight?.neck || ''}
+                  onChange={(e) => setEditingChicken({
+                    ...editingChicken,
+                    parts_weight: {
+                      ...editingChicken.parts_weight,
+                      neck: parseFloat(e.target.value) || 0
+                    }
+                  })}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            {/* Feet */}
+            <div className="form-row">
+              <div className="form-group">
+                <label>Feet Count</label>
+                <input
+                  type="number"
+                  placeholder="Count"
+                  value={editingChicken?.parts_count?.feet || ''}
+                  onChange={(e) => setEditingChicken({
+                    ...editingChicken,
+                    parts_count: {
+                      ...editingChicken.parts_count,
+                      feet: parseInt(e.target.value) || 0
+                    }
+                  })}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+              <div className="form-group">
+                <label>Feet Weight (kg)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Weight"
+                  value={editingChicken?.parts_weight?.feet || ''}
+                  onChange={(e) => setEditingChicken({
+                    ...editingChicken,
+                    parts_weight: {
+                      ...editingChicken.parts_weight,
+                      feet: parseFloat(e.target.value) || 0
+                    }
+                  })}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            {/* Gizzard */}
+            <div className="form-row">
+              <div className="form-group">
+                <label>Gizzard Count</label>
+                <input
+                  type="number"
+                  placeholder="Count"
+                  value={editingChicken?.parts_count?.gizzard || ''}
+                  onChange={(e) => setEditingChicken({
+                    ...editingChicken,
+                    parts_count: {
+                      ...editingChicken.parts_count,
+                      gizzard: parseInt(e.target.value) || 0
+                    }
+                  })}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+              <div className="form-group">
+                <label>Gizzard Weight (kg)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Weight"
+                  value={editingChicken?.parts_weight?.gizzard || ''}
+                  onChange={(e) => setEditingChicken({
+                    ...editingChicken,
+                    parts_weight: {
+                      ...editingChicken.parts_weight,
+                      gizzard: parseFloat(e.target.value) || 0
+                    }
+                  })}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+            </div>
+
+            {/* Dog Food (Head & Liver) */}
+            <div className="form-row">
+              <div className="form-group">
+                <label>Dog Food Count</label>
+                <input
+                  type="number"
+                  placeholder="Count"
+                  value={editingChicken?.parts_count?.dog_food || ''}
+                  onChange={(e) => setEditingChicken({
+                    ...editingChicken,
+                    parts_count: {
+                      ...editingChicken.parts_count,
+                      dog_food: parseInt(e.target.value) || 0
+                    }
+                  })}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+              <div className="form-group">
+                <label>Dog Food Weight (kg)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Weight"
+                  value={editingChicken?.parts_weight?.dog_food || ''}
+                  onChange={(e) => setEditingChicken({
+                    ...editingChicken,
+                    parts_weight: {
+                      ...editingChicken.parts_weight,
+                      dog_food: parseFloat(e.target.value) || 0
+                    }
+                  })}
+                  className="form-control"
+                  min="0"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button
+              type="button"
+              onClick={() => {
+                setEditingChicken(null);
+              }}
+              className="btn btn-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
+        </Modal>
+        </>
+      )}
     </div>
   );
 };

@@ -53,7 +53,6 @@ export const SiteSettingsProvider = ({ children }) => {
             table: 'site_settings'
           },
           () => {
-            console.log('Site settings changed, reloading...')
             loadSettings()
           }
         )
@@ -89,12 +88,10 @@ export const SiteSettingsProvider = ({ children }) => {
       }
 
       if (data?.settings_data) {
-        console.log('Loaded settings from database:', data.settings_data)
         // Prioritize database data over defaults for saved values
         setSettings({ ...data.settings_data, ...defaultSettings })
       } else {
         // No settings found, initialize with defaults
-        console.log('No settings found in database, using defaults')
         await initializeSettingsTable()
       }
     } catch (error) {
@@ -106,6 +103,22 @@ export const SiteSettingsProvider = ({ children }) => {
 
   const initializeSettingsTable = async () => {
     try {
+      // First check if any settings already exist
+      const { data: existingSettings, error: selectError } = await supabase
+        .from('site_settings')
+        .select('id')
+        .limit(1)
+
+      // If there's an error other than table not found, log it
+      if (selectError && selectError.code !== '42P01') {
+        console.warn('Settings table query warning:', selectError)
+      }
+
+      // If settings exist, don't overwrite them
+      if (existingSettings && existingSettings.length > 0) {
+        return
+      }
+
       // Use service role key for admin operations if available
       const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
       
@@ -117,10 +130,9 @@ export const SiteSettingsProvider = ({ children }) => {
         }
       }
       
-      // Insert default settings
+      // Insert default settings only if no settings exist
       await saveSettingsToSupabase(defaultSettings)
       setSettings(defaultSettings)
-      console.log('Initialized site settings table with defaults')
     } catch (error) {
       console.error('Error initializing settings table:', error)
       // Fallback to local defaults
@@ -130,8 +142,6 @@ export const SiteSettingsProvider = ({ children }) => {
   
   const saveSettingsToSupabase = async (newSettings) => {
     try {
-      console.log('Saving settings to database:', newSettings)
-      
       // Perform upsert operation
       const { error } = await supabase
         .from('site_settings')
@@ -148,8 +158,6 @@ export const SiteSettingsProvider = ({ children }) => {
         console.error('Error saving settings to database:', error)
         throw new Error(`Database save failed: ${error.message}`)
       }
-  
-      console.log('Settings saved successfully to database')
       
       // Trigger real-time update for other clients using main client
       const channel = supabase.channel('site-settings-update')

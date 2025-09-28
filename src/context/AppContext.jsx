@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { supabase, supabaseUrl } from '../utils/supabaseClient'
 import { isMigrationNeeded, migrateFromLocalStorage } from '../utils/migrateData'
+import { formatNumber } from '../utils/formatters'
 import { useAuth } from './AuthContext'
 
 const AppContext = createContext()
@@ -339,8 +340,6 @@ export function AppProvider({ children }) {
             throw dressedChickensError
           }
 
-          console.log('Loaded dressed chickens from Supabase:', dressedChickensData?.length || 0, 'records')
-
           // Prioritize database data over localStorage
           if (dressedChickensData && dressedChickensData.length > 0) {
             setDressedChickens(dressedChickensData)
@@ -350,7 +349,6 @@ export function AppProvider({ children }) {
             if (localDressedChickens && localDressedChickens !== 'undefined') {
               try {
                 const parsedDressedChickens = JSON.parse(localDressedChickens)
-                console.log('Loaded dressed chickens from localStorage:', parsedDressedChickens.length, 'records')
                 setDressedChickens(parsedDressedChickens)
               } catch (e) {
                 console.warn('Invalid dressedChickens data in localStorage:', e)
@@ -1915,8 +1913,6 @@ export function AppProvider({ children }) {
         updated_at: new Date().toISOString()
       }
 
-      console.log('Attempting to save dressed chicken to Supabase:', dressedChicken)
-
       // Save to Supabase first
       const { data, error } = await supabase.from('dressed_chickens').insert(dressedChicken).select()
       if (error) {
@@ -1931,8 +1927,6 @@ export function AppProvider({ children }) {
         // Instead of just warning, let's throw the error so the user knows
         throw new Error(`Database error: ${error.message}. Please check if the database tables are properly set up.`)
       }
-
-      console.log('Successfully saved to Supabase:', data)
 
       // Update local state using helper function that also saves to localStorage
       setDressedChickens([dressedChicken, ...dressedChickens])
@@ -1949,8 +1943,6 @@ export function AppProvider({ children }) {
 
   const updateDressedChicken = async (id, updates) => {
     try {
-      console.log('updateDressedChicken called with:', { id, updates });
-
       const oldDressedChicken = dressedChickens.find(item => item.id === id)
       if (!oldDressedChicken) {
         console.error('Dressed chicken not found with ID:', id);
@@ -1958,11 +1950,7 @@ export function AppProvider({ children }) {
         throw new Error('Dressed chicken not found')
       }
 
-      console.log('Found old chicken data:', oldDressedChicken);
-
       const updatedDressedChicken = { ...oldDressedChicken, ...updates, updated_at: new Date().toISOString() }
-
-      console.log('Attempting to update in Supabase:', updatedDressedChicken);
 
       // Update in Supabase
       const { data, error } = await supabase
@@ -1984,19 +1972,13 @@ export function AppProvider({ children }) {
         throw new Error(`Database update failed: ${error.message}. Please check your database connection and table permissions.`)
       }
 
-      console.log('Supabase update successful:', data);
-
       // Update local state using helper function that also saves to localStorage
       setDressedChickens(dressedChickens.map(item =>
         item.id === id ? updatedDressedChicken : item
       ))
 
-      console.log('Local state updated successfully');
-
       // Log audit action
       await logAuditAction('UPDATE', 'dressed_chickens', id, oldDressedChicken, updatedDressedChicken)
-
-      console.log('Audit action logged successfully');
 
       return updatedDressedChicken
     } catch (err) {

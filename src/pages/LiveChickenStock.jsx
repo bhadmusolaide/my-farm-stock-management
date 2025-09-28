@@ -119,9 +119,6 @@ const LiveChickenStock = () => {
     try {
       // Here you would typically save to the vaccination_records table
       // For now, we'll just close the modal and show success
-      console.log('Vaccination scheduled for batch:', selectedBatch.batchId);
-      console.log('Vaccination data:', vaccinationData);
-      
       setShowVaccinationModal(false);
       setSelectedBatch(null);
       setVaccinationData({

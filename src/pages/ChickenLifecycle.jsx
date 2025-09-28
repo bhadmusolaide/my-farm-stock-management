@@ -64,15 +64,15 @@ const ChickenLifecycle = () => {
             storage_location: 'Freezer Unit A',
             expiry_date: new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().split('T')[0], // 3 months expiry
             parts_count: {
-              neck: Math.floor(batch.current_count * 0.1), // 10% for necks
+              neck: batch.current_count, // 1 neck per chicken
               feet: batch.current_count * 2, // 2 feet per chicken
               gizzard: batch.current_count, // 1 gizzard per chicken
               dog_food: batch.current_count // 1 dog food portion per chicken
             },
             parts_weight: {
-              neck: parseFloat((batch.current_count * 0.1 * 0.2).toFixed(2)), // 0.2kg per neck
-              feet: parseFloat((batch.current_count * 2 * 0.1).toFixed(2)), // 0.1kg per foot
-              gizzard: parseFloat((batch.current_count * 0.05).toFixed(2)), // 0.05kg per gizzard
+              neck: parseFloat((batch.current_count * 0.15).toFixed(2)), // 0.15kg per neck (150g)
+              feet: parseFloat((batch.current_count * 2 * 0.1).toFixed(2)), // 0.1kg per foot (100g)
+              gizzard: parseFloat((batch.current_count * 0.05).toFixed(2)), // 0.05kg per gizzard (50g)
               dog_food: parseFloat((batch.current_count * 0.3).toFixed(2)) // 0.3kg per dog food portion
             }
           }

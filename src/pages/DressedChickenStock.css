@@ -135,6 +135,7 @@
 
 .dressed-chicken-table tr:hover {
   background-color: var(--table-row-hover);
+  transition: background-color 0.2s ease;
 }
 
 .dressed-chicken-table tr:last-child td {
@@ -220,6 +221,7 @@
 .btn-secondary:hover {
   background-color: var(--button-secondary-hover);
   transform: translateY(-1px);
+  transition: all 0.2s ease;
 }
 
 .btn-danger {

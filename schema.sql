@@ -432,8 +432,9 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Insert default site settings
-INSERT INTO public.site_settings (settings_data) VALUES ('{
+-- Insert default site settings only if the table is empty
+INSERT INTO public.site_settings (settings_data)
+SELECT '{
   "siteTitle": "Farm Stock Management",
   "logoType": "text",
   "logoUrl": "",
@@ -453,7 +454,8 @@ INSERT INTO public.site_settings (settings_data) VALUES ('{
     {"id": "transactions", "label": "Transactions", "path": "/transactions", "icon": "💰", "enabled": true, "order": 4},
     {"id": "reports", "label": "Reports", "path": "/reports", "icon": "📈", "enabled": true, "order": 5}
   ]
-}') ON CONFLICT DO NOTHING;
+}'::jsonb
+WHERE NOT EXISTS (SELECT 1 FROM public.site_settings);
 
 -- Comments for documentation
 COMMENT ON TABLE public.chickens IS 'Customer chicken orders and sales';
