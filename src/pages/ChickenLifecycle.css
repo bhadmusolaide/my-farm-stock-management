@@ -147,6 +147,22 @@
   cursor: not-allowed;
 }
 
+.btn-complete {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  background: var(--success-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  margin-left: 10px;
+}
+
+.btn-complete:hover {
+  background: var(--success-dark);
+}
+
 .batch-actions {
   display: flex;
   gap: 10px;
@@ -410,4 +426,50 @@
     flex-direction: column;
     gap: 10px;
   }
+}
+
+/* Completed batches section */
+.completed-batches-section {
+ margin-top: 40px;
+ padding-top: 30px;
+ border-top: 2px solid var(--border-color);
+}
+
+.completed-batches-section h3 {
+ color: var(--text-primary);
+ margin-bottom: 20px;
+ text-align: center;
+}
+
+.completed-batches-grid {
+ display: grid;
+ grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+ gap: 20px;
+}
+
+.completed-batch {
+ background: var(--bg-secondary);
+ border: 2px solid var(--success-color);
+ opacity: 0.8;
+}
+
+.completed-batch .batch-header h3 {
+ color: var(--success-color);
+}
+
+.status-badge.completed {
+ background: var(--success-color);
+ color: white;
+}
+
+.completed-batch-actions {
+ margin-top: 15px;
+ padding-top: 10px;
+ border-top: 1px solid var(--border-color-light);
+ text-align: center;
+}
+
+.completed-batch-actions small {
+ color: var(--text-secondary);
+ font-style: italic;
 }

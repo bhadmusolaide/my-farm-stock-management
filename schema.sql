@@ -101,6 +101,7 @@ ALTER TABLE public.live_chickens ADD COLUMN IF NOT EXISTS stage_brooding_date DA
 ALTER TABLE public.live_chickens ADD COLUMN IF NOT EXISTS stage_growing_date DATE;
 ALTER TABLE public.live_chickens ADD COLUMN IF NOT EXISTS stage_processing_date DATE;
 ALTER TABLE public.live_chickens ADD COLUMN IF NOT EXISTS stage_freezer_date DATE;
+ALTER TABLE public.live_chickens ADD COLUMN IF NOT EXISTS completed_date DATE;
 
 -- Create feed_inventory table
 CREATE TABLE IF NOT EXISTS public.feed_inventory (
@@ -238,6 +239,13 @@ CREATE TABLE IF NOT EXISTS public.dressed_chickens (
     storage_location TEXT,
     expiry_date DATE,
     notes TEXT,
+    parts_count JSONB DEFAULT '{}', -- Tracks count of specific parts: {"neck": 85, "feet": 85, "gizzard": 85, "dog_food": 85}
+    parts_weight JSONB DEFAULT '{}', -- Tracks weight of specific parts: {"neck": 2.1, "feet": 1.8, "gizzard": 3.2, "dog_food": 4.5}
+    -- Partial processing fields
+    processing_quantity INTEGER, -- Number of birds processed from the batch
+    remaining_birds INTEGER, -- Number of birds left in the original batch
+    create_new_batch_for_remaining BOOLEAN DEFAULT FALSE, -- Whether to create a new batch for remaining birds
+    remaining_batch_id TEXT, -- ID of the new batch created for remaining birds
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -280,6 +288,8 @@ CREATE INDEX IF NOT EXISTS idx_dressed_chickens_processing_date ON public.dresse
 CREATE INDEX IF NOT EXISTS idx_dressed_chickens_status ON public.dressed_chickens(status);
 CREATE INDEX IF NOT EXISTS idx_dressed_chickens_size_category ON public.dressed_chickens(size_category);
 CREATE INDEX IF NOT EXISTS idx_dressed_chickens_expiry_date ON public.dressed_chickens(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_dressed_chickens_processing_quantity ON public.dressed_chickens(processing_quantity);
+CREATE INDEX IF NOT EXISTS idx_dressed_chickens_remaining_batch_id ON public.dressed_chickens(remaining_batch_id);
 CREATE INDEX IF NOT EXISTS idx_batch_relationships_source ON public.batch_relationships(source_batch_id, source_batch_type);
 CREATE INDEX IF NOT EXISTS idx_batch_relationships_target ON public.batch_relationships(target_batch_id, target_batch_type);
 CREATE INDEX IF NOT EXISTS idx_batch_relationships_type ON public.batch_relationships(relationship_type);
@@ -295,6 +305,12 @@ DROP TRIGGER IF EXISTS update_dressed_chickens_updated_at ON public.dressed_chic
 CREATE TRIGGER update_dressed_chickens_updated_at
     BEFORE UPDATE ON public.dressed_chickens
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Add comments for the new columns
+COMMENT ON COLUMN public.dressed_chickens.processing_quantity IS 'Number of birds processed from the original batch';
+COMMENT ON COLUMN public.dressed_chickens.remaining_birds IS 'Number of birds left in the original batch after processing';
+COMMENT ON COLUMN public.dressed_chickens.create_new_batch_for_remaining IS 'Whether a new batch was created for remaining birds';
+COMMENT ON COLUMN public.dressed_chickens.remaining_batch_id IS 'ID of the new batch created for remaining birds';
 
 -- Create trigger for updated_at column for batch relationships
 DROP TRIGGER IF EXISTS update_batch_relationships_updated_at ON public.batch_relationships;
@@ -416,8 +432,9 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Insert default site settings
-INSERT INTO public.site_settings (settings_data) VALUES ('{
+-- Insert default site settings only if the table is empty
+INSERT INTO public.site_settings (settings_data)
+SELECT '{
   "siteTitle": "Farm Stock Management",
   "logoType": "text",
   "logoUrl": "",
@@ -432,15 +449,13 @@ INSERT INTO public.site_settings (settings_data) VALUES ('{
       {"id": "live-chickens", "label": "Live Chicken Stock", "path": "/live-chickens", "enabled": true},
       {"id": "lifecycle", "label": "Lifecycle Tracking", "path": "/lifecycle", "enabled": true},
       {"id": "feed", "label": "Feed Management", "path": "/feed", "enabled": true},
-      {"id": "enhanced-feed", "label": "Enhanced Feed Management", "path": "/enhanced-feed", "enabled": true},
-      {"id": "processing", "label": "Processing Management", "path": "/processing", "enabled": true},
-      {"id": "batch-relationships", "label": "Batch Relationships", "path": "/batch-relationships", "enabled": true},
-      {"id": "unified-inventory", "label": "Unified Inventory", "path": "/unified-inventory", "enabled": true}
+      {"id": "dressed-chicken", "label": "Dressed Chicken Stock", "path": "/dressed-chicken", "enabled": true}
     ]},
     {"id": "transactions", "label": "Transactions", "path": "/transactions", "icon": "💰", "enabled": true, "order": 4},
     {"id": "reports", "label": "Reports", "path": "/reports", "icon": "📈", "enabled": true, "order": 5}
   ]
-}') ON CONFLICT DO NOTHING;
+}'::jsonb
+WHERE NOT EXISTS (SELECT 1 FROM public.site_settings);
 
 -- Comments for documentation
 COMMENT ON TABLE public.chickens IS 'Customer chicken orders and sales';
@@ -454,5 +469,5 @@ COMMENT ON TABLE public.feed_inventory IS 'Feed inventory management';
 COMMENT ON TABLE public.feed_consumption IS 'Feed consumption tracking by chicken batches';
 COMMENT ON TABLE public.site_settings IS 'Global site settings and configuration';
 COMMENT ON TABLE public.chicken_inventory_transactions IS 'Audit trail for all changes to live chicken inventory (sales, mortality, transfers, etc.)';
-COMMENT ON TABLE public.dressed_chickens IS 'Processed/dressed chicken inventory tracking';
+COMMENT ON TABLE public.dressed_chickens IS 'Processed/dressed chicken inventory tracking with support for partial batch processing';
 COMMENT ON TABLE public.batch_relationships IS 'Relationships between different batches (feed to chickens, processing, etc.)';

@@ -7,7 +7,7 @@ import useTableSort from '../hooks/useTableSort';
 import './LiveChickenStock.css';
 
 const LiveChickenStock = () => {
-  const { liveChickens, addLiveChicken, deleteLiveChicken, updateLiveChicken, chickenInventoryTransactions } = useAppContext();
+  const { liveChickens, addLiveChicken, deleteLiveChicken, updateLiveChicken, chickenInventoryTransactions, getLowFeedAlerts } = useAppContext();
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showVaccinationModal, setShowVaccinationModal] = useState(false);
@@ -26,6 +26,11 @@ const LiveChickenStock = () => {
     ageRange: '',
     searchTerm: ''
   });
+
+  // Get low feed alerts
+  const feedAlerts = useMemo(() => {
+    return getLowFeedAlerts();
+  }, [liveChickens]);
 
   const [formData, setFormData] = useState({
     batch_id: '',
@@ -114,9 +119,6 @@ const LiveChickenStock = () => {
     try {
       // Here you would typically save to the vaccination_records table
       // For now, we'll just close the modal and show success
-      console.log('Vaccination scheduled for batch:', selectedBatch.batchId);
-      console.log('Vaccination data:', vaccinationData);
-      
       setShowVaccinationModal(false);
       setSelectedBatch(null);
       setVaccinationData({
@@ -659,6 +661,18 @@ const LiveChickenStock = () => {
 
       {activeTab === 'batches' && (
         <>
+          {/* Feed Alerts */}
+          {feedAlerts.length > 0 && (
+            <div className="alerts-section">
+              <h3>⚠️ Feed Stock Alerts</h3>
+              {feedAlerts.map(alert => (
+                <div key={alert.id} className={`alert-card ${alert.severity}`}>
+                  <p>{alert.message}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="summary-cards">
             <div className="summary-card">
               <h3>Total Batches</h3>
@@ -701,7 +715,9 @@ const LiveChickenStock = () => {
                   className="batch-select"
                 >
                   <option value="">Select Batch for Transaction History</option>
-                  {liveChickens.map(batch => (
+                  {liveChickens
+                    .filter(batch => batch.status !== 'completed') // Filter out completed batches
+                    .map(batch => (
                     <option key={batch.id} value={batch.id}>
                       {batch.batch_id} - {batch.breed} ({batch.current_count} birds)
                     </option>
@@ -983,8 +999,8 @@ const LiveChickenStock = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="9" className="no-data">
-                      No chicken batches found. Add your first batch to get started.
+                    <td colSpan="10" className="no-data">
+                      No chicken batches found
                     </td>
                   </tr>
                 )}

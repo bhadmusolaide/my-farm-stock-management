@@ -222,7 +222,7 @@ const AuditTrail = () => {
 
       {/* Filters */}
       <div className="filters-container">
-        <div className="filters-grid">
+        <div className="filters-row">
           <div className="filter-group">
             <label htmlFor="action">Action</label>
             <select

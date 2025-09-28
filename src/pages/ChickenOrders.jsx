@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { useNotification } from '../context/NotificationContext'
 import { formatNumber, formatDate } from '../utils/formatters'
+import { supabase } from '../utils/supabaseClient'
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner'
 import ColumnFilter from '../components/UI/ColumnFilter'
 import SortableTableHeader from '../components/UI/SortableTableHeader'
@@ -42,6 +43,9 @@ const ChickenOrders = () => {
   const [showModal, setShowModal] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [currentChicken, setCurrentChicken] = useState(null)
+  const [showHistory, setShowHistory] = useState(false)
+  const [editHistory, setEditHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
   
   // Form state
   const [formData, setFormData] = useState({
@@ -199,6 +203,43 @@ const ChickenOrders = () => {
   const closeModal = () => {
     setShowModal(false)
     setCurrentChicken(null)
+    setShowHistory(false)
+    setEditHistory([])
+  }
+
+  // Fetch edit history for a specific chicken order
+  const fetchEditHistory = async (chickenId) => {
+    try {
+      setHistoryLoading(true)
+
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select(`
+          *,
+          users!inner(full_name, email)
+        `)
+        .eq('table_name', 'chickens')
+        .eq('record_id', chickenId)
+        .eq('action', 'UPDATE')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      setEditHistory(data || [])
+    } catch (err) {
+      console.error('Error fetching edit history:', err)
+      showError('Failed to load edit history')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  // Toggle history visibility
+  const toggleHistory = async () => {
+    if (!showHistory && currentChicken) {
+      await fetchEditHistory(currentChicken.id)
+    }
+    setShowHistory(!showHistory)
   }
   
   // Handle form submission
@@ -667,7 +708,27 @@ const ChickenOrders = () => {
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h2>{editMode ? 'Edit Order' : 'Add New Order'}</h2>
+            <div className="modal-header">
+              <h2>{editMode ? 'Edit Order' : 'Add New Order'}</h2>
+              {editMode && (
+                <button
+                  className="btn-history-toggle"
+                  onClick={toggleHistory}
+                  disabled={historyLoading}
+                >
+                  {historyLoading ? (
+                    <>
+                      <LoadingSpinner size="small" color="currentColor" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      📋 {showHistory ? 'Hide History' : 'Show History'}
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
             
             <form onSubmit={handleSubmit}>
               <div className="form-container">
@@ -854,7 +915,85 @@ const ChickenOrders = () => {
                   </div>
                 </div>
               </div>
-              
+
+              {/* Edit History Section */}
+              {editMode && showHistory && (
+                <div className="edit-history-section">
+                  <h3>Edit History</h3>
+                  {historyLoading ? (
+                    <div className="history-loading">
+                      <LoadingSpinner size="small" text="Loading history..." />
+                    </div>
+                  ) : editHistory.length === 0 ? (
+                    <div className="no-history">
+                      <p>No edit history found for this order.</p>
+                    </div>
+                  ) : (
+                    <div className="history-list">
+                      {editHistory.map((log, index) => (
+                        <div key={log.id} className="history-item">
+                          <div className="history-header">
+                            <div className="history-meta">
+                              <span className="history-timestamp">
+                                {formatDate(log.created_at)}
+                              </span>
+                              <span className="history-user">
+                                by {log.users?.full_name || 'Unknown User'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="history-changes">
+                            {log.old_values && log.new_values && (
+                              <div className="changes-list">
+                                {(() => {
+                                  const oldValues = JSON.parse(log.old_values);
+                                  const newValues = JSON.parse(log.new_values);
+                                  const relevantFields = ['price', 'count', 'size', 'balance', 'status', 'amount_paid'];
+
+                                  const changes = [];
+
+                                  Object.keys({ ...oldValues, ...newValues }).forEach(key => {
+                                    if (relevantFields.includes(key)) {
+                                      const oldValue = oldValues[key];
+                                      const newValue = newValues[key];
+
+                                      if (oldValue !== newValue) {
+                                        changes.push({
+                                          field: key,
+                                          oldValue: oldValue,
+                                          newValue: newValue
+                                        });
+                                      }
+                                    }
+                                  });
+
+                                  return changes.length > 0 ? changes.map((change, index) => (
+                                    <div key={index} className="change-item">
+                                      <div className="change-field">
+                                        <span className="field-label">{change.field}:</span>
+                                      </div>
+                                      <div className="change-values">
+                                        <span className="old-value">{String(change.oldValue)}</span>
+                                        <span className="change-arrow">→</span>
+                                        <span className="new-value">{String(change.newValue)}</span>
+                                      </div>
+                                    </div>
+                                  )) : (
+                                    <div className="no-relevant-changes">
+                                      <p>No relevant changes in this edit.</p>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="form-actions">
                 <button type="button" className="btn-secondary" onClick={closeModal} disabled={isLoading}>
                   Cancel

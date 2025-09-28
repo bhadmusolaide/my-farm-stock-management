@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { formatNumber, formatDate } from '../utils/formatters'
+import { FEED_BRANDS, kgToBags, bagsToKg, LOW_STOCK_THRESHOLD } from '../utils/constants'
 import ColumnFilter from '../components/UI/ColumnFilter'
 import SortableTableHeader from '../components/UI/SortableTableHeader'
 import SortControls from '../components/UI/SortControls'
@@ -10,20 +11,36 @@ import Pagination from '../components/UI/Pagination'
 import usePagination from '../hooks/usePagination'
 import './FeedManagement.css'
 
-// Feed brand constants
-const FEED_BRANDS = [
-  'New Hope',
-  'BreedWell', 
-  'Ultima',
-  'Happy Chicken',
-  'Chikum',
-  'Others'
-]
-
 const FeedManagement = () => {
-  const { feedInventory, addFeedInventory, updateFeedInventory, deleteFeedInventory, feedConsumption, addFeedConsumption, deleteFeedConsumption, liveChickens } = useAppContext()
+  const { feedInventory, addFeedInventory, updateFeedInventory, deleteFeedInventory, feedConsumption, addFeedConsumption, deleteFeedConsumption, liveChickens, feedBatchAssignments, deleteFeedBatchAssignment } = useAppContext()
   
-
+  // Add resetFeedData function here
+  const resetFeedData = async () => {
+    if (window.confirm('⚠️ CAUTION: This will permanently delete ALL feed data from the database including inventory, consumption records, and batch assignments. This action cannot be undone. Do you want to proceed?')) {
+      try {
+        // Delete all feed consumption records one by one
+        for (const consumption of feedConsumption) {
+          await deleteFeedConsumption(consumption.id);
+        }
+        
+        // Delete all feed batch assignments one by one
+        for (const assignment of feedBatchAssignments) {
+          await deleteFeedBatchAssignment(assignment.id);
+        }
+        
+        // Delete all feed inventory records one by one
+        for (const feed of feedInventory) {
+          await deleteFeedInventory(feed.id);
+        }
+        
+        // Refresh the page to ensure UI is updated
+        window.location.reload();
+      } catch (error) {
+        console.error('Error resetting feed data:', error)
+        alert('❌ Error resetting feed data: ' + error.message)
+      }
+    }
+  }
   
   // State for active tab
   const [activeTab, setActiveTab] = useState('inventory')
@@ -306,7 +323,7 @@ const FeedManagement = () => {
   // Handle update feed
   const handleUpdateFeed = async (e) => {
     e.preventDefault()
-    
+
     try {
       const finalBrand = feedFormData.brand === 'Others' ? feedFormData.custom_brand : feedFormData.brand
       await updateFeedInventory(editingFeed.id, {
@@ -317,9 +334,10 @@ const FeedManagement = () => {
         cost_per_bag: parseFloat(feedFormData.cost_per_bag),
         supplier: feedFormData.supplier,
         expiry_date: feedFormData.expiry_date,
-        notes: feedFormData.notes
+        notes: feedFormData.notes,
+        assigned_batches: feedFormData.assigned_batches
       })
-      
+
       setEditingFeed(null)
       closeFeedModal()
     } catch (error) {
@@ -358,7 +376,7 @@ const FeedManagement = () => {
   
   // Calculate low stock items
   const getLowStockItems = () => {
-    return filteredFeed.filter(item => item.quantity_kg < 50) // Less than 50kg is considered low stock
+    return filteredFeed.filter(item => item.quantity_kg < LOW_STOCK_THRESHOLD)
   }
   
   return (
@@ -366,6 +384,20 @@ const FeedManagement = () => {
       <div className="page-header">
         <h1>Feed Management</h1>
         <div className="header-actions">
+          {/* Add Database Reset button here */}
+          <button 
+            className="btn-danger" 
+            onClick={resetFeedData}
+            style={{ 
+              backgroundColor: '#dc3545', 
+              color: 'white',
+              fontWeight: 'bold',
+              border: '2px solid #bd2130',
+              marginRight: '10px'
+            }}
+          >
+            🚨 Database Reset
+          </button>
           {activeTab === 'inventory' && (
             <button className="btn-primary" onClick={openFeedModal}>
               Add Feed Stock
@@ -408,7 +440,26 @@ const FeedManagement = () => {
           <div className="summary-cards">
             <div className="summary-card">
               <h3>Total Feed Stock</h3>
-              <p className="summary-value">{formatNumber(filteredFeed.reduce((sum, item) => sum + item.quantity_kg, 0))} kg</p>
+              <p className="summary-value">
+                {(() => {
+                  const totalKg = filteredFeed.reduce((sum, item) => sum + item.quantity_kg, 0)
+                  const totalBags = kgToBags(totalKg)
+                  return `${formatNumber(totalBags, 1)} bags / ${formatNumber(totalKg)} kg`
+                })()}
+              </p>
+            </div>
+            <div className="summary-card">
+              <h3>Assigned Feed Stock</h3>
+              <p className="summary-value">
+                {(() => {
+                  const totalAssigned = filteredFeed.reduce((sum, item) => {
+                    const assignedQuantity = item.assigned_batches?.reduce((batchSum, batch) => batchSum + (batch.assigned_quantity_kg || 0), 0) || 0
+                    return sum + assignedQuantity
+                  }, 0)
+                  const totalAssignedBags = kgToBags(totalAssigned)
+                  return `${formatNumber(totalAssigned)} kg / ${formatNumber(totalAssignedBags, 1)} bags`
+                })()}
+              </p>
             </div>
             <div className="summary-card">
               <h3>Total Value</h3>
@@ -421,6 +472,21 @@ const FeedManagement = () => {
             <div className="summary-card alert">
               <h3>Low Stock Items</h3>
               <p className="summary-value">{getLowStockItems().length}</p>
+            </div>
+            <div className="summary-card">
+              <h3>Remaining Feed</h3>
+              <p className="summary-value">
+                {(() => {
+                  const totalStock = filteredFeed.reduce((sum, item) => sum + item.quantity_kg, 0)
+                  const totalAssigned = filteredFeed.reduce((sum, item) => {
+                    const assignedQuantity = item.assigned_batches?.reduce((batchSum, batch) => batchSum + (batch.assigned_quantity_kg || 0), 0) || 0
+                    return sum + assignedQuantity
+                  }, 0)
+                  const remaining = totalStock - totalAssigned
+                  const remainingBags = kgToBags(remaining)
+                  return `${formatNumber(remaining)} kg / ${formatNumber(remainingBags, 1)} bags`
+                })()}
+              </p>
             </div>
           </div>
           
@@ -552,7 +618,7 @@ const FeedManagement = () => {
               <tbody>
                 {feedPagination.currentData.length > 0 ? (
                   feedPagination.currentData.map(item => {
-                    const isLowStock = item.quantity_kg < 50
+                    const isLowStock = item.quantity_kg < LOW_STOCK_THRESHOLD
                 const isExpiringSoon = new Date(item.expiry_date) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
                     
                     return (
@@ -785,17 +851,12 @@ const FeedManagement = () => {
       {/* Analytics Tab */}
       {activeTab === 'analytics' && (
         <>
-          {/* Analytics Summary Cards */}
+          {/* Overview Cards */}
           <div className="summary-cards">
             <div className="summary-card">
-              <h3>Feed Conversion Ratio</h3>
+              <h3>Total Feed Cost</h3>
               <p className="summary-value">
-                {(() => {
-                  const totalConsumed = feedConsumption.reduce((sum, item) => sum + item.quantity_consumed, 0)
-                   const totalChickens = liveChickens.reduce((sum, batch) => sum + batch.currentCount, 0)
-                   const ratio = totalChickens > 0 ? (totalConsumed / totalChickens).toFixed(2) : '0.00'
-                  return `${ratio} kg/bird`
-                })()} 
+                ₦{formatNumber(feedInventory.reduce((sum, item) => sum + ((item.number_of_bags || 1) * item.cost_per_bag), 0), 2)}
               </p>
             </div>
             <div className="summary-card">
@@ -806,18 +867,7 @@ const FeedManagement = () => {
                   const totalConsumption = feedConsumption.reduce((sum, item) => sum + item.quantity_consumed, 0)
                   const avgDaily = daysWithData > 0 ? (totalConsumption / daysWithData).toFixed(1) : '0.0'
                   return `${avgDaily} kg/day`
-                })()} 
-              </p>
-            </div>
-            <div className="summary-card">
-              <h3>Feed Cost per Bird</h3>
-              <p className="summary-value">
-                {(() => {
-                  const totalFeedValue = feedInventory.reduce((sum, item) => sum + ((item.number_of_bags || 1) * item.cost_per_bag), 0)
-                  const totalChickens = liveChickens.reduce((sum, batch) => sum + batch.currentCount, 0)
-                  const costPerBird = totalChickens > 0 ? (totalFeedValue / totalChickens).toFixed(2) : '0.00'
-                  return `₦${formatNumber(costPerBird)}`
-                })()} 
+                })()}
               </p>
             </div>
             <div className="summary-card">
@@ -828,8 +878,71 @@ const FeedManagement = () => {
                   const totalFeedConsumed = feedConsumption.reduce((sum, item) => sum + item.quantity_consumed, 0)
                   const efficiency = totalFeedConsumed > 0 ? ((totalWeight / totalFeedConsumed) * 100).toFixed(1) : '0.0'
                   return `${efficiency}%`
-                })()} 
+                })()}
               </p>
+            </div>
+            <div className="summary-card">
+              <h3>Active Batches</h3>
+              <p className="summary-value">
+                {liveChickens.filter(batch => batch.status === 'healthy' || batch.status === 'sick').length}
+              </p>
+            </div>
+          </div>
+
+          {/* Per-Batch Summary */}
+          <div className="analytics-section">
+            <h3>Per-Batch Summary</h3>
+            <div className="table-container">
+              <table className="feed-table">
+                <thead>
+                  <tr>
+                    <th>Batch ID</th>
+                    <th>Total Assigned (kg)</th>
+                    <th>Total Consumed (kg)</th>
+                    <th>Remaining (kg)</th>
+                    <th>FCR (kg/bird)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const batchStats = {}
+                    liveChickens.filter(batch => batch.status === 'healthy' || batch.status === 'sick').forEach(batch => {
+                      // Calculate assigned feed for this batch
+                      const assigned = feedInventory.reduce((sum, item) => {
+                        const batchAssignment = item.assigned_batches?.find(ab => ab.batch_id === batch.id)
+                        return sum + (batchAssignment?.assigned_quantity_kg || 0)
+                      }, 0)
+
+                      // Calculate consumed feed for this batch
+                      const consumed = feedConsumption
+                        .filter(consumption => consumption.chicken_batch_id === batch.id)
+                        .reduce((sum, consumption) => sum + consumption.quantity_consumed, 0)
+
+                      const remaining = assigned - consumed
+                      const fcr = batch.currentCount > 0 ? (consumed / batch.currentCount).toFixed(2) : '0.00'
+
+                      batchStats[batch.id] = {
+                        batch_id: batch.batch_id,
+                        assigned,
+                        consumed,
+                        remaining,
+                        fcr,
+                        currentCount: batch.currentCount
+                      }
+                    })
+
+                    return Object.values(batchStats).map(stat => (
+                      <tr key={stat.batch_id}>
+                        <td>{stat.batch_id}</td>
+                        <td>{formatNumber(stat.assigned)}</td>
+                        <td>{formatNumber(stat.consumed)}</td>
+                        <td>{formatNumber(stat.remaining)}</td>
+                        <td>{stat.fcr}</td>
+                      </tr>
+                    ))
+                  })()}
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -881,46 +994,77 @@ const FeedManagement = () => {
             </div>
           </div>
 
-          {/* Recent Consumption Trends */}
+          {/* Projected Feed Needs */}
           <div className="analytics-section">
-            <h3>Recent Consumption Trends (Last 7 Days)</h3>
+            <h3>Projected Feed Needs</h3>
             <div className="table-container">
               <table className="feed-table">
                 <thead>
                   <tr>
-                    <th>Date</th>
-                    <th>Total Consumption (kg)</th>
-                    <th>Number of Batches Fed</th>
-                    <th>Average per Batch (kg)</th>
+                    <th>Batch</th>
+                    <th>Current Count</th>
+                    <th>Age (weeks)</th>
+                    <th>Remaining Feed (kg)</th>
+                    <th>Projected Needs (kg)</th>
+                    <th>Additional Needed (kg)</th>
+                    <th>Recommended Feed Type</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(() => {
-                    const last7Days = []
-                    for (let i = 0; i <= 6; i++) {
-                      const date = new Date()
-                      date.setDate(date.getDate() - i)
-                      last7Days.push(date.toISOString().split('T')[0])
-                    }
-                    
-                    return last7Days.map(date => {
-                      const dayConsumption = feedConsumption.filter(item => item.consumption_date === date)
-                      const totalConsumption = dayConsumption.reduce((sum, item) => sum + item.quantity_consumed, 0)
-                       const batchesFed = new Set(dayConsumption.map(item => item.chicken_batch_id)).size
-                      const avgPerBatch = batchesFed > 0 ? (totalConsumption / batchesFed).toFixed(2) : '0.00'
-                      
-                      return (
-                        <tr key={date}>
-                          <td>{formatDate(date)}</td>
-                          <td>{formatNumber(totalConsumption)}</td>
-                          <td>{batchesFed}</td>
-                          <td>{avgPerBatch}</td>
-                        </tr>
-                      )
-                    })
-                  })()} 
+                  <tr>
+                    <td colSpan="7" className="no-data">
+                      Projected feed needs calculation would appear here
+                    </td>
+                  </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* Daily Consumption Trend Chart */}
+          <div className="analytics-section">
+            <h3>Daily Feed Consumption Trend (Last 7 Days)</h3>
+            <div className="chart-container">
+              <div className="chart-header">
+                <span>Daily Consumption (kg)</span>
+              </div>
+              <div className="bar-chart">
+                {(() => {
+                  const last7Days = []
+                  for (let i = 6; i >= 0; i--) {
+                    const date = new Date()
+                    date.setDate(date.getDate() - i)
+                    last7Days.push(date.toISOString().split('T')[0])
+                  }
+
+                  const maxConsumption = Math.max(...last7Days.map(date => {
+                    const dayConsumption = feedConsumption.filter(item => item.consumption_date === date)
+                    return dayConsumption.reduce((sum, item) => sum + item.quantity_consumed, 0)
+                  }))
+
+                  return last7Days.map((date, index) => {
+                    const dayConsumption = feedConsumption.filter(item => item.consumption_date === date)
+                    const totalConsumption = dayConsumption.reduce((sum, item) => sum + item.quantity_consumed, 0)
+                    const batchesFed = new Set(dayConsumption.map(item => item.chicken_batch_id)).size
+                    const height = maxConsumption > 0 ? (totalConsumption / maxConsumption) * 200 : 0
+
+                    return (
+                      <div key={date} className="chart-column">
+                        <div className="bar-container">
+                          <div
+                            className="bar"
+                            style={{ height: `${height}px` }}
+                            title={`${formatDate(date)}: ${formatNumber(totalConsumption)} kg (${batchesFed} batches)`}
+                          ></div>
+                        </div>
+                        <div className="chart-label">
+                          {new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
             </div>
           </div>
         </>
@@ -1130,7 +1274,7 @@ const FeedManagement = () => {
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary">
-                  Add Feed Stock
+                  {editingFeed ? 'Update Feed Stock' : 'Add Feed Stock'}
                 </button>
               </div>
             </form>

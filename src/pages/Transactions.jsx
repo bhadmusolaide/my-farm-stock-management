@@ -9,9 +9,33 @@ import useTableSort from '../hooks/useTableSort'
 import './Transactions.css'
 
 const Transactions = () => {
-  const { transactions, addFunds, addExpense, withdrawFunds } = useAppContext()
+  const { transactions, addFunds, addExpense, withdrawFunds, deleteTransaction, chickens } = useAppContext()
   
-
+  // Add resetTransactions function here
+  const resetTransactions = async () => {
+    if (window.confirm('⚠️ CAUTION: This will permanently delete ALL financial transaction records EXCEPT chicken order payments. Chicken order data will be preserved. This action cannot be undone. Do you want to proceed?')) {
+      try {
+        // Filter out transactions that are related to chicken orders (payments)
+        // These would typically be transactions with descriptions containing "Payment from" or "Additional payment from"
+        const nonChickenTransactions = transactions.filter(transaction => 
+          !transaction.description.includes('Payment from') && 
+          !transaction.description.includes('Additional payment from') &&
+          !transaction.description.includes('Refund for deleted chicken order')
+        );
+        
+        // Delete all non-chicken-related transactions one by one
+        for (const transaction of nonChickenTransactions) {
+          await deleteTransaction(transaction.id);
+        }
+        
+        // Refresh the page to ensure UI is updated
+        window.location.reload();
+      } catch (error) {
+        console.error('Error resetting transactions:', error)
+        alert('❌ Error resetting transactions: ' + error.message)
+      }
+    }
+  }
   
   // State for filters
   const [filters, setFilters] = useState({
@@ -19,7 +43,6 @@ const Transactions = () => {
     startDate: '',
     endDate: ''
   })
-  
   
   // State for modal
   const [activeModal, setActiveModal] = useState(null)
@@ -366,6 +389,24 @@ const Transactions = () => {
           </div>
         </div>
       )}
+      
+      {/* Danger Zone Section - Moved to bottom */}
+      <div className="danger-zone">
+        <h3>🚨 Danger Zone</h3>
+        <p>Reset all financial transactions except chicken order payments. This action cannot be undone.</p>
+        <button 
+          className="btn-danger" 
+          onClick={resetTransactions}
+          style={{ 
+            backgroundColor: '#dc3545', 
+            color: 'white',
+            fontWeight: 'bold',
+            border: '2px solid #bd2130'
+          }}
+        >
+          Reset All Transactions
+        </button>
+      </div>
     </div>
   )
 }

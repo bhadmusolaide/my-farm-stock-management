@@ -1551,3 +1551,38 @@
   background-color: rgba(0, 151, 167, 0.2);
   color: #4dd0e1;
 }
+
+.alerts-section {
+  margin-bottom: 20px;
+}
+
+.alerts-section h3 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.alert-card {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  padding: 12px 15px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.alert-card.critical {
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+  color: #721c24;
+}
+
+.alert-card.warning {
+  background-color: #fff3cd;
+  border-color: #ffeaa7;
+  color: #856404;
+}
+
+.alert-card p {
+  margin: 0;
+  font-size: 14px;
+}

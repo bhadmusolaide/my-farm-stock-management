@@ -20,6 +20,8 @@ A modern, full-featured web application for managing chicken stock inventory, or
 - Monitor cost per kg and total inventory value
 - Add new stock entries with detailed descriptions
 - Real-time stock level updates
+- Live synchronization with feed management
+- Automated feed consumption tracking
 
 ### 💰 **Financial Management**
 - Record funds, expenses, and withdrawals
@@ -31,6 +33,14 @@ A modern, full-featured web application for managing chicken stock inventory, or
 - Generate comprehensive business reports
 - Export data for external analysis
 - Track performance metrics over time
+
+### 🍽️ **Feed Management**
+- Track feed inventory levels and types
+- Assign feed to specific chicken batches
+- Monitor feed consumption in real-time
+- Automatic feed inventory deduction
+- Low stock alerts and notifications
+- Projected feed needs calculation
 
 ### 👥 **User Management** (Admin Only)
 - Create and manage user accounts
@@ -50,6 +60,8 @@ A modern, full-featured web application for managing chicken stock inventory, or
 - Loading states and error handling
 - Toast notifications for user feedback
 - Professional and intuitive interface
+- Real-time alerts for low feed stock
+- Projected feed needs analytics
 
 ## 🚀 Tech Stack
 
@@ -149,6 +161,8 @@ src/
 │   ├── Reports.jsx
 │   ├── UserManagement.jsx
 │   ├── AuditTrail.jsx
+│   ├── LiveChickenStock.jsx
+│   ├── FeedManagement.jsx
 │   └── Login.jsx
 ├── utils/               # Utility functions
 │   └── validation.js    # Form validation

@@ -5,7 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import './ChickenLifecycle.css'
 
 const ChickenLifecycle = () => {
-  const { liveChickens, updateLiveChicken, chickenInventoryTransactions, weightHistory, feedConsumption } = useAppContext()
+  const { liveChickens, updateLiveChicken, chickenInventoryTransactions, weightHistory, feedConsumption, addDressedChicken, addBatchRelationship } = useAppContext()
   const [selectedBatch, setSelectedBatch] = useState(null)
   const [lifecycleData, setLifecycleData] = useState({})
   const [showModal, setShowModal] = useState(false)
@@ -50,14 +50,68 @@ const ChickenLifecycle = () => {
     if (currentStageIndex < lifecycleStages.length - 1) {
       const nextStage = lifecycleStages[currentStageIndex + 1]
       try {
-        await updateLiveChicken(batch.id, { 
-          ...batch, 
+        // If moving to processing stage, automatically create a dressed chicken record
+        if (nextStage.id === 'processing') {
+          // Create a dressed chicken record
+          const dressedChickenData = {
+            batch_id: batch.batch_id,
+            processing_date: new Date().toISOString().split('T')[0],
+            initial_count: batch.current_count,
+            current_count: batch.current_count,
+            average_weight: batch.current_weight || 1.5, // Use current weight or default to 1.5kg
+            size_category: 'medium', // Default size category
+            status: 'in-storage',
+            storage_location: 'Freezer Unit A',
+            expiry_date: new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().split('T')[0], // 3 months expiry
+            parts_count: {
+              neck: batch.current_count, // 1 neck per chicken
+              feet: batch.current_count * 2, // 2 feet per chicken
+              gizzard: batch.current_count, // 1 gizzard per chicken
+              dog_food: batch.current_count // 1 dog food portion per chicken
+            },
+            parts_weight: {
+              neck: parseFloat((batch.current_count * 0.15).toFixed(2)), // 0.15kg per neck (150g)
+              feet: parseFloat((batch.current_count * 2 * 0.1).toFixed(2)), // 0.1kg per foot (100g)
+              gizzard: parseFloat((batch.current_count * 0.05).toFixed(2)), // 0.05kg per gizzard (50g)
+              dog_food: parseFloat((batch.current_count * 0.3).toFixed(2)) // 0.3kg per dog food portion
+            }
+          }
+
+          // Add the dressed chicken record
+          const dressedChicken = await addDressedChicken(dressedChickenData)
+
+          // Create a batch relationship
+          const relationshipData = {
+            source_batch_id: batch.batch_id,
+            target_batch_id: batch.batch_id, // Use the same batch ID for the processed record
+            relationship_type: 'processed_from',
+            quantity: batch.current_count
+          }
+
+          await addBatchRelationship(relationshipData)
+        }
+
+        await updateLiveChicken(batch.id, {
+          ...batch,
           lifecycle_stage: nextStage.id,
           [`stage_${nextStage.id}_date`]: new Date().toISOString().split('T')[0]
         })
       } catch (error) {
         console.error('Error updating lifecycle stage:', error)
       }
+    }
+  }
+
+  // Mark batch as complete (for freezer storage batches)
+  const markBatchAsComplete = async (batch) => {
+    try {
+      await updateLiveChicken(batch.id, {
+        ...batch,
+        status: 'completed',
+        completed_date: new Date().toISOString().split('T')[0]
+      })
+    } catch (error) {
+      console.error('Error marking batch as complete:', error)
     }
   }
 
@@ -157,7 +211,9 @@ const ChickenLifecycle = () => {
         </div>
       ) : (
         <div className="batches-grid">
-          {liveChickens.map(batch => (
+          {liveChickens
+            .filter(batch => batch.status !== 'completed') // Filter out completed batches
+            .map(batch => (
             <div key={batch.id} className="batch-card">
               <div className="batch-header">
                 <h3>{batch.batch_id}</h3>
@@ -175,10 +231,10 @@ const ChickenLifecycle = () => {
                 {lifecycleStages.map((stage, index) => {
                   const isCompleted = isStageCompleted(batch, stage.id)
                   const isCurrent = isStageCurrent(batch, stage.id)
-                  
+
                   return (
-                    <div 
-                      key={stage.id} 
+                    <div
+                      key={stage.id}
                       className={`stage ${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}`}
                     >
                       <div className="stage-icon">
@@ -187,12 +243,21 @@ const ChickenLifecycle = () => {
                       </div>
                       <div className="stage-name">{stage.name}</div>
                       {isCurrent && (
-                        <button 
+                        <button
                           className="btn-next-stage"
                           onClick={() => moveToNextStage(batch)}
                           disabled={index === lifecycleStages.length - 1}
                         >
                           Next Stage
+                        </button>
+                      )}
+                      {isCurrent && stage.id === 'freezer' && (
+                        <button
+                          className="btn-complete"
+                          onClick={() => markBatchAsComplete(batch)}
+                          title="Mark this batch as complete and remove from active tracking"
+                        >
+                          Mark Complete
                         </button>
                       )}
                     </div>
@@ -244,6 +309,37 @@ const ChickenLifecycle = () => {
               </div>
             </div>
           ))}
+
+          {/* Show completed batches section - Always render this section */}
+          <div className="completed-batches-section">
+            <h3>Completed Batches</h3>
+            {liveChickens.filter(batch => batch.status === 'completed').length > 0 ? (
+              <div className="completed-batches-grid">
+                {liveChickens
+                  .filter(batch => batch.status === 'completed')
+                  .map(batch => (
+                  <div key={batch.id} className="batch-card completed-batch">
+                    <div className="batch-header">
+                      <h3>{batch.batch_id}</h3>
+                      <span className="status-badge completed">Completed</span>
+                    </div>
+
+                    <div className="batch-info">
+                      <p><strong>Breed:</strong> {batch.breed}</p>
+                      <p><strong>Final Count:</strong> {formatNumber(batch.current_count)}</p>
+                      <p><strong>Completed:</strong> {formatDate(batch.completed_date)}</p>
+                    </div>
+
+                    <div className="completed-batch-actions">
+                      <small>Batch completed and archived for record purposes</small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="no-completed-batches">No batches have been completed yet.</p>
+            )}
+          </div>
         </div>
       )}
 
@@ -348,35 +444,20 @@ const ChickenLifecycle = () => {
               {(() => {
                 // Ensure weightHistory is an array before filtering
                 const safeWeightHistory = Array.isArray(weightHistory) ? weightHistory : [];
-                
+
                 // Get weight history from database for this batch
                 const batchWeightHistory = safeWeightHistory
                   .filter(record => record.chicken_batch_id === selectedBatch?.id)
                   .sort((a, b) => new Date(a.recorded_date) - new Date(b.recorded_date));
-                
+
                 // Create combined history including current weight if it exists
                 let combinedHistory = [...batchWeightHistory];
-                
-                // Add current weight to history if it exists and is not already in history
-                if (selectedBatch?.current_weight && selectedBatch.current_weight > 0) {
-                  const currentDate = new Date().toISOString().split('T')[0];
-                  const currentWeightExists = batchWeightHistory.some(
-                    record => record.weight === selectedBatch.current_weight && record.recorded_date === currentDate
-                  );
-                  
-                  if (!currentWeightExists) {
-                    combinedHistory.push({
-                      id: 'current',
-                      chicken_batch_id: selectedBatch.id,
-                      weight: selectedBatch.current_weight,
-                      recorded_date: currentDate,
-                      notes: 'Current weight',
-                      created_at: new Date().toISOString()
-                    });
-                  }
-                }
-                
-                // Sort combined history by date
+
+                // Note: We don't add current weight to history here to avoid date confusion
+                // The current weight is already tracked in the live_chickens table
+                // and will be added to weight_history when a new weight is recorded
+
+                // Sort combined history by date (oldest first for proper chronological order)
                 combinedHistory.sort((a, b) => new Date(a.recorded_date) - new Date(b.recorded_date));
                 
                 // Prepare data for chart
@@ -445,14 +526,14 @@ const ChickenLifecycle = () => {
                           </thead>
                           <tbody>
                             {combinedHistory
-                              .slice() // Create a copy for reverse sorting
-                              .reverse() // Show newest first
+                              .slice()
+                              .reverse() // Show newest first - most recent weight at top
                               .map(record => {
                                 // Calculate age at the time of recording
                                 const recordingDate = new Date(record.recorded_date);
                                 const hatchDate = selectedBatch ? new Date(selectedBatch.hatch_date) : recordingDate;
                                 const ageAtRecording = Math.floor((recordingDate - hatchDate) / (1000 * 60 * 60 * 24));
-                                
+
                                 return (
                                   <tr key={record.id}>
                                     <td>{formatDate(record.recorded_date)}</td>

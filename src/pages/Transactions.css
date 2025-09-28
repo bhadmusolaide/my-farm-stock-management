@@ -352,6 +352,49 @@
   color: white;
 }
 
+/* Danger Zone styles */
+.danger-zone {
+  background-color: #fff5f5;
+  border: 2px solid #fed7d7;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 2.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.danger-zone h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: #c53030;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.danger-zone p {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #744210;
+}
+
+.danger-zone .btn-danger {
+  background-color: #dc3545;
+  color: white;
+  border: 2px solid #bd2130;
+  border-radius: 4px;
+  padding: 0.6rem 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.danger-zone .btn-danger:hover {
+  background-color: #c82333;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .page-header {
