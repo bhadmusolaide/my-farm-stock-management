@@ -43,12 +43,14 @@ export const SiteSettingsProvider = ({ children }) => {
     let subscription
     
     const setupSubscription = async () => {
+      // Limit real-time subscription to reduce Egress
+      // Only subscribe if needed and unsubscribe when not in use
       subscription = supabase
         .channel('site-settings-changes')
         .on(
           'postgres_changes',
           {
-            event: '*',
+            event: 'UPDATE', // Only listen for updates, not all events
             schema: 'public',
             table: 'site_settings'
           },

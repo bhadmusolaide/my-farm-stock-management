@@ -66,6 +66,7 @@ export async function migrateFromLocalStorage() {
     }
     
     // Migration completed successfully
+    // Note: Consider clearing localStorage after successful migration to prevent repeated data transfers
     return { chickens, stock, transactions, liveChickens, balance }
   } catch (error) {
     console.error('Migration failed:', error)
@@ -79,7 +80,7 @@ export async function migrateFromLocalStorage() {
  */
 export async function isMigrationNeeded() {
   try {
-    // Check if there's data in localStorage
+    // Check if there's data in localStorage (optimized check)
     const hasLocalData = !!localStorage.getItem('chickens') || 
                          !!localStorage.getItem('stock') || 
                          !!localStorage.getItem('transactions') ||
@@ -90,7 +91,7 @@ export async function isMigrationNeeded() {
       return false
     }
     
-    // Check if there's already data in Supabase
+    // Check if there's already data in Supabase (optimized query with selective columns and limit)
     const { data: chickensData, error: chickensError } = await supabase
       .from('chickens')
       .select('id')

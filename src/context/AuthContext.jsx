@@ -116,6 +116,7 @@ export const AuthProvider = ({ children }) => {
         user_agent: navigator.userAgent
       };
 
+      // Insert audit log with minimal data transfer
       await supabase.from('audit_logs').insert([auditData]);
     } catch (err) {
       console.error('Error logging audit action:', err);

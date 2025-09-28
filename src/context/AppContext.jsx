@@ -137,29 +137,32 @@ export function AppProvider({ children }) {
         setLoading(true)
         
         try {
-          // Load chickens
+          // Load chickens with limit and selective columns to reduce Egress
           const { data: chickensData, error: chickensError } = await supabase
             .from('chickens')
-            .select('*')
+            .select('id, date, customer, phone, location, count, size, price, amount_paid, balance, status, calculation_mode, batch_id, created_at, updated_at')
             .order('created_at', { ascending: false })
+            .limit(100)
         
         if (chickensError) throw chickensError
         setChickens(chickensData || [])
         
-        // Load stock
+        // Load stock with limit and selective columns to reduce Egress
         const { data: stockData, error: stockError } = await supabase
           .from('stock')
-          .select('*')
+          .select('id, date, description, count, size, cost_per_kg, calculation_mode, notes, created_at, updated_at')
           .order('date', { ascending: false })
+          .limit(100)
         
         if (stockError) throw stockError
         setStock(stockData || [])
         
-        // Load live chickens
+        // Load live chickens with limit and selective columns to reduce Egress
         const { data: liveChickensData, error: liveChickensError } = await supabase
           .from('live_chickens')
-          .select('*')
+          .select('id, batch_id, breed, initial_count, current_count, hatch_date, expected_weight, current_weight, feed_type, status, mortality, notes, created_at, updated_at, lifecycle_stage, stage_arrival_date, stage_brooding_date, stage_growing_date, stage_processing_date, stage_freezer_date, completed_date')
           .order('hatch_date', { ascending: false })
+          .limit(100)
         
         if (liveChickensError && !liveChickensError.message.includes('relation "live_chickens" does not exist')) {
           throw liveChickensError
@@ -182,11 +185,11 @@ export function AppProvider({ children }) {
           }
         }
         
-        // Load feed inventory with batch assignments
+        // Load feed inventory with batch assignments and selective columns to reduce Egress
         const { data: feedInventoryData, error: feedInventoryError } = await supabase
           .from('feed_inventory')
           .select(`
-            *,
+            id, batch_number, feed_type, brand, quantity_kg, cost_per_kg, cost_per_bag, number_of_bags, purchase_date, expiry_date, supplier, status, created_at, updated_at,
             feed_batch_assignments (
               id,
               chicken_batch_id,
@@ -195,6 +198,7 @@ export function AppProvider({ children }) {
             )
           `)
           .order('purchase_date', { ascending: false })
+          .limit(100)
 
         if (feedInventoryError && !feedInventoryError.message.includes('relation "feed_inventory" does not exist')) {
           throw feedInventoryError
@@ -214,11 +218,12 @@ export function AppProvider({ children }) {
           setFeedInventory(transformedFeedData)
         }
         
-        // Load feed consumption
+        // Load feed consumption with limit and selective columns to reduce Egress
         const { data: feedConsumptionData, error: feedConsumptionError } = await supabase
           .from('feed_consumption')
-          .select('*')
+          .select('id, feed_id, chicken_batch_id, quantity_consumed, consumption_date, notes, created_at, updated_at')
           .order('consumption_date', { ascending: false })
+          .limit(100)
         
         if (feedConsumptionError && !feedConsumptionError.message.includes('relation "feed_consumption" does not exist')) {
           throw feedConsumptionError
@@ -245,8 +250,9 @@ export function AppProvider({ children }) {
         try {
           const { data: feedBatchAssignmentsData, error: feedBatchAssignmentsError } = await supabase
             .from('feed_batch_assignments')
-            .select('*')
+            .select('id, feed_id, chicken_batch_id, assigned_quantity_kg, assigned_date, created_at, updated_at')
             .order('assigned_date', { ascending: false })
+            .limit(100)
           
           if (feedBatchAssignmentsError) {
             console.warn('Feed batch assignments table not found - this is expected for new installations:', feedBatchAssignmentsError)
@@ -263,8 +269,9 @@ export function AppProvider({ children }) {
         try {
           const { data: chickenTransactionsData, error: chickenTransactionsError } = await supabase
             .from('chicken_inventory_transactions')
-            .select('*')
+            .select('id, batch_id, transaction_type, quantity_changed, reason, reference_id, reference_type, transaction_date, created_at, updated_at')
             .order('created_at', { ascending: false })
+            .limit(100)
           
           if (chickenTransactionsError && !chickenTransactionsError.message.includes('relation "chicken_inventory_transactions" does not exist')) {
             throw chickenTransactionsError
@@ -295,8 +302,9 @@ export function AppProvider({ children }) {
         try {
           const { data: weightHistoryData, error: weightHistoryError } = await supabase
             .from('weight_history')
-            .select('*')
+            .select('id, chicken_batch_id, weight, recorded_date, notes, created_at, updated_at')
             .order('recorded_date', { ascending: false })
+            .limit(100)
           
           if (weightHistoryError && !weightHistoryError.message.includes('relation "weight_history" does not exist')) {
             throw weightHistoryError
@@ -327,8 +335,9 @@ export function AppProvider({ children }) {
         try {
           const { data: dressedChickensData, error: dressedChickensError } = await supabase
             .from('dressed_chickens')
-            .select('*')
+            .select('id, batch_id, processing_date, initial_count, current_count, average_weight, size_category, status, storage_location, expiry_date, notes, parts_count, parts_weight, processing_quantity, remaining_birds, create_new_batch_for_remaining, remaining_batch_id, created_at, updated_at')
             .order('processing_date', { ascending: false })
+            .limit(100)
 
           if (dressedChickensError) {
             console.error('Error loading dressed chickens from Supabase:', dressedChickensError)
@@ -365,8 +374,9 @@ export function AppProvider({ children }) {
         try {
           const { data: batchRelationshipsData, error: batchRelationshipsError } = await supabase
             .from('batch_relationships')
-            .select('*')
+            .select('id, source_batch_id, source_batch_type, target_batch_id, target_batch_type, relationship_type, quantity, notes, created_at, updated_at')
             .order('created_at', { ascending: false })
+            .limit(100)
           
           if (batchRelationshipsError && !batchRelationshipsError.message.includes('relation "batch_relationships" does not exist')) {
             throw batchRelationshipsError
@@ -393,16 +403,17 @@ export function AppProvider({ children }) {
           setBatchRelationships([])
         }
         
-        // Load transactions
+        // Load transactions with limit and selective columns to reduce Egress
         const { data: transactionsData, error: transactionsError } = await supabase
           .from('transactions')
-          .select('*')
+          .select('id, date, type, amount, description, created_at, updated_at')
           .order('date', { ascending: false })
+          .limit(100)
         
         if (transactionsError) throw transactionsError
         setTransactions(transactionsData || [])
         
-        // Load balance
+        // Load balance (single record, no limit needed)
         const { data: balanceData, error: balanceError } = await supabase
           .from('balance')
           .select('amount')
