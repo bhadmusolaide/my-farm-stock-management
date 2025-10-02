@@ -14,8 +14,31 @@ import usePagination from '../hooks/usePagination'
 import './ChickenOrders.css'
 
 const ChickenOrders = () => {
-  const { chickens, addChicken, updateChicken, deleteChicken, exportToCSV, liveChickens, updateLiveChicken, logChickenTransaction } = useAppContext()
+  const { chickens, addChicken, updateChicken, deleteChicken, exportToCSV, liveChickens, updateLiveChicken, dressedChickens, updateDressedChicken, logChickenTransaction } = useAppContext()
   const { showError, showSuccess, showWarning } = useNotification()
+  
+  // Helper to get actual whole chicken count from dressed chicken batch
+  const getWholeChickenCount = (dressedChicken) => {
+    if (!dressedChicken) return 0
+    
+    // If processing_quantity exists, use it
+    if (dressedChicken.processing_quantity && dressedChicken.processing_quantity > 0) {
+      return dressedChicken.processing_quantity
+    }
+    
+    // Check if current_count looks like old format (sum of parts)
+    const partsCount = dressedChicken.parts_count || {}
+    const totalPartsCount = Object.values(partsCount).reduce((sum, count) => sum + (count || 0), 0)
+    
+    // If current_count equals total parts count, find smallest part count
+    if (dressedChicken.current_count === totalPartsCount && totalPartsCount > 0) {
+      const partsCounts = Object.values(partsCount).filter(c => c > 0)
+      return partsCounts.length > 0 ? Math.min(...partsCounts) : dressedChicken.current_count
+    }
+    
+    // Otherwise use current_count as-is
+    return dressedChicken.current_count || 0
+  }
   
 
   
@@ -58,7 +81,9 @@ const ChickenOrders = () => {
     amountPaid: '',
     status: 'pending',
     calculationMode: 'count_size_cost', // 'count_size_cost', 'count_cost', 'size_cost'
-    batch_id: '' // New field for batch selection
+    inventoryType: 'live', // 'live', 'dressed', 'parts'
+    batch_id: '', // For live or dressed chicken batch
+    part_type: '' // For parts: 'neck', 'feet', 'gizzard', 'dog_food'
   })
 
   // Column configuration
@@ -174,7 +199,9 @@ const ChickenOrders = () => {
       amountPaid: '',
       status: 'pending',
       calculationMode: 'count_size_cost',
-      batch_id: ''
+      inventoryType: 'live',
+      batch_id: '',
+      part_type: ''
     })
     setEditMode(false)
     setShowModal(true)
@@ -193,7 +220,9 @@ const ChickenOrders = () => {
       amountPaid: chicken.amount_paid || 0, // Use amount_paid from database
       status: chicken.status,
       calculationMode: chicken.calculation_mode || 'count_size_cost',
-      batch_id: chicken.batch_id || ''
+      inventoryType: chicken.inventory_type || 'live',
+      batch_id: chicken.batch_id || '',
+      part_type: chicken.part_type || ''
     })
     setEditMode(true)
     setShowModal(true)
@@ -240,6 +269,94 @@ const ChickenOrders = () => {
       await fetchEditHistory(currentChicken.id)
     }
     setShowHistory(!showHistory)
+  }
+  
+  // Helper function to handle inventory deduction
+  const handleInventoryDeduction = async (inventoryType, batchId, quantity, partType = null, reason = '', referenceId = null) => {
+    try {
+      if (inventoryType === 'live') {
+        const selectedBatch = liveChickens.find(batch => batch.id == batchId)
+        if (selectedBatch) {
+          const updatedBatch = {
+            ...selectedBatch,
+            current_count: selectedBatch.current_count - quantity
+          }
+          await updateLiveChicken(selectedBatch.id, updatedBatch)
+          
+          // Log the sales transaction
+          try {
+            await logChickenTransaction(
+              selectedBatch.id,
+              'sale',
+              -quantity,
+              reason,
+              referenceId,
+              'chicken_order'
+            )
+          } catch (logError) {
+            console.warn('Failed to log chicken transaction:', logError)
+          }
+        }
+      } else if (inventoryType === 'dressed') {
+        const selectedBatch = dressedChickens.find(batch => batch.id == batchId)
+        if (selectedBatch) {
+          // Get actual whole chicken count and deduct from it
+          const currentWholeChickens = getWholeChickenCount(selectedBatch)
+          const newWholeChickens = Math.max(0, currentWholeChickens - quantity)
+          
+          const updatedBatch = {
+            ...selectedBatch,
+            current_count: newWholeChickens,
+            processing_quantity: newWholeChickens // Update processing_quantity for future reference
+          }
+          await updateDressedChicken(selectedBatch.id, updatedBatch)
+          
+          // Log the sales transaction
+          try {
+            await logChickenTransaction(
+              selectedBatch.id,
+              'sale',
+              -quantity,
+              reason,
+              referenceId,
+              'dressed_chicken_order'
+            )
+          } catch (logError) {
+            console.warn('Failed to log dressed chicken transaction:', logError)
+          }
+        }
+      } else if (inventoryType === 'parts' && partType) {
+        const selectedBatch = dressedChickens.find(batch => batch.id == batchId)
+        if (selectedBatch) {
+          const updatedPartsCount = {
+            ...selectedBatch.parts_count,
+            [partType]: (selectedBatch.parts_count?.[partType] || 0) - quantity
+          }
+          const updatedBatch = {
+            ...selectedBatch,
+            parts_count: updatedPartsCount
+          }
+          await updateDressedChicken(selectedBatch.id, updatedBatch)
+          
+          // Log the parts sale
+          try {
+            await logChickenTransaction(
+              selectedBatch.id,
+              'sale',
+              -quantity,
+              `${reason} - ${partType}`,
+              referenceId,
+              'chicken_parts_order'
+            )
+          } catch (logError) {
+            console.warn('Failed to log parts transaction:', logError)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error deducting from inventory:', error)
+      throw error
+    }
   }
   
   // Handle form submission
@@ -293,7 +410,20 @@ const ChickenOrders = () => {
     
     // Validate batch selection if a batch is selected
     if (formData.batch_id) {
-      const selectedBatch = liveChickens.find(batch => batch.id == formData.batch_id)
+      let selectedBatch = null
+      let availableCount = 0
+      
+      if (formData.inventoryType === 'live') {
+        selectedBatch = liveChickens.find(batch => batch.id == formData.batch_id)
+        availableCount = selectedBatch?.current_count || 0
+      } else if (formData.inventoryType === 'dressed') {
+        selectedBatch = dressedChickens.find(batch => batch.id == formData.batch_id)
+        availableCount = getWholeChickenCount(selectedBatch)
+      } else if (formData.inventoryType === 'parts' && formData.part_type) {
+        selectedBatch = dressedChickens.find(batch => batch.id == formData.batch_id)
+        availableCount = selectedBatch?.parts_count?.[formData.part_type] || 0
+      }
+      
       if (!selectedBatch) {
         showError('Selected batch not found')
         return
@@ -301,8 +431,9 @@ const ChickenOrders = () => {
       
       // Only validate count for modes that use chicken count
       if (formData.calculationMode !== 'size_cost') {
-        if (selectedBatch.current_count < count) {
-          showError(`Insufficient chickens in batch. Available: ${selectedBatch.current_count}, Required: ${count}`)
+        if (availableCount < count) {
+          const itemName = formData.inventoryType === 'parts' ? formData.part_type : 'chickens'
+          showError(`Insufficient ${itemName} in batch. Available: ${availableCount}, Required: ${count}`)
           return
         }
       }
@@ -333,35 +464,16 @@ const ChickenOrders = () => {
         price,
         amountPaid,
         status,
-        calculationMode: formData.calculationMode
+        calculationMode: formData.calculationMode,
+        inventoryType: formData.inventoryType,
+        batch_id: formData.batch_id || null,
+        part_type: formData.part_type || null
       }
       
       if (editMode && currentChicken) {
         // Handle batch deduction for edit operations
         if (formData.batch_id && formData.calculationMode !== 'size_cost') {
-          const batchId = formData.batch_id
-          const selectedBatch = liveChickens.find(batch => batch.id == batchId)
-          if (selectedBatch) {
-            const updatedBatch = {
-              ...selectedBatch,
-              current_count: selectedBatch.current_count - count
-            }
-            await updateLiveChicken(selectedBatch.id, updatedBatch)
-            
-            // Log the sales transaction for edit
-            try {
-              await logChickenTransaction(
-                selectedBatch.id,
-                'sale',
-                -count,
-                `Chicken order update for ${formData.customer}`,
-                currentChicken.id,
-                'chicken_order'
-              )
-            } catch (logError) {
-              console.warn('Failed to log chicken transaction for edit:', logError)
-            }
-          }
+          await handleInventoryDeduction(formData.inventoryType, formData.batch_id, count, formData.part_type, `Chicken order update for ${formData.customer}`, currentChicken.id)
         }
         
         await updateChicken(currentChicken.id, chickenData)
@@ -369,30 +481,9 @@ const ChickenOrders = () => {
       } else {
         await addChicken(chickenData)
         
-        // Update batch chicken count if a batch was selected
+        // Update batch inventory if a batch was selected
         if (formData.batch_id && formData.calculationMode !== 'size_cost') {
-          const selectedBatch = liveChickens.find(batch => batch.id == formData.batch_id)
-          if (selectedBatch) {
-            const updatedBatch = {
-              ...selectedBatch,
-              current_count: selectedBatch.current_count - count
-            }
-            await updateLiveChicken(selectedBatch.id, updatedBatch)
-            
-            // Log the sales transaction
-            try {
-              await logChickenTransaction(
-                selectedBatch.id,
-                'sale',
-                -count,
-                `Chicken order sale to ${formData.customer}`,
-                chickenData.id || Date.now().toString(),
-                'chicken_order'
-              )
-            } catch (logError) {
-              console.warn('Failed to log chicken transaction:', logError)
-            }
-          }
+          await handleInventoryDeduction(formData.inventoryType, formData.batch_id, count, formData.part_type, `Chicken order sale to ${formData.customer}`, chickenData.id || Date.now().toString())
         }
         
         showSuccess('Order added successfully!')
@@ -759,7 +850,24 @@ const ChickenOrders = () => {
                 
                 <div className="form-row">
                   <div className="form-group">
-                    <label htmlFor="batch_id">Chicken Batch (Optional)</label>
+                    <label htmlFor="inventoryType">Inventory Type*</label>
+                    <select
+                      id="inventoryType"
+                      name="inventoryType"
+                      value={formData.inventoryType}
+                      onChange={handleInputChange}
+                      required
+                    >
+                      <option value="live">Live Chickens</option>
+                      <option value="dressed">Dressed Chickens (Whole)</option>
+                      <option value="parts">Chicken Parts</option>
+                    </select>
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="batch_id">
+                      {formData.inventoryType === 'live' ? 'Live Chicken Batch' : 'Dressed Chicken Batch'} (Optional)
+                    </label>
                     <select
                       id="batch_id"
                       name="batch_id"
@@ -767,19 +875,62 @@ const ChickenOrders = () => {
                       onChange={handleInputChange}
                     >
                       <option value="">No batch selected</option>
-                      {liveChickens
-                        .filter(batch => 
-                          (batch.status === 'healthy' || batch.status === 'sick') && 
-                          batch.current_count > 0
-                        )
-                        .map(batch => (
-                          <option key={batch.id} value={batch.id}>
-                            {batch.batch_id} - {batch.breed} ({batch.current_count} available)
-                          </option>
-                        ))
-                      }
+                      {formData.inventoryType === 'live' ? (
+                        liveChickens
+                          .filter(batch =>
+                            (batch.status === 'healthy' || batch.status === 'sick') &&
+                            batch.current_count > 0
+                          )
+                          .map(batch => (
+                            <option key={batch.id} value={batch.id}>
+                              {batch.batch_id} - {batch.breed} ({batch.current_count} available)
+                            </option>
+                          ))
+                      ) : (
+                        dressedChickens
+                          .filter(batch =>
+                            batch.status === 'in-storage' &&
+                            (formData.inventoryType === 'parts' ?
+                              Object.values(batch.parts_count || {}).some(count => count > 0) :
+                              getWholeChickenCount(batch) > 0
+                            )
+                          )
+                          .map(batch => (
+                            <option key={batch.id} value={batch.id}>
+                              {batch.batch_id} - {batch.size_category} (
+                              {formData.inventoryType === 'parts' ?
+                                'Parts available' :
+                                `${getWholeChickenCount(batch)} available`
+                              })
+                            </option>
+                          ))
+                      )}
                     </select>
                   </div>
+                </div>
+                
+                {formData.inventoryType === 'parts' && formData.batch_id && (
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label htmlFor="part_type">Part Type*</label>
+                      <select
+                        id="part_type"
+                        name="part_type"
+                        value={formData.part_type}
+                        onChange={handleInputChange}
+                        required={formData.inventoryType === 'parts'}
+                      >
+                        <option value="">Select part type</option>
+                        <option value="neck">Neck ({dressedChickens.find(b => b.id === formData.batch_id)?.parts_count?.neck || 0} available)</option>
+                        <option value="feet">Feet ({dressedChickens.find(b => b.id === formData.batch_id)?.parts_count?.feet || 0} available)</option>
+                        <option value="gizzard">Gizzard ({dressedChickens.find(b => b.id === formData.batch_id)?.parts_count?.gizzard || 0} available)</option>
+                        <option value="dog_food">Dog Food ({dressedChickens.find(b => b.id === formData.batch_id)?.parts_count?.dog_food || 0} available)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="form-row">
                   
                   <div className="form-group">
                     <label htmlFor="status">Status*</label>

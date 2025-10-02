@@ -138,11 +138,30 @@ export function AppProvider({ children }) {
         
         try {
           // Load chickens with limit and selective columns to reduce Egress
-          const { data: chickensData, error: chickensError } = await supabase
-            .from('chickens')
-            .select('id, date, customer, phone, location, count, size, price, amount_paid, balance, status, calculation_mode, batch_id, created_at, updated_at')
-            .order('created_at', { ascending: false })
-            .limit(100)
+          // Try to load with new columns first
+          let chickensData, chickensError;
+          
+          try {
+            const result = await supabase
+              .from('chickens')
+              .select('id, date, customer, phone, location, count, size, price, amount_paid, balance, status, calculation_mode, inventory_type, batch_id, part_type, created_at, updated_at')
+              .order('created_at', { ascending: false })
+              .limit(100)
+            
+            chickensData = result.data
+            chickensError = result.error
+          } catch (newColumnsError) {
+            // If new columns don't exist yet, fall back to old schema
+            console.warn('New columns not found, falling back to old schema:', newColumnsError)
+            const result = await supabase
+              .from('chickens')
+              .select('id, date, customer, phone, location, count, size, price, amount_paid, balance, status, calculation_mode, batch_id, created_at, updated_at')
+              .order('created_at', { ascending: false })
+              .limit(100)
+            
+            chickensData = result.data
+            chickensError = result.error
+          }
         
         if (chickensError) throw chickensError
         setChickens(chickensData || [])
@@ -580,7 +599,7 @@ export function AppProvider({ children }) {
   const addChicken = async (chickenData) => {
     try {
       // Convert amountPaid to amount_paid to match database schema
-      const { amountPaid, calculationMode, batch_id, ...otherData } = chickenData;
+      const { amountPaid, calculationMode, batch_id, inventoryType, part_type, ...otherData } = chickenData;
       
       const chicken = {
         id: Date.now().toString(),
@@ -588,7 +607,9 @@ export function AppProvider({ children }) {
         ...otherData,
         amount_paid: amountPaid || 0,
         calculation_mode: calculationMode || 'count_size_cost',
-        batch_id: batch_id || null, // Now included in database schema
+        inventory_type: inventoryType || 'live',
+        batch_id: batch_id || null,
+        part_type: part_type || null,
         balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0)
       }
 
@@ -637,13 +658,15 @@ export function AppProvider({ children }) {
   const updateChicken = async (id, chickenData) => {
     try {
       // Convert amountPaid to amount_paid to match database schema
-      const { amountPaid, calculationMode, batch_id, ...otherData } = chickenData;
+      const { amountPaid, calculationMode, batch_id, inventoryType, part_type, ...otherData } = chickenData;
       
       const updatedChicken = {
         ...otherData,
         amount_paid: amountPaid || 0,
         calculation_mode: calculationMode || 'count_size_cost',
-        batch_id: batch_id || null, // Now included in database schema
+        inventory_type: inventoryType || 'live',
+        batch_id: batch_id || null,
+        part_type: part_type || null,
         balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0)
       }
 

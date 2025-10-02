@@ -15,10 +15,16 @@ CREATE TABLE IF NOT EXISTS public.chickens (
     balance DECIMAL(10,2) NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     calculation_mode TEXT DEFAULT 'count_size_cost',
-    batch_id TEXT, -- Add batch_id column to link to live_chickens
+    inventory_type TEXT DEFAULT 'live', -- 'live', 'dressed', 'parts'
+    batch_id TEXT, -- Links to live_chickens or dressed_chickens depending on inventory_type
+    part_type TEXT, -- For parts orders: 'neck', 'feet', 'gizzard', 'dog_food'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Add columns if they don't exist (for existing databases)
+ALTER TABLE public.chickens ADD COLUMN IF NOT EXISTS inventory_type TEXT DEFAULT 'live';
+ALTER TABLE public.chickens ADD COLUMN IF NOT EXISTS part_type TEXT;
 
 -- Create stock table
 CREATE TABLE IF NOT EXISTS public.stock (

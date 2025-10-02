@@ -75,6 +75,27 @@ const DressedChickenStock = () => {
   const getTotalPartsWeight = (partsWeight) => {
     return Object.values(partsWeight || {}).reduce((sum, weight) => sum + weight, 0);
   };
+  
+  // Helper to get actual whole chicken count (handles old and new data formats)
+  const getWholeChickenCount = (chicken) => {
+    // If processing_quantity exists, use it (it represents the number of birds processed)
+    if (chicken.processing_quantity && chicken.processing_quantity > 0) {
+      return chicken.processing_quantity;
+    }
+    
+    // Otherwise, check if current_count looks like old format (sum of parts)
+    const totalPartsCount = getTotalPartsCount(chicken.parts_count);
+    
+    // If current_count equals total parts count, it's likely old format
+    // Use the smallest non-zero part count as a proxy for whole chicken count
+    if (chicken.current_count === totalPartsCount && totalPartsCount > 0) {
+      const partsCounts = Object.values(chicken.parts_count || {}).filter(c => c > 0);
+      return partsCounts.length > 0 ? Math.min(...partsCounts) : chicken.current_count;
+    }
+    
+    // For new format or when parts don't match, use current_count as-is
+    return chicken.current_count || 0;
+  };
 
   const handleProcessChickenForm = async (e) => {
     e.preventDefault();
@@ -159,10 +180,9 @@ const DressedChickenStock = () => {
       dog_food: parseFloat(dogFoodWeight) || 0
     };
 
-    // Calculate total count and average weight
-    const totalCount = Object.values(partsCount).reduce((a, b) => a + b, 0);
-    const totalWeight = Object.values(partsWeight).reduce((a, b) => a + b, 0);
-    const averageWeight = totalCount > 0 ? (totalWeight / totalCount) : 0;
+    // Calculate total parts weight and average weight per chicken
+    const totalPartsWeight = Object.values(partsWeight).reduce((a, b) => a + b, 0);
+    const averageWeight = quantityToProcess > 0 ? (totalPartsWeight / quantityToProcess) : 0;
 
     const remainingBirds = availableBirds - quantityToProcess;
 
@@ -170,8 +190,8 @@ const DressedChickenStock = () => {
       id: Date.now().toString(),
       batch_id: selectedBatch,
       processing_date: processingDate,
-      initial_count: totalCount,
-      current_count: totalCount,
+      initial_count: quantityToProcess, // Number of whole chickens processed
+      current_count: quantityToProcess, // Current number of whole chickens available
       average_weight: averageWeight,
       size_category: sizeCategory,
       status: 'in-storage',
@@ -386,17 +406,17 @@ Check the browser console for more details.`);
       dog_food: parseFloat(editingChicken.parts_weight?.dog_food) || 0
     };
 
-    // Calculate total count and average weight
-    const totalCount = Object.values(partsCount).reduce((a, b) => a + b, 0);
-    const totalWeight = Object.values(partsWeight).reduce((a, b) => a + b, 0);
-    const averageWeight = totalCount > 0 ? (totalWeight / totalCount) : 0;
+    // Calculate total parts weight and average weight
+    const totalPartsWeight = Object.values(partsWeight).reduce((a, b) => a + b, 0);
+    const currentCount = editingChicken.current_count || editingChicken.initial_count || 0;
+    const averageWeight = currentCount > 0 ? (totalPartsWeight / currentCount) : 0;
 
     const data = {
       id: editingChicken.id,
       batch_id: editingChicken.batch_id,
       processing_date: editingChicken.processing_date || editingChicken.processingDate,
       initial_count: editingChicken.initial_count || editingChicken.initialCount,
-      current_count: totalCount,
+      current_count: editingChicken.current_count, // Keep the current count of whole chickens
       average_weight: averageWeight,
       size_category: editingChicken.size_category,
       status: editingChicken.status,
@@ -450,9 +470,9 @@ Check the browser console for more details.`);
               <tr>
                 <th>Batch ID</th>
                 <th>Size Category</th>
-                <th>Count</th>
+                <th>Whole Chickens</th>
                 <th>Avg Weight</th>
-                <th>Parts</th>
+                <th>Parts Inventory</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -462,7 +482,12 @@ Check the browser console for more details.`);
                 <tr key={chicken.id}>
                   <td className="font-medium">{chicken.batch_id}</td>
                   <td>{chicken.size_category}</td>
-                  <td>{chicken.current_count}</td>
+                  <td>
+                    <strong>{getWholeChickenCount(chicken)}</strong>
+                    <small style={{display: 'block', color: '#666'}}>
+                      (Processed: {chicken.processing_quantity || chicken.initial_count || getWholeChickenCount(chicken)})
+                    </small>
+                  </td>
                   <td>{formatWeight(chicken.average_weight)}</td>
                   <td>
                     <div className="space-y-1">
@@ -570,12 +595,12 @@ Check the browser console for more details.`);
   const AnalyticsView = ({ dressedChickens }) => {
     // Overall statistics
     const totalBatches = dressedChickens.length;
-    const totalChickenCount = dressedChickens.reduce((sum, dc) => sum + (dc.current_count || 0), 0);
-    const totalWeight = dressedChickens.reduce((sum, dc) => sum + ((dc.current_count || 0) * (dc.average_weight || 0)), 0);
+    const totalWholeChickens = dressedChickens.reduce((sum, dc) => sum + getWholeChickenCount(dc), 0);
+    const totalWeight = dressedChickens.reduce((sum, dc) => sum + (getWholeChickenCount(dc) * (dc.average_weight || 0)), 0);
     
-    // Size distribution
+    // Size distribution (based on whole chickens)
     const sizeDistribution = dressedChickens.reduce((acc, dc) => {
-      acc[dc.size_category] = (acc[dc.size_category] || 0) + (dc.current_count || 0);
+      acc[dc.size_category] = (acc[dc.size_category] || 0) + getWholeChickenCount(dc);
       return acc;
     }, {});
 
@@ -628,8 +653,8 @@ Check the browser console for more details.`);
               </svg>
             </div>
             <div className="stat-content">
-              <h3>Total Chickens</h3>
-              <p>{totalChickenCount}</p>
+              <h3>Total Whole Chickens</h3>
+              <p>{totalWholeChickens}</p>
             </div>
           </div>
 
@@ -652,9 +677,9 @@ Check the browser console for more details.`);
               </svg>
             </div>
             <div className="stat-content">
-              <h3>Avg. Yield</h3>
+              <h3>Avg. per Batch</h3>
               <p>
-                {totalBatches > 0 ? ((totalChickenCount / totalBatches) || 0).toFixed(1) : '0'}
+                {totalBatches > 0 ? ((totalWholeChickens / totalBatches) || 0).toFixed(1) : '0'}
               </p>
             </div>
           </div>
@@ -673,9 +698,9 @@ Check the browser console for more details.`);
                     <span className="distribution-value">{count}</span>
                   </div>
                   <div className="distribution-bar">
-                    <div 
-                      className="distribution-progress blue" 
-                      style={{ width: `${totalChickenCount > 0 ? (count / totalChickenCount) * 100 : 0}%` }}
+                    <div
+                      className="distribution-progress blue"
+                      style={{ width: `${totalWholeChickens > 0 ? (count / totalWholeChickens) * 100 : 0}%` }}
                     ></div>
                   </div>
                 </div>
