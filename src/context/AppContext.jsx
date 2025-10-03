@@ -179,7 +179,8 @@ export function AppProvider({ children }) {
           if (filters.status) query = query.eq('status', filters.status)
           if (filters.startDate) query = query.gte('date', filters.startDate)
           if (filters.endDate) query = query.lte('date', filters.endDate)
-          query = query.select('id, date, customer, phone, location, count, size, price, amount_paid, balance, status, calculation_mode, inventory_type, batch_id, part_type, created_at, updated_at')
+          // Select only essential columns for better performance
+          query = query.select('id, date, customer, count, size, price, amount_paid, balance, status, batch_id')
           break
         case 'stock':
           query = query.select('id, date, description, count, size, cost_per_kg, calculation_mode, notes, created_at, updated_at')
@@ -191,7 +192,8 @@ export function AppProvider({ children }) {
           query = query.select('id, date, type, amount, description, created_at, updated_at')
           break
         case 'live_chickens':
-          query = query.select('id, batch_id, breed, initial_count, current_count, hatch_date, expected_weight, current_weight, feed_type, status, mortality, notes, created_at, updated_at, lifecycle_stage, stage_arrival_date, stage_brooding_date, stage_growing_date, stage_processing_date, stage_freezer_date, completed_date')
+          // Select only essential columns for better performance
+          query = query.select('id, batch_id, breed, initial_count, current_count, hatch_date, status, lifecycle_stage')
           break
         case 'feed_inventory':
           query = query.select(`
@@ -217,7 +219,8 @@ export function AppProvider({ children }) {
           query = query.select('id, chicken_batch_id, weight, recorded_date, notes, created_at, updated_at')
           break
         case 'dressed_chickens':
-          query = query.select('id, batch_id, processing_date, initial_count, current_count, average_weight, size_category, status, storage_location, expiry_date, notes, parts_count, parts_weight, processing_quantity, remaining_birds, create_new_batch_for_remaining, remaining_batch_id, created_at, updated_at')
+          // Select only essential columns for better performance
+          query = query.select('id, batch_id, processing_date, initial_count, current_count, status, size_category')
           break
         case 'batch_relationships':
           query = query.select('id, source_batch_id, source_batch_type, target_batch_id, target_batch_type, relationship_type, quantity, notes, created_at, updated_at')
@@ -537,10 +540,12 @@ export function AppProvider({ children }) {
   const loadLiveChickensData = async () => {
     if (liveChickens.length === 0) {
       try {
+        // Load only recent 50 live chickens with essential columns to reduce data transfer
         const { data, error } = await supabase
           .from('live_chickens')
-          .select('*')
+          .select('id, batch_id, breed, initial_count, current_count, hatch_date, status, lifecycle_stage') // Select only essential columns
           .order('hatch_date', { ascending: false })
+          .limit(50)
 
         if (error && !error.message.includes('relation "live_chickens" does not exist')) {
           throw error
@@ -558,10 +563,12 @@ export function AppProvider({ children }) {
   const loadDressedChickensData = async () => {
     if (dressedChickens.length === 0) {
       try {
+        // Load only recent 50 dressed chickens with essential columns to reduce data transfer
         const { data, error } = await supabase
           .from('dressed_chickens')
-          .select('*')
+          .select('id, batch_id, processing_date, initial_count, current_count, status, size_category') // Select only essential columns
           .order('processing_date', { ascending: false })
+          .limit(50)
 
         if (error && !error.message.includes('relation "dressed_chickens" does not exist')) {
           throw error
@@ -579,18 +586,19 @@ export function AppProvider({ children }) {
   const loadFeedInventoryData = async () => {
     if (feedInventory.length === 0) {
       try {
+        // Load only recent 50 feed inventory items with essential columns to reduce data transfer
         const { data, error } = await supabase
           .from('feed_inventory')
           .select(`
-            *,
+            id, batch_number, feed_type, brand, quantity_kg, status, purchase_date,
             feed_batch_assignments (
               id,
               chicken_batch_id,
-              assigned_quantity_kg,
-              assigned_date
+              assigned_quantity_kg
             )
-          `)
+          `) // Select only essential columns
           .order('purchase_date', { ascending: false })
+          .limit(50)
 
         if (error && !error.message.includes('relation "feed_inventory" does not exist')) {
           throw error

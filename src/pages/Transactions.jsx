@@ -1,15 +1,76 @@
 import { useState, useEffect } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { formatNumber, formatDate } from '../utils/formatters'
+import { supabase } from '../utils/supabaseClient'
 import Pagination from '../components/UI/Pagination'
 import usePagination from '../hooks/usePagination'
 import SortableTableHeader from '../components/UI/SortableTableHeader'
 import SortControls from '../components/UI/SortControls'
 import useTableSort from '../hooks/useTableSort'
+import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner'
 import './Transactions.css'
 
 const Transactions = () => {
-  const { transactions, addFunds, addExpense, withdrawFunds, deleteTransaction, chickens } = useAppContext()
+  const { addFunds, addExpense, withdrawFunds, deleteTransaction, chickens } = useAppContext()
+
+  // Local state for all transactions (not just recent ones)
+  const [allTransactions, setAllTransactions] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // Load transactions with pagination on component mount
+  useEffect(() => {
+    const loadTransactions = async () => {
+      try {
+        setLoading(true)
+
+        // Load recent transactions (last 100) for better performance
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('id, date, type, amount, description, created_at, updated_at') // Select only needed columns
+          .order('date', { ascending: false })
+          .limit(100) // Limit to recent 100 transactions
+
+        if (error && !error.message.includes('relation "transactions" does not exist')) {
+          throw error
+        }
+
+        if (data) {
+          setAllTransactions(data)
+        } else {
+          // Fallback to localStorage if Supabase fails
+          const localTransactions = localStorage.getItem('transactions')
+          if (localTransactions) {
+            try {
+              const parsed = JSON.parse(localTransactions)
+              // Sort by date and limit to recent 100 for performance
+              const sorted = parsed.sort((a, b) => new Date(b.date) - new Date(a.date))
+              setAllTransactions(sorted.slice(0, 100))
+            } catch (e) {
+              console.warn('Invalid transactions in localStorage:', e)
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error loading transactions:', err)
+        // Fallback to localStorage
+        const localTransactions = localStorage.getItem('transactions')
+        if (localTransactions) {
+          try {
+            const parsed = JSON.parse(localTransactions)
+            // Sort by date and limit to recent 100 for performance
+            const sorted = parsed.sort((a, b) => new Date(b.date) - new Date(a.date))
+            setAllTransactions(sorted.slice(0, 100))
+          } catch (e) {
+            console.warn('Invalid transactions in localStorage:', e)
+          }
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadTransactions()
+  }, [])
   
   // Add resetTransactions function here
   const resetTransactions = async () => {
@@ -17,8 +78,8 @@ const Transactions = () => {
       try {
         // Filter out transactions that are related to chicken orders (payments)
         // These would typically be transactions with descriptions containing "Payment from" or "Additional payment from"
-        const nonChickenTransactions = transactions.filter(transaction => 
-          !transaction.description.includes('Payment from') && 
+        const nonChickenTransactions = allTransactions.filter(transaction =>
+          !transaction.description.includes('Payment from') &&
           !transaction.description.includes('Additional payment from') &&
           !transaction.description.includes('Refund for deleted chicken order')
         );
@@ -51,24 +112,24 @@ const Transactions = () => {
   
   // Get filtered transactions
   const getFilteredTransactions = () => {
-    let filtered = [...transactions]
-    
+    let filtered = [...allTransactions]
+
     if (filters.type) {
       filtered = filtered.filter(transaction => transaction.type === filters.type)
     }
-    
+
     if (filters.startDate) {
-      filtered = filtered.filter(transaction => 
+      filtered = filtered.filter(transaction =>
         new Date(transaction.date) >= new Date(filters.startDate)
       )
     }
-    
+
     if (filters.endDate) {
-      filtered = filtered.filter(transaction => 
+      filtered = filtered.filter(transaction =>
         new Date(transaction.date) <= new Date(filters.endDate)
       )
     }
-    
+
     return filtered
   }
   

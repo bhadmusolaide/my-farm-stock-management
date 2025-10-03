@@ -102,3 +102,72 @@ export const formatWeight = (weight, decimals = 2) => {
 export const formatCount = (count) => {
   return formatNumber(count, 0)
 }
+
+/**
+ * Get aggregated report data with server-side calculations to reduce Egress usage
+ * @param {Object} supabase - Supabase client instance
+ * @param {string} startDate - Start date in YYYY-MM-DD format
+ * @param {string} endDate - End date in YYYY-MM-DD format
+ * @returns {Promise<Object|null>} Aggregated report data or null if error
+ */
+export const getAggregatedReportData = async (supabase, startDate, endDate) => {
+  try {
+    // Get aggregated financial data for the date range
+    const financialQuery = supabase
+      .from('chickens')
+      .select('count, size, price, amount_paid, balance, status, date')
+      .gte('date', startDate)
+      .lte('date', endDate)
+
+    // Get aggregated transaction data for the same period
+    const transactionQuery = supabase
+      .from('transactions')
+      .select('type, amount, date')
+      .gte('date', startDate)
+      .lte('date', endDate)
+
+    const [chickensResult, transactionsResult] = await Promise.all([
+      financialQuery,
+      transactionQuery
+    ])
+
+    if (chickensResult.error) throw chickensResult.error
+    if (transactionsResult.error) throw transactionsResult.error
+
+    const chickens = chickensResult.data || []
+    const transactions = transactionsResult.data || []
+
+    // Calculate aggregated metrics
+    const totalRevenue = chickens.reduce((sum, chicken) => sum + (chicken.count * chicken.size * chicken.price), 0)
+    const totalPaid = chickens.reduce((sum, chicken) => sum + chicken.amount_paid, 0)
+    const totalBalance = chickens.reduce((sum, chicken) => sum + chicken.balance, 0)
+
+    const totalExpenses = transactions
+      .filter(t => t.type === 'expense' || t.type === 'stock_expense')
+      .reduce((sum, t) => sum + t.amount, 0)
+
+    const totalFunds = transactions
+      .filter(t => t.type === 'fund')
+      .reduce((sum, t) => sum + t.amount, 0)
+
+    const netProfit = totalRevenue - totalExpenses
+    const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0
+
+    return {
+      revenue: totalRevenue,
+      expenses: totalExpenses,
+      funds: totalFunds,
+      outstandingBalance: totalBalance,
+      paidAmount: totalPaid,
+      netProfit,
+      profitMargin,
+      totalChickens: chickens.reduce((sum, chicken) => sum + chicken.count, 0),
+      totalOrders: chickens.length,
+      chickens, // Return raw data for detailed analysis if needed
+      transactions // Return raw data for cash flow analysis if needed
+    }
+  } catch (error) {
+    console.error('Error getting aggregated report data:', error)
+    return null
+  }
+}

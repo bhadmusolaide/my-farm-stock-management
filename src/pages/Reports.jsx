@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useAppContext } from '../context/AppContext'
-import { formatCurrency, formatNumber, formatDate } from '../utils/formatters'
+import { formatCurrency, formatNumber, formatDate, getAggregatedReportData } from '../utils/formatters'
+import { supabase } from '../utils/supabaseClient'
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
@@ -24,8 +25,29 @@ const Reports = () => {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [activeTab, setActiveTab] = useState('overview') // 'overview', 'profitability', 'seasonal', 'feed', 'customers'
+  const [aggregatedData, setAggregatedData] = useState(null)
+  const [loadingAggregated, setLoadingAggregated] = useState(false)
 
-  // Calculate key metrics based on filtered data
+  // Load aggregated data for better performance
+  useEffect(() => {
+    const loadAggregatedData = async () => {
+      if (viewMode === 'custom' && startDate && endDate) {
+        setLoadingAggregated(true)
+        try {
+          const aggregated = await getAggregatedReportData(supabase, startDate, endDate)
+          setAggregatedData(aggregated)
+        } catch (error) {
+          console.error('Error loading aggregated data:', error)
+        } finally {
+          setLoadingAggregated(false)
+        }
+      }
+    }
+
+    loadAggregatedData()
+  }, [viewMode, startDate, endDate])
+
+  // Calculate key metrics based on filtered data or aggregated data
   const { keyMetrics, filteredData, revenueChartData, expensesChartData, liveChickensData, customerMetrics, batchProfitability, seasonalTrends, feedEfficiency, customerLifetimeValue, inventoryTurnover, cashFlowData } = useMemo(() => {
     // Determine date range based on view mode
     const now = new Date()
@@ -112,26 +134,56 @@ const Reports = () => {
     
     const customerMetrics = Array.from(customerMap.values())
     
-    // Calculate financial metrics
-    const totalRevenue = filteredChickens.reduce((sum, chicken) => {
-      return sum + (chicken.count * chicken.size * chicken.price)
-    }, 0)
-    
-    const totalExpenses = filteredTransactions
-      .filter(t => t.type === 'expense' || t.type === 'stock_expense')
-      .reduce((sum, t) => sum + t.amount, 0)
-      
-    const netProfit = totalRevenue - totalExpenses
-    const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0
+    // Use aggregated data when available (for custom date ranges) to reduce processing load
+    let financialMetrics, fundsMetrics
 
-    // Funds metrics
-    const fundsAdded = filteredTransactions
-      .filter(t => t.type === 'fund')
-      .reduce((sum, t) => sum + t.amount, 0)
-    const fundsWithdrawn = filteredTransactions
-      .filter(t => t.type === 'withdrawal')
-      .reduce((sum, t) => sum + t.amount, 0)
-    const currentBalance = balance
+    if (viewMode === 'custom' && startDate && endDate && aggregatedData) {
+      // Use server-side aggregated data for better performance
+      financialMetrics = {
+        revenue: aggregatedData.revenue,
+        expenses: aggregatedData.expenses,
+        profit: aggregatedData.netProfit,
+        profitMargin: aggregatedData.profitMargin
+      }
+      fundsMetrics = {
+        added: aggregatedData.funds,
+        withdrawn: 0, // We'll still calculate this client-side for accuracy
+        balance: balance
+      }
+    } else {
+      // Calculate financial metrics client-side for weekly/monthly views
+      const totalRevenue = filteredChickens.reduce((sum, chicken) => {
+        return sum + (chicken.count * chicken.size * chicken.price)
+      }, 0)
+
+      const totalExpenses = filteredTransactions
+        .filter(t => t.type === 'expense' || t.type === 'stock_expense')
+        .reduce((sum, t) => sum + t.amount, 0)
+
+      const netProfit = totalRevenue - totalExpenses
+      const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0
+
+      financialMetrics = {
+        revenue: totalRevenue,
+        expenses: totalExpenses,
+        profit: netProfit,
+        profitMargin
+      }
+
+      // Funds metrics
+      const fundsAdded = filteredTransactions
+        .filter(t => t.type === 'fund')
+        .reduce((sum, t) => sum + t.amount, 0)
+      const fundsWithdrawn = filteredTransactions
+        .filter(t => t.type === 'withdrawal')
+        .reduce((sum, t) => sum + t.amount, 0)
+
+      fundsMetrics = {
+        added: fundsAdded,
+        withdrawn: fundsWithdrawn,
+        balance: balance
+      }
+    }
 
     // Stock metrics
     const generalStockItems = feedInventory.length
@@ -152,17 +204,8 @@ const Reports = () => {
       sum + (item.quantity_kg || 0), 0)
 
     const keyMetrics = {
-      financial: {
-        revenue: totalRevenue,
-        expenses: totalExpenses,
-        profit: netProfit,
-        profitMargin
-      },
-      funds: {
-        added: fundsAdded,
-        withdrawn: fundsWithdrawn,
-        balance: currentBalance
-      },
+      financial: financialMetrics,
+      funds: fundsMetrics,
       stock: {
         items: generalStockItems,
         value: generalStockValue
