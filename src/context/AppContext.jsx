@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useMemo } from 'react'
 import { supabase, supabaseUrl } from '../utils/supabaseClient'
 import { isMigrationNeeded, migrateFromLocalStorage } from '../utils/migrateData'
 import { formatNumber } from '../utils/formatters'
+import { storageOptimizer } from '../utils/requestDedupe'
 import { useAuth } from './AuthContext'
 
 const AppContext = createContext()
@@ -16,10 +17,14 @@ export function AppProvider({ children }) {
   const [stock, setStockState] = useState([])
   const [transactions, setTransactionsState] = useState([])
   
-  // Helper functions to update state and save to localStorage
+  // Helper functions to update state and save to localStorage with optimization
   const setChickens = (newChickens) => {
     setChickensState(newChickens)
-    localStorage.setItem('chickens', JSON.stringify(newChickens))
+    storageOptimizer.setItem('chickens', {
+      data: newChickens,
+      timestamp: Date.now(),
+      version: '1.0'
+    })
   }
   
   const setStock = (newStock) => {
@@ -160,17 +165,23 @@ export function AppProvider({ children }) {
     batchRelationships: []
   })
 
-  // Load data from Supabase with pagination
+  // Load data from Supabase with optimized pagination and selective loading
   const loadPaginatedData = async (dataType, page = 1, pageSize = 20, filters = {}) => {
     try {
       const cacheKey = `${dataType}_${page}_${pageSize}_${JSON.stringify(filters)}`
 
-      // Check cache first
+      // Check cache first (extended timeout)
       if (dataCache[dataType] && dataCache[dataType][cacheKey]) {
-        return dataCache[dataType][cacheKey]
+        const cached = dataCache[dataType][cacheKey]
+        // Extend cache timeout to 10 minutes for better performance
+        if (Date.now() - cached.timestamp < 600000) {
+          return cached
+        }
       }
 
-      let query = supabase.from(dataType)
+      // Use selective column loading based on data type
+      let selectColumns = getOptimizedColumns(dataType)
+      let query = supabase.from(dataType).select(selectColumns)
 
       // Apply filters based on data type
       switch (dataType) {
@@ -303,12 +314,16 @@ export function AppProvider({ children }) {
         }
       }))
 
-      // Update cache
+      // Update cache with timestamp for better management
       setDataCache(prev => ({
         ...prev,
         [dataType]: {
           ...prev[dataType],
-          [cacheKey]: { data: transformedData || [], count: count || 0 }
+          [cacheKey]: {
+            data: transformedData || [],
+            count: count || 0,
+            timestamp: Date.now()
+          }
         }
       }))
 
@@ -319,13 +334,31 @@ export function AppProvider({ children }) {
     }
   }
 
+  // Optimized column selection for reduced payload size
+  const getOptimizedColumns = (dataType) => {
+    const columnMap = {
+      chickens: 'id, date, customer, count, size, price, amount_paid, balance, status, batch_id, created_at',
+      stock: 'id, date, description, count, size, cost_per_kg, created_at',
+      transactions: 'id, date, type, amount, description, created_at',
+      live_chickens: 'id, batch_id, breed, initial_count, current_count, hatch_date, status, lifecycle_stage',
+      feed_inventory: 'id, batch_number, feed_type, brand, quantity_kg, status, purchase_date',
+      feed_consumption: 'id, feed_id, chicken_batch_id, quantity_consumed, consumption_date',
+      feed_batch_assignments: 'id, feed_id, chicken_batch_id, assigned_quantity_kg, assigned_date',
+      chicken_inventory_transactions: 'id, batch_id, transaction_type, quantity_changed, transaction_date',
+      weight_history: 'id, chicken_batch_id, weight, recorded_date',
+      dressed_chickens: 'id, batch_id, processing_date, initial_count, current_count, status, size_category',
+      batch_relationships: 'id, source_batch_id, target_batch_id, relationship_type, created_at'
+    }
+    return columnMap[dataType] || '*'
+  }
+
   // Load data from Supabase with optimized loading
   useEffect(() => {
     async function loadInitialData() {
       try {
         setLoading(true)
 
-        // Load only essential data initially (balance, recent transactions, and chicken orders)
+        // Load only essential data initially with optimized queries (balance and recent transactions only)
         try {
           const balancePromise = supabase
             .from('balance')
@@ -340,8 +373,16 @@ export function AppProvider({ children }) {
             })
             .catch(() => 0)
 
-          const recentTransactionsPromise = loadPaginatedData('transactions', 1, 10)
-          const recentChickensPromise = loadPaginatedData('chickens', 1, 20) // Load recent chicken orders
+          // Only load recent transactions (last 7 days) for dashboard
+          const sevenDaysAgo = new Date()
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+          const recentTransactionsPromise = supabase
+            .from('transactions')
+            .select('id, date, type, amount, description')
+            .gte('date', sevenDaysAgo.toISOString().split('T')[0])
+            .order('date', { ascending: false })
+            .limit(20)
 
           // Load balance first (most critical)
           const currentBalance = await balancePromise

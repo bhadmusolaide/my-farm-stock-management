@@ -281,4 +281,221 @@ export class BatchedAuditLogger {
 // Export singleton instance
 export const auditLogger = new BatchedAuditLogger()
 
+// Optimized data loader with pagination and selective loading
+export class OptimizedDataLoader {
+  constructor(requestDeduper) {
+    this.deduper = requestDeduper
+    this.loadingStates = new Map()
+  }
+
+  // Load data with pagination and selective columns
+  async loadWithPagination(table, options = {}) {
+    const {
+      page = 1,
+      pageSize = 20,
+      columns = '*',
+      filters = {},
+      orderBy = { column: 'created_at', ascending: false },
+      useCache = true
+    } = options
+
+    const cacheKey = `${table}_${page}_${pageSize}_${columns}_${JSON.stringify(filters)}_${JSON.stringify(orderBy)}`
+
+    // Prevent duplicate requests
+    if (this.loadingStates.get(cacheKey)) {
+      return this.loadingStates.get(cacheKey)
+    }
+
+    const loadPromise = (async () => {
+      try {
+        // Use optimized Supabase client if available
+        if (window.optimizedSupabase) {
+          return await window.optimizedSupabase.select(table, columns, filters, {
+            orderBy,
+            limit: pageSize,
+            range: {
+              from: (page - 1) * pageSize,
+              to: page * pageSize - 1
+            }
+          })
+        }
+
+        // Fallback to existing loadPaginatedData
+        if (window.loadPaginatedData) {
+          return await window.loadPaginatedData(table, page, pageSize, filters)
+        }
+
+        throw new Error('No data loading method available')
+      } finally {
+        this.loadingStates.delete(cacheKey)
+      }
+    })()
+
+    if (useCache) {
+      this.loadingStates.set(cacheKey, loadPromise)
+    }
+
+    return loadPromise
+  }
+
+  // Batch load multiple tables efficiently
+  async batchLoad(tables) {
+    const promises = tables.map(table => this.loadWithPagination(table.table, table.options))
+    return Promise.allSettled(promises)
+  }
+
+  // Smart preloading for likely next pages
+  preloadNextPage(currentPage, table, options) {
+    if (currentPage < 10) { // Only preload first 10 pages
+      this.loadWithPagination(table, {
+        ...options,
+        page: currentPage + 1,
+        useCache: false // Background load
+      }).catch(() => {
+        // Silently fail preload
+      })
+    }
+  }
+}
+
+// localStorage optimization utility
+export class StorageOptimizer {
+  constructor() {
+    this.maxStorageSize = 5 * 1024 * 1024 // 5MB limit
+    this.cleanupThreshold = 4 * 1024 * 1024 // Cleanup at 4MB
+  }
+
+  // Get current storage size
+  getStorageSize() {
+    let total = 0
+    for (let key in localStorage) {
+      if (localStorage.hasOwnProperty(key)) {
+        total += localStorage.getItem(key).length + key.length
+      }
+    }
+    return total
+  }
+
+  // Cleanup old data when threshold exceeded
+  cleanup() {
+    const currentSize = this.getStorageSize()
+    if (currentSize < this.cleanupThreshold) return
+
+    // Get all keys with timestamps
+    const keysWithTime = []
+    for (let key in localStorage) {
+      if (localStorage.hasOwnProperty(key)) {
+        const item = JSON.parse(localStorage.getItem(key) || '{}')
+        keysWithTime.push({
+          key,
+          size: localStorage.getItem(key).length,
+          timestamp: item.updated_at || item.timestamp || 0
+        })
+      }
+    }
+
+    // Sort by timestamp (oldest first) and remove until under limit
+    keysWithTime.sort((a, b) => a.timestamp - b.timestamp)
+
+    let removedSize = 0
+    for (const item of keysWithTime) {
+      if (currentSize - removedSize < this.maxStorageSize) break
+
+      localStorage.removeItem(item.key)
+      removedSize += item.size
+    }
+  }
+
+  // Set item with size check and cleanup
+  setItem(key, value) {
+    const serializedValue = JSON.stringify(value)
+    const itemSize = serializedValue.length + key.length
+
+    // Check if adding this item would exceed limit
+    if (this.getStorageSize() + itemSize > this.maxStorageSize) {
+      this.cleanup()
+    }
+
+    localStorage.setItem(key, serializedValue)
+  }
+}
+
+// Performance monitoring utility
+export class PerformanceMonitor {
+  constructor() {
+    this.metrics = new Map()
+    this.egressTracking = {
+      totalRequests: 0,
+      totalBytesTransferred: 0,
+      cacheHits: 0,
+      cacheMisses: 0,
+      startTime: Date.now()
+    }
+  }
+
+  // Track API request metrics
+  trackRequest(endpoint, method, bytesTransferred, cached = false) {
+    const key = `${method}:${endpoint}`
+
+    if (!this.metrics.has(key)) {
+      this.metrics.set(key, {
+        count: 0,
+        totalBytes: 0,
+        avgResponseTime: 0,
+        lastAccessed: Date.now()
+      })
+    }
+
+    const metric = this.metrics.get(key)
+    metric.count++
+    metric.totalBytes += bytesTransferred
+    metric.lastAccessed = Date.now()
+
+    // Update egress tracking
+    this.egressTracking.totalRequests++
+    this.egressTracking.totalBytesTransferred += bytesTransferred
+
+    if (cached) {
+      this.egressTracking.cacheHits++
+    } else {
+      this.egressTracking.cacheMisses++
+    }
+  }
+
+  // Get performance report
+  getReport() {
+    const uptime = Date.now() - this.egressTracking.startTime
+    const hitRate = this.egressTracking.cacheHits /
+      (this.egressTracking.cacheHits + this.egressTracking.cacheMisses) || 0
+
+    return {
+      uptime: Math.round(uptime / 1000),
+      totalRequests: this.egressTracking.totalRequests,
+      totalBytesTransferred: this.egressTracking.totalBytesTransferred,
+      cacheHitRate: Math.round(hitRate * 100),
+      avgBytesPerRequest: Math.round(this.egressTracking.totalBytesTransferred / this.egressTracking.totalRequests) || 0,
+      topEndpoints: Array.from(this.metrics.entries())
+        .sort((a, b) => b[1].totalBytes - a[1].totalBytes)
+        .slice(0, 5)
+    }
+  }
+
+  // Reset metrics
+  reset() {
+    this.metrics.clear()
+    this.egressTracking = {
+      totalRequests: 0,
+      totalBytesTransferred: 0,
+      cacheHits: 0,
+      cacheMisses: 0,
+      startTime: Date.now()
+    }
+  }
+}
+
+// Export instances
+export const optimizedLoader = new OptimizedDataLoader()
+export const storageOptimizer = new StorageOptimizer()
+export const performanceMonitor = new PerformanceMonitor()
+
 export default RequestDeduper;

@@ -16,7 +16,6 @@ import './ChickenOrders.css'
 
 const ChickenOrders = () => {
   const {
-    chickens,
     addChicken,
     updateChicken,
     deleteChicken,
@@ -29,6 +28,11 @@ const ChickenOrders = () => {
     loadPaginatedData,
     pagination
   } = useAppContext()
+
+  // Use pagination instead of loading all chickens
+  const [paginatedChickens, setPaginatedChickens] = useState({ data: [], count: 0 })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [loading, setLoading] = useState(false)
   const { showError, showSuccess, showWarning } = useNotification()
   
   // Helper to get actual whole chicken count from dressed chicken batch
@@ -81,8 +85,13 @@ const ChickenOrders = () => {
   // Sorting hook
   const { sortedData, requestSort, resetSort, getSortIcon, sortConfig } = useTableSort(filteredChickens)
   
-  // Pagination for chicken orders
-  const chickenPagination = usePagination(sortedData, 10)
+  // Pagination for chicken orders (using paginated data)
+  const chickenPagination = usePagination(sortedData, 20)
+
+  // Handle page changes
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage)
+  }
   
   // State for modal
   const [showModal, setShowModal] = useState(false)
@@ -133,14 +142,49 @@ const ChickenOrders = () => {
   // Debounce filter changes to avoid excessive filtering
   const debouncedFilters = useDebouncedFilter(filters, 300)
 
-  // Apply filters when chickens or debounced filters change
+  // Load paginated data when page or filters change
   useEffect(() => {
-    filterChickens()
-  }, [chickens, debouncedFilters])
+    loadChickensPage()
+  }, [currentPage, debouncedFilters])
+
+  // Load chickens for current page with filters
+  const loadChickensPage = async () => {
+    try {
+      setLoading(true)
+
+      const filtersToApply = {}
+      if (debouncedFilters.customer) {
+        filtersToApply.customer = debouncedFilters.customer
+      }
+      if (debouncedFilters.status) {
+        filtersToApply.status = debouncedFilters.status
+      }
+      if (debouncedFilters.startDate) {
+        filtersToApply.startDate = debouncedFilters.startDate
+      }
+      if (debouncedFilters.endDate) {
+        filtersToApply.endDate = debouncedFilters.endDate
+      }
+
+      const result = await loadPaginatedData('chickens', currentPage, 20, filtersToApply)
+      setPaginatedChickens(result)
+    } catch (error) {
+      console.error('Error loading chickens page:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Apply filters when chickens data or debounced filters change (for client-side filtering)
+  useEffect(() => {
+    if (paginatedChickens.data.length > 0) {
+      filterChickens()
+    }
+  }, [paginatedChickens.data, debouncedFilters])
   
-  // Filter chickens based on debounced filters
+  // Filter chickens based on debounced filters (client-side filtering for loaded page)
   const filterChickens = () => {
-    let filtered = [...chickens]
+    let filtered = [...paginatedChickens.data]
 
     if (debouncedFilters.customer) {
       filtered = filtered.filter(chicken =>
@@ -952,12 +996,14 @@ const ChickenOrders = () => {
       
       {/* Chicken Orders Pagination */}
       <Pagination
-        currentPage={chickenPagination.currentPage}
-        totalPages={chickenPagination.totalPages}
-        onPageChange={chickenPagination.handlePageChange}
-        pageSize={chickenPagination.pageSize}
-        onPageSizeChange={chickenPagination.handlePageSizeChange}
-        totalItems={chickenPagination.totalItems}
+        currentPage={currentPage}
+        totalPages={Math.ceil(paginatedChickens.count / 20)}
+        onPageChange={handlePageChange}
+        pageSize={20}
+        onPageSizeChange={(size) => {
+          // Handle page size change if needed
+        }}
+        totalItems={paginatedChickens.count}
       />
       
       {/* Add/Edit Chicken Modal */}
