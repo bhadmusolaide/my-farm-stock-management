@@ -8,17 +8,18 @@ import './DressedChickenStock.css';
 
 
 const DressedChickenStock = () => {
-  const {
-    dressedChickens,
-    liveChickens,
-    addDressedChicken,
-    updateDressedChicken,
-    deleteDressedChicken,
-    batchRelationships,
-    addBatchRelationship,
-    updateLiveChicken,
-    addLiveChicken
-  } = useContext(AppContext);
+   const {
+     dressedChickens,
+     liveChickens,
+     addDressedChicken,
+     updateDressedChicken,
+     deleteDressedChicken,
+     batchRelationships,
+     addBatchRelationship,
+     updateLiveChicken,
+     addLiveChicken,
+     loadDressedChickens
+   } = useContext(AppContext);
 
   const [activeTab, setActiveTab] = useState('inventory');
   const [showProcessingModal, setShowProcessingModal] = useState(false);
@@ -61,7 +62,12 @@ const DressedChickenStock = () => {
     setEditingChicken(chicken);
   }, []);
 
-  // Removed debug logging useEffect to prevent potential render loops
+  // Load dressed chickens data if not already loaded
+  useEffect(() => {
+    if (!dressedChickens || dressedChickens.length === 0) {
+      loadDressedChickens();
+    }
+  }, [dressedChickens, loadDressedChickens]);
 
   // Format weight using existing formatter
   const formatPartWeight = (weight) => formatWeight(weight);

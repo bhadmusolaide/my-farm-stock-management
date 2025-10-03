@@ -1,13 +1,14 @@
-import { useState, useContext, useMemo } from 'react';
+import { useState, useContext, useMemo, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { formatDate, formatNumber } from '../utils/formatters';
+import { supabase } from '../utils/supabaseClient';
 import SortableTableHeader from '../components/UI/SortableTableHeader';
 import SortControls from '../components/UI/SortControls';
 import useTableSort from '../hooks/useTableSort';
 import './LiveChickenStock.css';
 
 const LiveChickenStock = () => {
-  const { liveChickens, addLiveChicken, deleteLiveChicken, updateLiveChicken, chickenInventoryTransactions, getLowFeedAlerts } = useAppContext();
+  const { liveChickens, addLiveChicken, deleteLiveChicken, updateLiveChicken, chickenInventoryTransactions, getLowFeedAlerts, loadLiveChickens } = useAppContext();
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showVaccinationModal, setShowVaccinationModal] = useState(false);
@@ -26,6 +27,13 @@ const LiveChickenStock = () => {
     ageRange: '',
     searchTerm: ''
   });
+
+  // Load live chickens data if not already loaded
+  useEffect(() => {
+    if (!liveChickens || liveChickens.length === 0) {
+      loadLiveChickens();
+    }
+  }, [liveChickens, loadLiveChickens]);
 
   // Get low feed alerts
   const feedAlerts = useMemo(() => {

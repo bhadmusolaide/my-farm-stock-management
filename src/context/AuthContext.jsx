@@ -16,6 +16,10 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Audit logging batch state
+  const [auditBatch, setAuditBatch] = useState([]);
+  const [auditBatchTimeout, setAuditBatchTimeout] = useState(null);
+
   useEffect(() => {
     // Check if user is already logged in
     const storedUser = localStorage.getItem('chicken_stock_user');
@@ -28,6 +32,19 @@ export const AuthProvider = ({ children }) => {
     }
     setLoading(false);
   }, []);
+
+  // Cleanup effect to flush remaining audit logs
+  useEffect(() => {
+    return () => {
+      if (auditBatchTimeout) {
+        clearTimeout(auditBatchTimeout);
+      }
+      // Flush any remaining audit logs
+      if (auditBatch.length > 0) {
+        flushAuditBatch();
+      }
+    };
+  }, [auditBatch, auditBatchTimeout]);
 
   const login = async (email, password) => {
     try {
@@ -100,24 +117,69 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('chicken_stock_user');
   };
 
-  const logAuditAction = async (action, tableName, recordId, oldValues, newValues) => {
+  // Batch flush function for audit logs
+  const flushAuditBatch = async () => {
+    if (auditBatch.length === 0) return;
+
+    try {
+      const batchToFlush = [...auditBatch];
+      setAuditBatch([]);
+
+      await supabase.from('audit_logs').insert(batchToFlush);
+    } catch (err) {
+      console.error('Error flushing audit batch:', err);
+      // Re-queue failed batch items
+      setAuditBatch(prev => [...prev, ...auditBatch]);
+    }
+  };
+
+  const logAuditAction = async (action, tableName, recordId, oldValues, newValues, forceImmediate = false) => {
     try {
       if (!user && action !== 'LOGIN') return;
 
+      // Conditional logging: skip certain non-critical actions
+      const skipActions = ['VIEW', 'SEARCH', 'FILTER'];
+      if (skipActions.includes(action) && !forceImmediate) return;
+
       const auditData = {
-        id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        user_id: user?.id || 'anonymous',
+        user_id: user?.id || null,
         action,
         table_name: tableName,
         record_id: recordId,
         old_values: oldValues ? JSON.stringify(oldValues) : null,
         new_values: newValues ? JSON.stringify(newValues) : null,
         ip_address: 'localhost', // In production, get real IP
-        user_agent: navigator.userAgent
+        user_agent: navigator.userAgent,
+        created_at: new Date().toISOString()
       };
 
-      // Insert audit log with minimal data transfer
-      await supabase.from('audit_logs').insert([auditData]);
+      // For critical actions, log immediately
+      const criticalActions = ['DELETE', 'LOGIN', 'LOGOUT', 'CREATE'];
+      if (criticalActions.includes(action) || forceImmediate) {
+        await supabase.from('audit_logs').insert([auditData]);
+        return;
+      }
+
+      // Add to batch
+      setAuditBatch(prev => [...prev, auditData]);
+
+      // Set timeout to flush batch if not already set
+      if (!auditBatchTimeout) {
+        const timeout = setTimeout(() => {
+          flushAuditBatch();
+          setAuditBatchTimeout(null);
+        }, 5000); // Flush every 5 seconds
+        setAuditBatchTimeout(timeout);
+      }
+
+      // Flush immediately if batch gets too large
+      if (auditBatch.length >= 10) {
+        if (auditBatchTimeout) {
+          clearTimeout(auditBatchTimeout);
+          setAuditBatchTimeout(null);
+        }
+        await flushAuditBatch();
+      }
     } catch (err) {
       console.error('Error logging audit action:', err);
     }

@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext'
 import { useNotification } from '../context/NotificationContext'
 import { formatNumber, formatDate } from '../utils/formatters'
 import { supabase } from '../utils/supabaseClient'
+import { useDebouncedFilter } from '../utils/debounce'
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner'
 import ColumnFilter from '../components/UI/ColumnFilter'
 import SortableTableHeader from '../components/UI/SortableTableHeader'
@@ -14,7 +15,20 @@ import usePagination from '../hooks/usePagination'
 import './ChickenOrders.css'
 
 const ChickenOrders = () => {
-  const { chickens, addChicken, updateChicken, deleteChicken, exportToCSV, liveChickens, updateLiveChicken, dressedChickens, updateDressedChicken, logChickenTransaction } = useAppContext()
+  const {
+    chickens,
+    addChicken,
+    updateChicken,
+    deleteChicken,
+    exportToCSV,
+    liveChickens,
+    updateLiveChicken,
+    dressedChickens,
+    updateDressedChicken,
+    logChickenTransaction,
+    loadPaginatedData,
+    pagination
+  } = useAppContext()
   const { showError, showSuccess, showWarning } = useNotification()
   
   // Helper to get actual whole chicken count from dressed chicken batch
@@ -55,7 +69,15 @@ const ChickenOrders = () => {
   
   // State for filtered chickens
   const [filteredChickens, setFilteredChickens] = useState([])
-  
+
+  // Batch operations state
+  const [selectedOrders, setSelectedOrders] = useState([])
+  const [showBatchModal, setShowBatchModal] = useState(false)
+  const [batchUpdateData, setBatchUpdateData] = useState({
+    status: '',
+    amountPaid: ''
+  })
+
   // Sorting hook
   const { sortedData, requestSort, resetSort, getSortIcon, sortConfig } = useTableSort(filteredChickens)
   
@@ -69,6 +91,10 @@ const ChickenOrders = () => {
   const [showHistory, setShowHistory] = useState(false)
   const [editHistory, setEditHistory] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
+
+  // Cache for edit history to avoid redundant fetches
+  const [historyCache, setHistoryCache] = useState(new Map())
+  const [historyCacheTimeout, setHistoryCacheTimeout] = useState(null)
   
   // Form state
   const [formData, setFormData] = useState({
@@ -103,38 +129,41 @@ const ChickenOrders = () => {
 
   // Column visibility hook
   const columnConfig = useColumnConfig('chickenOrders', orderColumns)
-  
-  // Apply filters when chickens or filters change
+
+  // Debounce filter changes to avoid excessive filtering
+  const debouncedFilters = useDebouncedFilter(filters, 300)
+
+  // Apply filters when chickens or debounced filters change
   useEffect(() => {
     filterChickens()
-  }, [chickens, filters])
+  }, [chickens, debouncedFilters])
   
-  // Filter chickens based on current filters
+  // Filter chickens based on debounced filters
   const filterChickens = () => {
     let filtered = [...chickens]
-    
-    if (filters.customer) {
-      filtered = filtered.filter(chicken => 
-        chicken.customer.toLowerCase().includes(filters.customer.toLowerCase())
+
+    if (debouncedFilters.customer) {
+      filtered = filtered.filter(chicken =>
+        chicken.customer.toLowerCase().includes(debouncedFilters.customer.toLowerCase())
       )
     }
-    
-    if (filters.status) {
-      filtered = filtered.filter(chicken => chicken.status === filters.status)
+
+    if (debouncedFilters.status) {
+      filtered = filtered.filter(chicken => chicken.status === debouncedFilters.status)
     }
-    
-    if (filters.startDate) {
-      filtered = filtered.filter(chicken => 
-        new Date(chicken.date) >= new Date(filters.startDate)
+
+    if (debouncedFilters.startDate) {
+      filtered = filtered.filter(chicken =>
+        new Date(chicken.date) >= new Date(debouncedFilters.startDate)
       )
     }
-    
-    if (filters.endDate) {
-      filtered = filtered.filter(chicken => 
-        new Date(chicken.date) <= new Date(filters.endDate)
+
+    if (debouncedFilters.endDate) {
+      filtered = filtered.filter(chicken =>
+        new Date(chicken.date) <= new Date(debouncedFilters.endDate)
       )
     }
-    
+
     setFilteredChickens(filtered)
   }
   
@@ -236,10 +265,19 @@ const ChickenOrders = () => {
     setEditHistory([])
   }
 
-  // Fetch edit history for a specific chicken order
+  // Fetch edit history for a specific chicken order with caching
   const fetchEditHistory = async (chickenId) => {
     try {
       setHistoryLoading(true)
+
+      // Check cache first (cache for 5 minutes)
+      const cacheKey = `history_${chickenId}`
+      const cached = historyCache.get(cacheKey)
+      if (cached && Date.now() - cached.timestamp < 300000) {
+        setEditHistory(cached.data)
+        setHistoryLoading(false)
+        return
+      }
 
       const { data, error } = await supabase
         .from('audit_logs')
@@ -254,7 +292,15 @@ const ChickenOrders = () => {
 
       if (error) throw error
 
-      setEditHistory(data || [])
+      const historyData = data || []
+
+      // Cache the result
+      setHistoryCache(prev => new Map(prev).set(cacheKey, {
+        data: historyData,
+        timestamp: Date.now()
+      }))
+
+      setEditHistory(historyData)
     } catch (err) {
       console.error('Error fetching edit history:', err)
       showError('Failed to load edit history')
@@ -279,7 +325,7 @@ const ChickenOrders = () => {
         if (selectedBatch) {
           const updatedBatch = {
             ...selectedBatch,
-            current_count: selectedBatch.current_count - quantity
+            current_count: Math.max(0, selectedBatch.current_count - quantity)
           }
           await updateLiveChicken(selectedBatch.id, updatedBatch)
           
@@ -330,7 +376,7 @@ const ChickenOrders = () => {
         if (selectedBatch) {
           const updatedPartsCount = {
             ...selectedBatch.parts_count,
-            [partType]: (selectedBatch.parts_count?.[partType] || 0) - quantity
+            [partType]: Math.max(0, (selectedBatch.parts_count?.[partType] || 0) - quantity)
           }
           const updatedBatch = {
             ...selectedBatch,
@@ -479,13 +525,42 @@ const ChickenOrders = () => {
         await updateChicken(currentChicken.id, chickenData)
         showSuccess('Order updated successfully!')
       } else {
-        await addChicken(chickenData)
-        
-        // Update batch inventory if a batch was selected
+        // Update batch inventory FIRST if a batch was selected
         if (formData.batch_id && formData.calculationMode !== 'size_cost') {
+          // Validate that the batch still exists and has sufficient quantity
+          let selectedBatch = null
+          let availableCount = 0
+          
+          if (formData.inventoryType === 'live') {
+            selectedBatch = liveChickens.find(batch => batch.id == formData.batch_id)
+            availableCount = selectedBatch?.current_count || 0
+          } else if (formData.inventoryType === 'dressed') {
+            selectedBatch = dressedChickens.find(batch => batch.id == formData.batch_id)
+            availableCount = getWholeChickenCount(selectedBatch)
+          } else if (formData.inventoryType === 'parts' && formData.part_type) {
+            selectedBatch = dressedChickens.find(batch => batch.id == formData.batch_id)
+            availableCount = selectedBatch?.parts_count?.[formData.part_type] || 0
+          }
+          
+          if (!selectedBatch) {
+            showError('Selected batch no longer exists. Please refresh the page and try again.')
+            return
+          }
+          
+          // Validate count for modes that use chicken count
+          if (formData.calculationMode !== 'size_cost') {
+            if (availableCount < count) {
+              const itemName = formData.inventoryType === 'parts' ? formData.part_type : 'chickens'
+              showError(`Insufficient ${itemName} in batch. Available: ${availableCount}, Required: ${count}`)
+              return
+            }
+          }
+          
           await handleInventoryDeduction(formData.inventoryType, formData.batch_id, count, formData.part_type, `Chicken order sale to ${formData.customer}`, chickenData.id || Date.now().toString())
         }
         
+        // Then add the chicken order
+        await addChicken(chickenData)
         showSuccess('Order added successfully!')
       }
       
@@ -524,7 +599,7 @@ const ChickenOrders = () => {
         } else {
           total = chicken.size * chicken.price
         }
-        
+
         return {
           Date: chicken.date,
           Customer: chicken.customer,
@@ -540,10 +615,79 @@ const ChickenOrders = () => {
           Status: chicken.status
         }
       })
-      
+
       exportToCSV(dataToExport, 'chicken-orders.csv')
     } catch (error) {
       alert(`Export failed: ${error.message}`)
+    }
+  }
+
+  // Batch operations
+  const handleSelectOrder = (orderId) => {
+    setSelectedOrders(prev =>
+      prev.includes(orderId)
+        ? prev.filter(id => id !== orderId)
+        : [...prev, orderId]
+    )
+  }
+
+  const handleSelectAll = () => {
+    if (selectedOrders.length === chickenPagination.currentData.length) {
+      setSelectedOrders([])
+    } else {
+      setSelectedOrders(chickenPagination.currentData.map(order => order.id))
+    }
+  }
+
+  const openBatchModal = () => {
+    if (selectedOrders.length === 0) {
+      showWarning('Please select orders to update')
+      return
+    }
+    setShowBatchModal(true)
+  }
+
+  const closeBatchModal = () => {
+    setShowBatchModal(false)
+    setBatchUpdateData({ status: '', amountPaid: '' })
+  }
+
+  const handleBatchUpdate = async () => {
+    if (selectedOrders.length === 0) {
+      showWarning('No orders selected')
+      return
+    }
+
+    const updates = {}
+    if (batchUpdateData.status) updates.status = batchUpdateData.status
+    if (batchUpdateData.amountPaid !== '') {
+      updates.amount_paid = parseFloat(batchUpdateData.amountPaid)
+    }
+
+    if (Object.keys(updates).length === 0) {
+      showWarning('Please specify at least one field to update')
+      return
+    }
+
+    try {
+      setIsLoading(true)
+
+      // Process updates in batches to avoid overwhelming the server
+      const batchSize = 5
+      for (let i = 0; i < selectedOrders.length; i += batchSize) {
+        const batch = selectedOrders.slice(i, i + batchSize)
+        await Promise.all(
+          batch.map(orderId => updateChicken(orderId, updates))
+        )
+      }
+
+      showSuccess(`Successfully updated ${selectedOrders.length} orders`)
+      setSelectedOrders([])
+      closeBatchModal()
+    } catch (error) {
+      showError(`Batch update failed: ${error.message}`)
+    } finally {
+      setIsLoading(false)
     }
   }
   
@@ -569,6 +713,11 @@ const ChickenOrders = () => {
           <button className="btn-primary" onClick={openAddModal}>
             Add Order
           </button>
+          {selectedOrders.length > 0 && (
+            <button className="btn-secondary" onClick={openBatchModal}>
+              Batch Update ({selectedOrders.length})
+            </button>
+          )}
           <button className="btn-export" onClick={handleExport}>
             Export CSV
           </button>
@@ -653,6 +802,14 @@ const ChickenOrders = () => {
         <table className="orders-table">
           <thead>
             <tr>
+              <th className="select-column">
+                <input
+                  type="checkbox"
+                  checked={selectedOrders.length === chickenPagination.currentData.length && chickenPagination.currentData.length > 0}
+                  onChange={handleSelectAll}
+                  aria-label="Select all orders"
+                />
+              </th>
               {columnConfig.isColumnVisible('date') && (
                 <SortableTableHeader sortKey="date" onSort={requestSort} getSortIcon={getSortIcon}>
                   Date
@@ -713,7 +870,15 @@ const ChickenOrders = () => {
           <tbody>
             {chickenPagination.currentData.length > 0 ? (
               chickenPagination.currentData.map(chicken => (
-                <tr key={chicken.id}>
+                <tr key={chicken.id} className={selectedOrders.includes(chicken.id) ? 'selected' : ''}>
+                  <td className="select-column">
+                    <input
+                      type="checkbox"
+                      checked={selectedOrders.includes(chicken.id)}
+                      onChange={() => handleSelectOrder(chicken.id)}
+                      aria-label={`Select order for ${chicken.customer}`}
+                    />
+                  </td>
                   {columnConfig.isColumnVisible('date') && <td>{formatDate(chicken.date)}</td>}
                   {columnConfig.isColumnVisible('customer') && (
                     <td>
@@ -1157,6 +1322,67 @@ const ChickenOrders = () => {
                     </>
                   ) : (
                     editMode ? 'Update Order' : 'Add Order'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Update Modal */}
+      {showBatchModal && (
+        <div className="modal-overlay" onClick={closeBatchModal}>
+          <div className="modal-content batch-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Batch Update Orders</h2>
+              <p>Update {selectedOrders.length} selected order{selectedOrders.length !== 1 ? 's' : ''}</p>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); handleBatchUpdate(); }}>
+              <div className="form-container">
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="batchStatus">Status</label>
+                    <select
+                      id="batchStatus"
+                      value={batchUpdateData.status}
+                      onChange={(e) => setBatchUpdateData(prev => ({ ...prev, status: e.target.value }))}
+                    >
+                      <option value="">No change</option>
+                      <option value="pending">Pending</option>
+                      <option value="partial">Partial</option>
+                      <option value="paid">Paid</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="batchAmountPaid">Amount Paid (₦)</label>
+                    <input
+                      type="number"
+                      id="batchAmountPaid"
+                      value={batchUpdateData.amountPaid}
+                      onChange={(e) => setBatchUpdateData(prev => ({ ...prev, amountPaid: e.target.value }))}
+                      min="0"
+                      step="0.01"
+                      placeholder="Leave empty for no change"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button type="button" className="btn-secondary" onClick={closeBatchModal} disabled={isLoading}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <LoadingSpinner size="small" color="white" />
+                      Updating...
+                    </>
+                  ) : (
+                    `Update ${selectedOrders.length} Order${selectedOrders.length !== 1 ? 's' : ''}`
                   )}
                 </button>
               </div>

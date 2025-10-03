@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { formatNumber, formatDate } from '../utils/formatters'
 import { FEED_BRANDS, kgToBags, bagsToKg, LOW_STOCK_THRESHOLD } from '../utils/constants'
@@ -12,7 +12,7 @@ import usePagination from '../hooks/usePagination'
 import './FeedManagement.css'
 
 const FeedManagement = () => {
-  const { feedInventory, addFeedInventory, updateFeedInventory, deleteFeedInventory, feedConsumption, addFeedConsumption, deleteFeedConsumption, liveChickens, feedBatchAssignments, deleteFeedBatchAssignment } = useAppContext()
+  const { feedInventory, addFeedInventory, updateFeedInventory, deleteFeedInventory, feedConsumption, addFeedConsumption, deleteFeedConsumption, liveChickens, feedBatchAssignments, deleteFeedBatchAssignment, loadFeedInventory } = useAppContext()
   
   // Add resetFeedData function here
   const resetFeedData = async () => {
@@ -42,6 +42,13 @@ const FeedManagement = () => {
     }
   }
   
+  // Load feed inventory data if not already loaded
+  useEffect(() => {
+    if (!feedInventory || feedInventory.length === 0) {
+      loadFeedInventory();
+    }
+  }, [feedInventory, loadFeedInventory]);
+
   // State for active tab
   const [activeTab, setActiveTab] = useState('inventory')
   
