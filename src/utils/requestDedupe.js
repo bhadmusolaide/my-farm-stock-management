@@ -3,7 +3,7 @@ class RequestDeduper {
   constructor() {
     this.pendingRequests = new Map();
     this.cache = new Map();
-    this.cacheTimeout = 30000; // 30 seconds cache
+    this.cacheTimeout = 300000; // 5 minutes cache for better egress reduction
   }
 
   // Generate a unique key for the request
@@ -208,5 +208,77 @@ export const getRequestDeduper = (supabaseClient) => {
   }
   return deduperInstance;
 };
+
+// Batched audit logger to reduce egress from frequent individual writes
+export class BatchedAuditLogger {
+  constructor() {
+    this.auditQueue = []
+    this.batchSize = 10
+    this.flushInterval = 5000 // 5 seconds
+    this.isFlushing = false
+
+    // Auto-flush every 5 seconds
+    setInterval(() => {
+      this.flush()
+    }, this.flushInterval)
+  }
+
+  // Queue audit log entry
+  queueAudit(action, tableName, recordId, oldValues, newValues, userId = null) {
+    this.auditQueue.push({
+      action,
+      table_name: tableName,
+      record_id: recordId,
+      old_values: oldValues ? JSON.stringify(oldValues) : null,
+      new_values: newValues ? JSON.stringify(newValues) : null,
+      user_id: userId,
+      created_at: new Date().toISOString()
+    })
+
+    // Auto-flush if batch is full
+    if (this.auditQueue.length >= this.batchSize) {
+      this.flush()
+    }
+  }
+
+  // Flush queued audits to database
+  async flush() {
+    if (this.auditQueue.length === 0 || this.isFlushing) return
+
+    this.isFlushing = true
+    const batch = [...this.auditQueue]
+    this.auditQueue = []
+
+    try {
+      // This would integrate with your Supabase client
+      // For now, just log the batch size
+      console.log(`Flushing ${batch.length} audit records`)
+
+      // TODO: Implement actual batch insert to audit_logs table
+      // const { error } = await supabase.from('audit_logs').insert(batch)
+      // if (error) throw error
+
+    } catch (error) {
+      console.error('Failed to flush audit logs:', error)
+      // Re-queue failed items
+      this.auditQueue.unshift(...batch)
+    } finally {
+      this.isFlushing = false
+    }
+  }
+
+  // Force flush (useful before app unload)
+  async forceFlush() {
+    while (this.auditQueue.length > 0 || this.isFlushing) {
+      await this.flush()
+      if (this.auditQueue.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    }
+  }
+}
+
+// Export singleton instance
+export const auditLogger = new BatchedAuditLogger()
 
 export default RequestDeduper;
