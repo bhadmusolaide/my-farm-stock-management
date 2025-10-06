@@ -43,19 +43,21 @@ const DressedChickenStock = () => {
   const [dogFoodWeight, setDogFoodWeight] = useState('');
 
   // Edit modal state
-  const [editBatchId, setEditBatchId] = useState('');
-  const [editSizeCategory, setEditSizeCategory] = useState('medium');
-  const [editStatus, setEditStatus] = useState('in-storage');
-  const [editStorageLocation, setEditStorageLocation] = useState('');
-  const [editExpiryDate, setEditExpiryDate] = useState('');
-  const [editNeckCount, setEditNeckCount] = useState('');
-  const [editNeckWeight, setEditNeckWeight] = useState('');
-  const [editFeetCount, setEditFeetCount] = useState('');
-  const [editFeetWeight, setEditFeetWeight] = useState('');
-  const [editGizzardCount, setEditGizzardCount] = useState('');
-  const [editGizzardWeight, setEditGizzardWeight] = useState('');
-  const [editDogFoodCount, setEditDogFoodCount] = useState('');
-  const [editDogFoodWeight, setEditDogFoodWeight] = useState('');
+   const [editBatchId, setEditBatchId] = useState('');
+   const [editWholeChickenCount, setEditWholeChickenCount] = useState(''); // Independent whole chicken count editing
+   const [editSizeCategoryId, setEditSizeCategoryId] = useState(''); // Use new flexible size category system
+   const [editSizeCategoryCustom, setEditSizeCategoryCustom] = useState(''); // Custom size name if not using predefined
+   const [editStatus, setEditStatus] = useState('in-storage');
+   const [editStorageLocation, setEditStorageLocation] = useState('');
+   const [editExpiryDate, setEditExpiryDate] = useState('');
+   const [editNeckCount, setEditNeckCount] = useState('');
+   const [editNeckWeight, setEditNeckWeight] = useState('');
+   const [editFeetCount, setEditFeetCount] = useState('');
+   const [editFeetWeight, setEditFeetWeight] = useState('');
+   const [editGizzardCount, setEditGizzardCount] = useState('');
+   const [editGizzardWeight, setEditGizzardWeight] = useState('');
+   const [editDogFoodCount, setEditDogFoodCount] = useState('');
+   const [editDogFoodWeight, setEditDogFoodWeight] = useState('');
 
   // Memoized edit handler to prevent inline function churn
   const handleEditChicken = useCallback((chicken) => {
@@ -412,7 +414,7 @@ Check the browser console for more details.`);
       dog_food: parseFloat(editingChicken.parts_weight?.dog_food) || 0
     };
 
-    // Calculate total parts weight and average weight
+    // Calculate total parts weight and average weight based on current whole chicken count
     const totalPartsWeight = Object.values(partsWeight).reduce((a, b) => a + b, 0);
     const currentCount = editingChicken.current_count || editingChicken.initial_count || 0;
     const averageWeight = currentCount > 0 ? (totalPartsWeight / currentCount) : 0;
@@ -422,14 +424,18 @@ Check the browser console for more details.`);
       batch_id: editingChicken.batch_id,
       processing_date: editingChicken.processing_date || editingChicken.processingDate,
       initial_count: editingChicken.initial_count || editingChicken.initialCount,
-      current_count: editingChicken.current_count, // Keep the current count of whole chickens
+      current_count: editingChicken.current_count, // Use the independently edited whole chicken count
       average_weight: averageWeight,
-      size_category: editingChicken.size_category,
+      // Use new flexible size category system
+      size_category_id: editingChicken.size_category_id,
+      size_category_custom: editingChicken.size_category_custom,
       status: editingChicken.status,
       storage_location: editingChicken.storage_location,
       expiry_date: editingChicken.expiry_date,
       parts_count: partsCount,
-      parts_weight: partsWeight
+      parts_weight: partsWeight,
+      // Add any additional custom fields
+      custom_fields: editingChicken.custom_fields || {}
     };
 
     try {
@@ -487,7 +493,9 @@ Check the browser console for more details.`);
               {dressedChickens.map((chicken) => (
                 <tr key={chicken.id}>
                   <td className="font-medium">{chicken.batch_id}</td>
-                  <td>{chicken.size_category}</td>
+                  <td>
+                    {chicken.size_category_custom || chicken.size_category || 'Not specified'}
+                  </td>
                   <td>
                     <strong>{getWholeChickenCount(chicken)}</strong>
                     <small style={{display: 'block', color: '#666'}}>
@@ -1167,18 +1175,51 @@ Check the browser console for more details.`);
           handleUpdateChickenForm(e);
         }}>
           <div className="form-group">
+            <label>Whole Chicken Count *</label>
+            <input
+              type="number"
+              placeholder="Number of whole chickens"
+              value={editingChicken?.current_count || ''}
+              onChange={(e) => setEditingChicken({...editingChicken, current_count: parseInt(e.target.value) || 0})}
+              className="form-control"
+              min="0"
+              required
+            />
+            <small className="form-help">Edit independently of parts</small>
+          </div>
+
+          <div className="form-group">
             <label>Size Category</label>
             <select
-              value={editingChicken?.size_category || 'medium'}
-              onChange={(e) => setEditingChicken({...editingChicken, size_category: e.target.value})}
+              value={editingChicken?.size_category_id || ''}
+              onChange={(e) => {
+                const value = e.target.value;
+                setEditingChicken({
+                  ...editingChicken,
+                  size_category_id: value,
+                  size_category_custom: value === 'custom' ? editingChicken?.size_category_custom || '' : ''
+                });
+              }}
               className="form-control"
             >
-              <option value="small">Small</option>
-              <option value="medium">Medium</option>
-              <option value="large">Large</option>
-              <option value="extra-large">Extra Large</option>
+              <option value="">Select Size Category</option>
+              {/* This will be populated with data from chicken_size_categories */}
+              <option value="custom">Custom Size</option>
             </select>
           </div>
+
+          {editingChicken?.size_category_id === 'custom' && (
+            <div className="form-group">
+              <label>Custom Size Name</label>
+              <input
+                type="text"
+                placeholder="Enter custom size name"
+                value={editingChicken?.size_category_custom || ''}
+                onChange={(e) => setEditingChicken({...editingChicken, size_category_custom: e.target.value})}
+                className="form-control"
+              />
+            </div>
+          )}
 
           <div className="form-group">
             <label>Status</label>

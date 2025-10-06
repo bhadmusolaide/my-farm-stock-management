@@ -74,6 +74,11 @@ export function AppProvider({ children }) {
   const [weightHistory, setWeightHistory] = useState([]) // Add weight history state
   const [dressedChickens, setDressedChickensState] = useState([])
   const [batchRelationships, setBatchRelationshipsState] = useState([])
+  // Configuration tables state
+  const [chickenSizeCategories, setChickenSizeCategoriesState] = useState([])
+  const [chickenPartTypes, setChickenPartTypesState] = useState([])
+  const [chickenPartStandards, setChickenPartStandardsState] = useState([])
+  const [chickenProcessingConfigs, setChickenProcessingConfigsState] = useState([])
   
   // Helper function to update dressedChickens state and save to localStorage
   const setDressedChickens = (newDressedChickens) => {
@@ -2614,6 +2619,284 @@ export function AppProvider({ children }) {
     }
   }
 
+  // Configuration Management CRUD operations
+
+  // Load configuration data functions
+  const loadChickenSizeCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chicken_size_categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+
+      if (error && !error.message.includes('relation "chicken_size_categories" does not exist')) {
+        throw error
+      }
+
+      if (data) {
+        setChickenSizeCategories(data)
+      }
+    } catch (err) {
+      console.error('Error loading chicken size categories:', err)
+    }
+  }
+
+  const loadChickenPartTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chicken_part_types')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+
+      if (error && !error.message.includes('relation "chicken_part_types" does not exist')) {
+        throw error
+      }
+
+      if (data) {
+        setChickenPartTypes(data)
+      }
+    } catch (err) {
+      console.error('Error loading chicken part types:', err)
+    }
+  }
+
+  const loadChickenPartStandards = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chicken_part_standards')
+        .select(`
+          *,
+          chicken_size_categories(name),
+          chicken_part_types(name)
+        `)
+        .eq('is_active', true)
+        .order('breed', { ascending: true })
+
+      if (error && !error.message.includes('relation "chicken_part_standards" does not exist')) {
+        throw error
+      }
+
+      if (data) {
+        setChickenPartStandards(data)
+      }
+    } catch (err) {
+      console.error('Error loading chicken part standards:', err)
+    }
+  }
+
+  const loadChickenProcessingConfigs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chicken_processing_config')
+        .select(`
+          *,
+          chicken_size_categories(name)
+        `)
+        .eq('is_active', true)
+        .order('config_name', { ascending: true })
+
+      if (error && !error.message.includes('relation "chicken_processing_config" does not exist')) {
+        throw error
+      }
+
+      if (data) {
+        setChickenProcessingConfigs(data)
+      }
+    } catch (err) {
+      console.error('Error loading chicken processing configs:', err)
+    }
+  }
+
+  // CRUD operations for chicken size categories
+  const addChickenSizeCategory = async (categoryData) => {
+    try {
+      const { error } = await supabase.from('chicken_size_categories').insert(categoryData)
+      if (error) throw error
+
+      await loadChickenSizeCategories() // Reload to get updated data
+      return categoryData
+    } catch (err) {
+      console.error('Error adding chicken size category:', err)
+      throw err
+    }
+  }
+
+  const updateChickenSizeCategory = async (id, updates) => {
+    try {
+      const { error } = await supabase
+        .from('chicken_size_categories')
+        .update(updates)
+        .eq('id', id)
+
+      if (error) throw error
+
+      await loadChickenSizeCategories() // Reload to get updated data
+      return updates
+    } catch (err) {
+      console.error('Error updating chicken size category:', err)
+      throw err
+    }
+  }
+
+  const deleteChickenSizeCategory = async (id) => {
+    try {
+      const { error } = await supabase
+        .from('chicken_size_categories')
+        .update({ is_active: false })
+        .eq('id', id)
+
+      if (error) throw error
+
+      await loadChickenSizeCategories() // Reload to get updated data
+    } catch (err) {
+      console.error('Error deleting chicken size category:', err)
+      throw err
+    }
+  }
+
+  // CRUD operations for chicken part types
+  const addChickenPartType = async (partTypeData) => {
+    try {
+      const { error } = await supabase.from('chicken_part_types').insert(partTypeData)
+      if (error) throw error
+
+      await loadChickenPartTypes() // Reload to get updated data
+      return partTypeData
+    } catch (err) {
+      console.error('Error adding chicken part type:', err)
+      throw err
+    }
+  }
+
+  const updateChickenPartType = async (id, updates) => {
+    try {
+      const { error } = await supabase
+        .from('chicken_part_types')
+        .update(updates)
+        .eq('id', id)
+
+      if (error) throw error
+
+      await loadChickenPartTypes() // Reload to get updated data
+      return updates
+    } catch (err) {
+      console.error('Error updating chicken part type:', err)
+      throw err
+    }
+  }
+
+  const deleteChickenPartType = async (id) => {
+    try {
+      const { error } = await supabase
+        .from('chicken_part_types')
+        .update({ is_active: false })
+        .eq('id', id)
+
+      if (error) throw error
+
+      await loadChickenPartTypes() // Reload to get updated data
+    } catch (err) {
+      console.error('Error deleting chicken part type:', err)
+      throw err
+    }
+  }
+
+  // CRUD operations for chicken part standards
+  const addChickenPartStandard = async (standardData) => {
+    try {
+      const { error } = await supabase.from('chicken_part_standards').insert(standardData)
+      if (error) throw error
+
+      await loadChickenPartStandards() // Reload to get updated data
+      return standardData
+    } catch (err) {
+      console.error('Error adding chicken part standard:', err)
+      throw err
+    }
+  }
+
+  const updateChickenPartStandard = async (id, updates) => {
+    try {
+      const { error } = await supabase
+        .from('chicken_part_standards')
+        .update(updates)
+        .eq('id', id)
+
+      if (error) throw error
+
+      await loadChickenPartStandards() // Reload to get updated data
+      return updates
+    } catch (err) {
+      console.error('Error updating chicken part standard:', err)
+      throw err
+    }
+  }
+
+  const deleteChickenPartStandard = async (id) => {
+    try {
+      const { error } = await supabase
+        .from('chicken_part_standards')
+        .update({ is_active: false })
+        .eq('id', id)
+
+      if (error) throw error
+
+      await loadChickenPartStandards() // Reload to get updated data
+    } catch (err) {
+      console.error('Error deleting chicken part standard:', err)
+      throw err
+    }
+  }
+
+  // CRUD operations for chicken processing configs
+  const addChickenProcessingConfig = async (configData) => {
+    try {
+      const { error } = await supabase.from('chicken_processing_config').insert(configData)
+      if (error) throw error
+
+      await loadChickenProcessingConfigs() // Reload to get updated data
+      return configData
+    } catch (err) {
+      console.error('Error adding chicken processing config:', err)
+      throw err
+    }
+  }
+
+  const updateChickenProcessingConfig = async (id, updates) => {
+    try {
+      const { error } = await supabase
+        .from('chicken_processing_config')
+        .update(updates)
+        .eq('id', id)
+
+      if (error) throw error
+
+      await loadChickenProcessingConfigs() // Reload to get updated data
+      return updates
+    } catch (err) {
+      console.error('Error updating chicken processing config:', err)
+      throw err
+    }
+  }
+
+  const deleteChickenProcessingConfig = async (id) => {
+    try {
+      const { error } = await supabase
+        .from('chicken_processing_config')
+        .update({ is_active: false })
+        .eq('id', id)
+
+      if (error) throw error
+
+      await loadChickenProcessingConfigs() // Reload to get updated data
+    } catch (err) {
+      console.error('Error deleting chicken processing config:', err)
+      throw err
+    }
+  }
+
   const value = {
     // State
     chickens,
@@ -2628,6 +2911,11 @@ export function AppProvider({ children }) {
     weightHistory,
     dressedChickens,
     batchRelationships,
+    // Configuration state
+    chickenSizeCategories,
+    chickenPartTypes,
+    chickenPartStandards,
+    chickenProcessingConfigs,
     loading,
     error,
     migrationStatus,
@@ -2677,6 +2965,12 @@ export function AppProvider({ children }) {
     addDressedChicken,
     updateDressedChicken,
     deleteDressedChicken,
+
+    // Configuration Management state
+    chickenSizeCategories,
+    chickenPartTypes,
+    chickenPartStandards,
+    chickenProcessingConfigs,
   
     // Batch Relationship operations
     addBatchRelationship,
@@ -2693,12 +2987,30 @@ export function AppProvider({ children }) {
     loadDressedChickensData,
     loadFeedInventoryData,
   
+    // Configuration Management operations
+    loadChickenSizeCategories,
+    loadChickenPartTypes,
+    loadChickenPartStandards,
+    loadChickenProcessingConfigs,
+    addChickenSizeCategory,
+    updateChickenSizeCategory,
+    deleteChickenSizeCategory,
+    addChickenPartType,
+    updateChickenPartType,
+    deleteChickenPartType,
+    addChickenPartStandard,
+    updateChickenPartStandard,
+    deleteChickenPartStandard,
+    addChickenProcessingConfig,
+    updateChickenProcessingConfig,
+    deleteChickenProcessingConfig,
+
     // Stats and reports
     stats,
     calculateStats,
     generateReport,
     exportToCSV,
-  
+
     // Pagination and lazy loading
     pagination,
     loadPaginatedData,

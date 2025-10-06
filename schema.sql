@@ -232,6 +232,72 @@ CREATE TABLE IF NOT EXISTS public.chicken_inventory_transactions (
     user_id UUID REFERENCES auth.users(id)
 );
 
+-- Create chicken_size_categories table for configurable size definitions
+CREATE TABLE IF NOT EXISTS public.chicken_size_categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE, -- Custom size name (e.g., "Farm Standard", "Export Grade")
+    description TEXT,
+    min_weight DECIMAL(10,2), -- Minimum weight for this category
+    max_weight DECIMAL(10,2), -- Maximum weight for this category
+    is_active BOOLEAN DEFAULT true,
+    sort_order INTEGER DEFAULT 0,
+    created_by UUID REFERENCES auth.users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create chicken_part_types table for defining available part types
+CREATE TABLE IF NOT EXISTS public.chicken_part_types (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE, -- Part name (e.g., "neck", "feet", "gizzard", "liver")
+    description TEXT,
+    default_count_per_bird DECIMAL(10,2) DEFAULT 1, -- Default quantity per whole chicken
+    unit_of_measure TEXT DEFAULT 'count', -- 'count', 'kg', 'lbs'
+    is_active BOOLEAN DEFAULT true,
+    sort_order INTEGER DEFAULT 0,
+    created_by UUID REFERENCES auth.users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create chicken_part_standards table for breed/size specific weight standards
+CREATE TABLE IF NOT EXISTS public.chicken_part_standards (
+    id TEXT PRIMARY KEY,
+    breed TEXT NOT NULL, -- Chicken breed (e.g., "Broiler", "Layer")
+    size_category_id TEXT REFERENCES public.chicken_size_categories(id),
+    part_type_id TEXT REFERENCES public.chicken_part_types(id),
+    standard_weight_kg DECIMAL(10,3) NOT NULL, -- Standard weight in kg per part
+    weight_variance_percent DECIMAL(5,2) DEFAULT 10, -- Allowed variance percentage
+    sample_size INTEGER, -- Number of measurements this standard is based on
+    measured_by TEXT, -- Person who took measurements
+    measurement_date DATE,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_by UUID REFERENCES auth.users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(breed, size_category_id, part_type_id)
+);
+
+-- Create chicken_processing_config table for farm-specific processing rules
+CREATE TABLE IF NOT EXISTS public.chicken_processing_config (
+    id TEXT PRIMARY KEY,
+    config_name TEXT NOT NULL,
+    config_type TEXT NOT NULL CHECK (config_type IN ('global', 'breed_specific', 'seasonal')),
+    breed TEXT, -- NULL for global configs
+    season_start_month INTEGER CHECK (season_start_month >= 1 AND season_start_month <= 12),
+    season_end_month INTEGER CHECK (season_end_month >= 1 AND season_end_month <= 12),
+    default_size_category_id TEXT REFERENCES public.chicken_size_categories(id),
+    auto_calculate_parts BOOLEAN DEFAULT false, -- Whether to auto-calculate parts from whole count
+    allow_part_editing BOOLEAN DEFAULT true,
+    require_weight_validation BOOLEAN DEFAULT false,
+    config_data JSONB DEFAULT '{}', -- Additional flexible configuration
+    is_active BOOLEAN DEFAULT true,
+    created_by UUID REFERENCES auth.users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create dressed_chickens table for tracking processed/dressed chicken inventory
 CREATE TABLE IF NOT EXISTS public.dressed_chickens (
     id TEXT PRIMARY KEY,
@@ -240,18 +306,22 @@ CREATE TABLE IF NOT EXISTS public.dressed_chickens (
     initial_count INTEGER NOT NULL,
     current_count INTEGER NOT NULL,
     average_weight DECIMAL(10,2) NOT NULL,
-    size_category TEXT NOT NULL, -- 'small', 'medium', 'large', 'extra-large'
+    size_category_id TEXT REFERENCES public.chicken_size_categories(id), -- Reference to size_categories table
+    size_category_custom TEXT, -- Custom size name if not using predefined categories
     status TEXT NOT NULL DEFAULT 'in-storage', -- 'in-storage', 'sold', 'expired'
     storage_location TEXT,
     expiry_date DATE,
     notes TEXT,
-    parts_count JSONB DEFAULT '{}', -- Tracks count of specific parts: {"neck": 85, "feet": 85, "gizzard": 85, "dog_food": 85}
-    parts_weight JSONB DEFAULT '{}', -- Tracks weight of specific parts: {"neck": 2.1, "feet": 1.8, "gizzard": 3.2, "dog_food": 4.5}
+    parts_count JSONB DEFAULT '{}', -- Tracks count of specific parts: {"neck": 85, "feet": 85, "gizzard": 85, "liver": 42}
+    parts_weight JSONB DEFAULT '{}', -- Tracks weight of specific parts: {"neck": 2.1, "feet": 1.8, "gizzard": 3.2, "liver": 1.8}
     -- Partial processing fields
     processing_quantity INTEGER, -- Number of birds processed from the batch
     remaining_birds INTEGER, -- Number of birds left in the original batch
     create_new_batch_for_remaining BOOLEAN DEFAULT FALSE, -- Whether to create a new batch for remaining birds
     remaining_batch_id TEXT, -- ID of the new batch created for remaining birds
+    -- Enhanced fields for flexibility
+    custom_fields JSONB DEFAULT '{}', -- Additional custom fields for farm-specific data
+    created_by UUID REFERENCES auth.users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -280,14 +350,25 @@ CREATE TABLE IF NOT EXISTS public.batch_relationships (
 ALTER TABLE public.chicken_inventory_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dressed_chickens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.batch_relationships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chicken_size_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chicken_part_types ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chicken_part_standards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chicken_processing_config ENABLE ROW LEVEL SECURITY;
 
 -- Apply standard RLS policies to the new tables
 SELECT create_standard_rls_policies('chicken_inventory_transactions');
 SELECT create_standard_rls_policies('dressed_chickens');
 SELECT create_standard_rls_policies('batch_relationships');
+SELECT create_standard_rls_policies('chicken_size_categories');
+SELECT create_standard_rls_policies('chicken_part_types');
+SELECT create_standard_rls_policies('chicken_part_standards');
+SELECT create_standard_rls_policies('chicken_processing_config');
 
 -- Clean up the utility function
 DROP FUNCTION create_standard_rls_policies(TEXT);
+
+-- Migration script has been moved to a separate file: migration-flexible-chicken-processing.sql
+-- Run that file after this schema file to complete the setup and migrate existing data.
 
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_chicken_transactions_batch ON public.chicken_inventory_transactions(batch_id);
@@ -298,10 +379,24 @@ CREATE INDEX IF NOT EXISTS idx_chicken_transactions_reference ON public.chicken_
 CREATE INDEX IF NOT EXISTS idx_dressed_chickens_batch_id ON public.dressed_chickens(batch_id);
 CREATE INDEX IF NOT EXISTS idx_dressed_chickens_processing_date ON public.dressed_chickens(processing_date);
 CREATE INDEX IF NOT EXISTS idx_dressed_chickens_status ON public.dressed_chickens(status);
-CREATE INDEX IF NOT EXISTS idx_dressed_chickens_size_category ON public.dressed_chickens(size_category);
+CREATE INDEX IF NOT EXISTS idx_dressed_chickens_size_category_id ON public.dressed_chickens(size_category_id);
+CREATE INDEX IF NOT EXISTS idx_dressed_chickens_size_category_custom ON public.dressed_chickens(size_category_custom);
 CREATE INDEX IF NOT EXISTS idx_dressed_chickens_expiry_date ON public.dressed_chickens(expiry_date);
 CREATE INDEX IF NOT EXISTS idx_dressed_chickens_processing_quantity ON public.dressed_chickens(processing_quantity);
 CREATE INDEX IF NOT EXISTS idx_dressed_chickens_remaining_batch_id ON public.dressed_chickens(remaining_batch_id);
+CREATE INDEX IF NOT EXISTS idx_dressed_chickens_created_by ON public.dressed_chickens(created_by);
+-- Indexes for new configuration tables
+CREATE INDEX IF NOT EXISTS idx_chicken_size_categories_active ON public.chicken_size_categories(is_active, sort_order);
+CREATE INDEX IF NOT EXISTS idx_chicken_size_categories_name ON public.chicken_size_categories(name);
+CREATE INDEX IF NOT EXISTS idx_chicken_part_types_active ON public.chicken_part_types(is_active, sort_order);
+CREATE INDEX IF NOT EXISTS idx_chicken_part_types_name ON public.chicken_part_types(name);
+CREATE INDEX IF NOT EXISTS idx_chicken_part_standards_breed ON public.chicken_part_standards(breed);
+CREATE INDEX IF NOT EXISTS idx_chicken_part_standards_breed_size ON public.chicken_part_standards(breed, size_category_id);
+CREATE INDEX IF NOT EXISTS idx_chicken_part_standards_part_type ON public.chicken_part_standards(part_type_id);
+CREATE INDEX IF NOT EXISTS idx_chicken_part_standards_active ON public.chicken_part_standards(is_active);
+CREATE INDEX IF NOT EXISTS idx_chicken_processing_config_type ON public.chicken_processing_config(config_type);
+CREATE INDEX IF NOT EXISTS idx_chicken_processing_config_breed ON public.chicken_processing_config(breed);
+CREATE INDEX IF NOT EXISTS idx_chicken_processing_config_active ON public.chicken_processing_config(is_active);
 -- Enhanced indexes for better query performance and constraints
 CREATE INDEX IF NOT EXISTS idx_batch_relationships_source ON public.batch_relationships(source_batch_id, source_batch_type);
 CREATE INDEX IF NOT EXISTS idx_batch_relationships_target ON public.batch_relationships(target_batch_id, target_batch_type);
@@ -320,6 +415,27 @@ CREATE TRIGGER update_chicken_transactions_updated_at
 DROP TRIGGER IF EXISTS update_dressed_chickens_updated_at ON public.dressed_chickens;
 CREATE TRIGGER update_dressed_chickens_updated_at
     BEFORE UPDATE ON public.dressed_chickens
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Create triggers for updated_at column for new configuration tables
+DROP TRIGGER IF EXISTS update_chicken_size_categories_updated_at ON public.chicken_size_categories;
+CREATE TRIGGER update_chicken_size_categories_updated_at
+    BEFORE UPDATE ON public.chicken_size_categories
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+DROP TRIGGER IF EXISTS update_chicken_part_types_updated_at ON public.chicken_part_types;
+CREATE TRIGGER update_chicken_part_types_updated_at
+    BEFORE UPDATE ON public.chicken_part_types
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+DROP TRIGGER IF EXISTS update_chicken_part_standards_updated_at ON public.chicken_part_standards;
+CREATE TRIGGER update_chicken_part_standards_updated_at
+    BEFORE UPDATE ON public.chicken_part_standards
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+DROP TRIGGER IF EXISTS update_chicken_processing_config_updated_at ON public.chicken_processing_config;
+CREATE TRIGGER update_chicken_processing_config_updated_at
+    BEFORE UPDATE ON public.chicken_processing_config
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- Add comments for the new columns
@@ -553,13 +669,59 @@ SELECT '{
       {"id": "live-chickens", "label": "Live Chicken Stock", "path": "/live-chickens", "enabled": true},
       {"id": "lifecycle", "label": "Lifecycle Tracking", "path": "/lifecycle", "enabled": true},
       {"id": "feed", "label": "Feed Management", "path": "/feed", "enabled": true},
-      {"id": "dressed-chicken", "label": "Dressed Chicken Stock", "path": "/dressed-chicken", "enabled": true}
+      {"id": "dressed-chicken", "label": "Dressed Chicken Stock", "path": "/dressed-chicken", "enabled": true},
+      {"id": "processing-config", "label": "Processing Config", "path": "/processing-config", "enabled": true}
     ]},
     {"id": "transactions", "label": "Transactions", "path": "/transactions", "icon": "💰", "enabled": true, "order": 4},
     {"id": "reports", "label": "Reports", "path": "/reports", "icon": "📈", "enabled": true, "order": 5}
   ]
 }'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM public.site_settings);
+
+-- Insert default size categories only if the table is empty
+INSERT INTO public.chicken_size_categories (id, name, description, min_weight, max_weight, sort_order)
+SELECT 'small', 'Small', 'Small sized chickens under 1.2kg', 0.8, 1.2, 1
+WHERE NOT EXISTS (SELECT 1 FROM public.chicken_size_categories WHERE name = 'Small');
+
+INSERT INTO public.chicken_size_categories (id, name, description, min_weight, max_weight, sort_order)
+SELECT 'medium', 'Medium', 'Medium sized chickens 1.2-1.8kg', 1.2, 1.8, 2
+WHERE NOT EXISTS (SELECT 1 FROM public.chicken_size_categories WHERE name = 'Medium');
+
+INSERT INTO public.chicken_size_categories (id, name, description, min_weight, max_weight, sort_order)
+SELECT 'large', 'Large', 'Large sized chickens 1.8-2.5kg', 1.8, 2.5, 3
+WHERE NOT EXISTS (SELECT 1 FROM public.chicken_size_categories WHERE name = 'Large');
+
+INSERT INTO public.chicken_size_categories (id, name, description, min_weight, max_weight, sort_order)
+SELECT 'extra-large', 'Extra Large', 'Extra large chickens over 2.5kg', 2.5, 10.0, 4
+WHERE NOT EXISTS (SELECT 1 FROM public.chicken_size_categories WHERE name = 'Extra Large');
+
+-- Insert default part types only if the table is empty
+INSERT INTO public.chicken_part_types (id, name, description, default_count_per_bird, unit_of_measure, sort_order)
+SELECT 'neck', 'Neck', 'Chicken neck portion', 1, 'count', 1
+WHERE NOT EXISTS (SELECT 1 FROM public.chicken_part_types WHERE name = 'Neck');
+
+INSERT INTO public.chicken_part_types (id, name, description, default_count_per_bird, unit_of_measure, sort_order)
+SELECT 'feet', 'Feet', 'Chicken feet (2 per bird)', 2, 'count', 2
+WHERE NOT EXISTS (SELECT 1 FROM public.chicken_part_types WHERE name = 'Feet');
+
+INSERT INTO public.chicken_part_types (id, name, description, default_count_per_bird, unit_of_measure, sort_order)
+SELECT 'gizzard', 'Gizzard', 'Chicken gizzard', 1, 'count', 3
+WHERE NOT EXISTS (SELECT 1 FROM public.chicken_part_types WHERE name = 'Gizzard');
+
+INSERT INTO public.chicken_part_types (id, name, description, default_count_per_bird, unit_of_measure, sort_order)
+SELECT 'liver', 'Liver', 'Chicken liver', 1, 'count', 4
+WHERE NOT EXISTS (SELECT 1 FROM public.chicken_part_types WHERE name = 'Liver');
+
+INSERT INTO public.chicken_part_types (id, name, description, default_count_per_bird, unit_of_measure, sort_order)
+SELECT 'dog_food', 'Dog Food', 'Head and liver mix for dog food', 1, 'count', 5
+WHERE NOT EXISTS (SELECT 1 FROM public.chicken_part_types WHERE name = 'Dog Food');
+
+-- Insert default processing configuration only if the table is empty
+INSERT INTO public.chicken_processing_config (id, config_name, config_type, default_size_category_id, auto_calculate_parts, allow_part_editing, require_weight_validation, config_data)
+SELECT 'default_global_config', 'Default Global Configuration', 'global',
+       (SELECT id FROM public.chicken_size_categories WHERE name = 'Medium' LIMIT 1),
+       false, true, false, '{"allow_custom_size_categories": true, "default_processing_method": "standard"}'::jsonb
+WHERE NOT EXISTS (SELECT 1 FROM public.chicken_processing_config WHERE config_name = 'Default Global Configuration');
 
 -- Comments for documentation
 COMMENT ON TABLE public.chickens IS 'Customer chicken orders and sales';

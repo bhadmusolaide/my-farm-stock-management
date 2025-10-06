@@ -1,11 +1,24 @@
 import { useState, useEffect } from 'react'
 import { useAppContext } from '../context/AppContext'
 import { formatDate, formatNumber } from '../utils/formatters'
+import { supabase } from '../utils/supabaseClient'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import './ChickenLifecycle.css'
 
 const ChickenLifecycle = () => {
-  const { liveChickens, updateLiveChicken, chickenInventoryTransactions, weightHistory, feedConsumption, addDressedChicken, createBatchRelationship } = useAppContext()
+  const {
+    liveChickens,
+    updateLiveChicken,
+    chickenInventoryTransactions,
+    weightHistory,
+    feedConsumption,
+    addDressedChicken,
+    createBatchRelationship,
+    chickenSizeCategories,
+    chickenPartTypes,
+    chickenPartStandards,
+    chickenProcessingConfigs
+  } = useAppContext()
   const [selectedBatch, setSelectedBatch] = useState(null)
   const [lifecycleData, setLifecycleData] = useState({})
   const [showModal, setShowModal] = useState(false)
@@ -20,6 +33,83 @@ const ChickenLifecycle = () => {
     { id: 'processing', name: 'Processing', icon: '🔪', description: 'Ready for processing' },
     { id: 'freezer', name: 'Freezer Storage', icon: '❄️', description: 'Stored as dressed chicken' }
   ]
+
+  // Function to get part weights from configuration or fall back to defaults
+  const getPartWeightsFromConfig = (batch, chickenCount) => {
+    const breed = batch.breed || 'Broiler'
+    const currentWeight = batch.current_weight || 1.5
+
+    // Find appropriate size category based on current weight
+    let sizeCategory = chickenSizeCategories.find(sc =>
+      currentWeight >= sc.min_weight && currentWeight <= sc.max_weight
+    )
+
+    // Default to medium if no size category matches
+    if (!sizeCategory) {
+      sizeCategory = chickenSizeCategories.find(sc => sc.name === 'Medium') ||
+                     chickenSizeCategories[0]
+    }
+
+    if (!sizeCategory) {
+      // Fall back to hardcoded values if no configuration is available
+      return {
+        neck: parseFloat((chickenCount * 0.15).toFixed(2)),
+        feet: parseFloat((chickenCount * 2 * 0.1).toFixed(2)),
+        gizzard: parseFloat((chickenCount * 0.05).toFixed(2)),
+        dog_food: parseFloat((chickenCount * 0.3).toFixed(2))
+      }
+    }
+
+    // Get part standards for this breed and size category
+    const partWeights = {}
+    chickenPartTypes.forEach(partType => {
+      const standard = chickenPartStandards.find(ps =>
+        ps.breed === breed &&
+        ps.size_category_id === sizeCategory.id &&
+        ps.part_type_id === partType.id &&
+        ps.is_active
+      )
+
+      if (standard) {
+        const baseWeight = standard.standard_weight_kg * (partType.default_count_per_bird || 1)
+        partWeights[partType.name.toLowerCase()] = parseFloat((baseWeight * chickenCount).toFixed(2))
+      } else {
+        // Fall back to default calculations based on part type
+        switch (partType.name.toLowerCase()) {
+          case 'neck':
+            partWeights.neck = parseFloat((chickenCount * 0.15).toFixed(2))
+            break
+          case 'feet':
+            partWeights.feet = parseFloat((chickenCount * 2 * 0.1).toFixed(2))
+            break
+          case 'gizzard':
+            partWeights.gizzard = parseFloat((chickenCount * 0.05).toFixed(2))
+            break
+          case 'liver':
+            partWeights.liver = parseFloat((chickenCount * 0.04).toFixed(2))
+            break
+          case 'dog_food':
+            partWeights.dog_food = parseFloat((chickenCount * 0.3).toFixed(2))
+            break
+          default:
+            partWeights[partType.name.toLowerCase()] = 0
+        }
+      }
+    })
+
+    return partWeights
+  }
+
+  // Function to get part counts from configuration or fall back to defaults
+  const getPartCountsFromConfig = (batch, chickenCount) => {
+    const partCounts = {}
+
+    chickenPartTypes.forEach(partType => {
+      partCounts[partType.name.toLowerCase()] = Math.round(chickenCount * (partType.default_count_per_bird || 1))
+    })
+
+    return partCounts
+  }
 
   // Get current stage for a batch
   const getCurrentStage = (batch) => {
@@ -52,29 +142,41 @@ const ChickenLifecycle = () => {
       try {
         // If moving to processing stage, automatically create a dressed chicken record
         if (nextStage.id === 'processing') {
-          // Create a dressed chicken record
+          const chickenCount = batch.current_count
+
+          // Get configurable part weights and counts
+          const partWeights = getPartWeightsFromConfig(batch, chickenCount)
+          const partCounts = getPartCountsFromConfig(batch, chickenCount)
+
+          // Get appropriate size category
+          const currentWeight = batch.current_weight || 1.5
+          let sizeCategory = chickenSizeCategories.find(sc =>
+            currentWeight >= sc.min_weight && currentWeight <= sc.max_weight
+          )
+
+          // Default to medium if no size category matches
+          if (!sizeCategory) {
+            sizeCategory = chickenSizeCategories.find(sc => sc.name === 'Medium') ||
+                           chickenSizeCategories[0]
+          }
+
+          // Create a dressed chicken record with configurable values
           const dressedChickenData = {
             batch_id: batch.batch_id,
             processing_date: new Date().toISOString().split('T')[0],
-            initial_count: batch.current_count,
-            current_count: batch.current_count,
-            average_weight: batch.current_weight || 1.5, // Use current weight or default to 1.5kg
-            size_category: 'medium', // Default size category
+            initial_count: chickenCount,
+            current_count: chickenCount,
+            average_weight: currentWeight,
+            size_category_id: sizeCategory?.id || null,
+            size_category_custom: sizeCategory?.name || 'Medium',
             status: 'in-storage',
             storage_location: 'Freezer Unit A',
             expiry_date: new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().split('T')[0], // 3 months expiry
-            parts_count: {
-              neck: batch.current_count, // 1 neck per chicken
-              feet: batch.current_count * 2, // 2 feet per chicken
-              gizzard: batch.current_count, // 1 gizzard per chicken
-              dog_food: batch.current_count // 1 dog food portion per chicken
-            },
-            parts_weight: {
-              neck: parseFloat((batch.current_count * 0.15).toFixed(2)), // 0.15kg per neck (150g)
-              feet: parseFloat((batch.current_count * 2 * 0.1).toFixed(2)), // 0.1kg per foot (100g)
-              gizzard: parseFloat((batch.current_count * 0.05).toFixed(2)), // 0.05kg per gizzard (50g)
-              dog_food: parseFloat((batch.current_count * 0.3).toFixed(2)) // 0.3kg per dog food portion
-            }
+            parts_count: partCounts,
+            parts_weight: partWeights,
+            processing_quantity: chickenCount,
+            remaining_birds: 0,
+            create_new_batch_for_remaining: false
           }
 
           // Add the dressed chicken record

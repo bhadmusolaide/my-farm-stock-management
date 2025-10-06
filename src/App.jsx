@@ -26,6 +26,7 @@ const SiteSettings = lazy(() => import('./pages/SiteSettings'))
 const ChickenLifecycle = lazy(() => import('./pages/ChickenLifecycle'))
 // Replace deprecated pages with consolidated DressedChickenStock
 const DressedChickenStock = lazy(() => import('./pages/DressedChickenStock'))
+const ProcessingConfiguration = lazy(() => import('./pages/ProcessingConfiguration'))
 
 // Import theme styles
 import './styles/theme.css'
@@ -127,6 +128,13 @@ function AppContent() {
           <ProtectedRoute>
             <Layout>
               <DressedChickenStock />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/processing-config" element={
+          <ProtectedRoute>
+            <Layout>
+              <ProcessingConfiguration />
             </Layout>
           </ProtectedRoute>
         } />
