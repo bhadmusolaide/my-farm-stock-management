@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react'
-import { supabase, supabaseUrl } from '../utils/supabaseClient'
+import { supabase, supabaseUrl, optimizedSupabase } from '../utils/supabaseClient'
 import { isMigrationNeeded, migrateFromLocalStorage } from '../utils/migrateData'
 import { formatNumber } from '../utils/formatters'
 import { storageOptimizer } from '../utils/requestDedupe'
@@ -19,9 +19,11 @@ export function AppProvider({ children }) {
   
   // Helper functions to update state and save to localStorage with optimization
   const setChickens = (newChickens) => {
-    setChickensState(newChickens)
+    // Ensure newChickens is always an array
+    const chickensArray = Array.isArray(newChickens) ? newChickens : []
+    setChickensState(chickensArray)
     storageOptimizer.setItem('chickens', {
-      data: newChickens,
+      data: chickensArray,
       timestamp: Date.now(),
       version: '1.0'
     })
@@ -165,136 +167,125 @@ export function AppProvider({ children }) {
     batchRelationships: []
   })
 
-  // Load data from Supabase with optimized pagination and selective loading
+  // Cache invalidation helper
+  const invalidateCache = (tableName, recordId = null) => {
+    // Invalidate optimized client cache
+    optimizedSupabase.invalidateTableCache(tableName, recordId)
+
+    // Clear local data cache for this table
+    setDataCache(prev => ({
+      ...prev,
+      [tableName]: {}
+    }))
+  }
+
+  // Paginated data loading for traditional pagination
   const loadPaginatedData = async (dataType, page = 1, pageSize = 20, filters = {}) => {
     try {
-      const cacheKey = `${dataType}_${page}_${pageSize}_${JSON.stringify(filters)}`
+      // Use optimized client for enhanced caching and performance
+      const adaptiveTimeout = optimizedSupabase.getAdaptiveCacheTimeout(dataType)
+      const cacheKey = `paginated_${dataType}_${page}_${pageSize}_${JSON.stringify(filters)}`
 
-      // Check cache first (extended timeout)
+      // Check cache first
       if (dataCache[dataType] && dataCache[dataType][cacheKey]) {
         const cached = dataCache[dataType][cacheKey]
-        // Extend cache timeout to 10 minutes for better performance
-        if (Date.now() - cached.timestamp < 600000) {
+        if (Date.now() - cached.timestamp < adaptiveTimeout) {
           return cached
         }
       }
 
-      // Use selective column loading based on data type
-      let selectColumns = getOptimizedColumns(dataType)
-      let query = supabase.from(dataType).select(selectColumns)
-
-      // Apply filters based on data type
-      switch (dataType) {
-        case 'chickens':
-          if (filters.customer) query = query.ilike('customer', `%${filters.customer}%`)
-          if (filters.status) query = query.eq('status', filters.status)
-          if (filters.startDate) query = query.gte('date', filters.startDate)
-          if (filters.endDate) query = query.lte('date', filters.endDate)
-          // Select only essential columns for better performance
-          query = query.select('id, date, customer, count, size, price, amount_paid, balance, status, batch_id')
-          break
-        case 'stock':
-          query = query.select('id, date, description, count, size, cost_per_kg, calculation_mode, notes, created_at, updated_at')
-          break
-        case 'transactions':
-          if (filters.type) query = query.eq('type', filters.type)
-          if (filters.startDate) query = query.gte('date', filters.startDate)
-          if (filters.endDate) query = query.lte('date', filters.endDate)
-          query = query.select('id, date, type, amount, description, created_at, updated_at')
-          break
-        case 'live_chickens':
-          // Select only essential columns for better performance
-          query = query.select('id, batch_id, breed, initial_count, current_count, hatch_date, status, lifecycle_stage')
-          break
-        case 'feed_inventory':
-          query = query.select(`
-            id, batch_number, feed_type, brand, quantity_kg, cost_per_kg, cost_per_bag, number_of_bags, purchase_date, expiry_date, supplier, status, created_at, updated_at,
-            feed_batch_assignments (
-              id,
-              chicken_batch_id,
-              assigned_quantity_kg,
-              assigned_date
-            )
-          `)
-          break
-        case 'feed_consumption':
-          query = query.select('id, feed_id, chicken_batch_id, quantity_consumed, consumption_date, notes, created_at, updated_at')
-          break
-        case 'feed_batch_assignments':
-          query = query.select('id, feed_id, chicken_batch_id, assigned_quantity_kg, assigned_date, created_at, updated_at')
-          break
-        case 'chicken_inventory_transactions':
-          query = query.select('id, batch_id, transaction_type, quantity_changed, reason, reference_id, reference_type, transaction_date, created_at, updated_at')
-          break
-        case 'weight_history':
-          query = query.select('id, chicken_batch_id, weight, recorded_date, notes, created_at, updated_at')
-          break
-        case 'dressed_chickens':
-          // Select only essential columns for better performance
-          query = query.select('id, batch_id, processing_date, initial_count, current_count, status, size_category')
-          break
-        case 'batch_relationships':
-          query = query.select('id, source_batch_id, source_batch_type, target_batch_id, target_batch_type, relationship_type, quantity, notes, created_at, updated_at')
-          break
-      }
-
-      // Apply pagination
-      const from = (page - 1) * pageSize
-      const to = from + pageSize - 1
-      query = query.range(from, to)
-
-      // Apply sorting
-      switch (dataType) {
-        case 'chickens':
-          query = query.order('created_at', { ascending: false })
-          break
-        case 'stock':
-          query = query.order('date', { ascending: false })
-          break
-        case 'transactions':
-          query = query.order('date', { ascending: false })
-          break
-        case 'live_chickens':
-          query = query.order('hatch_date', { ascending: false })
-          break
-        case 'feed_inventory':
-          query = query.order('purchase_date', { ascending: false })
-          break
-        case 'feed_consumption':
-          query = query.order('consumption_date', { ascending: false })
-          break
-        case 'feed_batch_assignments':
-          query = query.order('assigned_date', { ascending: false })
-          break
-        case 'chicken_inventory_transactions':
-          query = query.order('created_at', { ascending: false })
-          break
-        case 'weight_history':
-          query = query.order('recorded_date', { ascending: false })
-          break
-        case 'dressed_chickens':
-          query = query.order('processing_date', { ascending: false })
-          break
-        case 'batch_relationships':
-          query = query.order('created_at', { ascending: false })
-          break
-      }
-
-      const { data, error, count } = await query
-
-      if (error) {
-        // Handle table doesn't exist errors gracefully
-        if (error.message.includes('relation') && error.message.includes('does not exist')) {
-          console.warn(`${dataType} table not found - this is expected for new installations`)
-          return { data: [], count: 0 }
+      // Build query options for pagination
+      let queryOptions = {
+        orderBy: getDefaultOrderBy(dataType),
+        range: {
+          from: (page - 1) * pageSize,
+          to: page * pageSize - 1
         }
-        throw error
       }
 
-      // Transform feed inventory data if needed
-      let transformedData = data
-      if (dataType === 'feed_inventory' && data) {
-        transformedData = data.map(feed => ({
+      // Apply filters if provided
+      let queryFilters = {}
+      if (filters.customer) {
+        queryFilters.customer = filters.customer
+      }
+      if (filters.status) {
+        queryFilters.status = filters.status
+      }
+      if (filters.startDate) {
+        queryFilters.date = `gte.${filters.startDate}`
+      }
+      if (filters.endDate) {
+        queryFilters.date = `lte.${filters.endDate}`
+      }
+
+      // Use optimized columns for pagination
+      let selectColumns = getOptimizedColumns(dataType, 'list')
+
+      // Use optimized client for better performance
+      const result = await optimizedSupabase.select(dataType, selectColumns, queryFilters, queryOptions)
+      const { data: paginatedData, count: paginatedCount } = result
+
+      // Update cache for paginated data
+      setDataCache(prev => ({
+        ...prev,
+        [dataType]: {
+          ...prev[dataType],
+          [cacheKey]: {
+            data: paginatedData || [],
+            count: paginatedCount || 0,
+            timestamp: Date.now()
+          }
+        }
+      }))
+
+      return { data: paginatedData || [], count: paginatedCount || 0 }
+    } catch (error) {
+      console.error(`Error loading paginated ${dataType}:`, error)
+      return { data: [], count: 0 }
+    }
+  }
+
+  // Virtualized data loading for large datasets
+  const loadVirtualizedData = async (dataType, options = {}) => {
+    const {
+      startIndex = 0,
+      stopIndex = 20,
+      filters = {},
+      sortBy = null,
+      sortDirection = 'DESC'
+    } = options
+
+    try {
+      // Use optimized client for enhanced caching and performance
+      const adaptiveTimeout = optimizedSupabase.getAdaptiveCacheTimeout(dataType)
+      const cacheKey = `virtual_${dataType}_${startIndex}_${stopIndex}_${JSON.stringify(filters)}_${sortBy}_${sortDirection}`
+
+      // Check cache first
+      if (dataCache[dataType] && dataCache[dataType][cacheKey]) {
+        const cached = dataCache[dataType][cacheKey]
+        if (Date.now() - cached.timestamp < adaptiveTimeout) {
+          return cached
+        }
+      }
+
+      // Use minimal columns for virtualization
+      let selectColumns = getOptimizedColumns(dataType, 'minimal')
+      let queryOptions = {
+        orderBy: sortBy ? { column: sortBy, ascending: sortDirection === 'ASC' } : getDefaultOrderBy(dataType),
+        range: {
+          from: startIndex,
+          to: stopIndex
+        }
+      }
+
+      // Use optimized client for better performance
+      const result = await optimizedSupabase.select(dataType, selectColumns, filters, queryOptions)
+      const { data: virtualData, count: virtualCount } = result
+
+      // Transform data if needed for virtualization
+      let transformedVirtualData = virtualData
+      if (dataType === 'feed_inventory' && virtualData) {
+        transformedVirtualData = virtualData.map(feed => ({
           ...feed,
           assigned_batches: feed.feed_batch_assignments?.map(assignment => ({
             batch_id: assignment.chicken_batch_id,
@@ -303,53 +294,89 @@ export function AppProvider({ children }) {
         }))
       }
 
-      // Update pagination state
-      setPagination(prev => ({
-        ...prev,
-        [dataType]: {
-          ...prev[dataType],
-          page,
-          total: count || 0,
-          hasMore: (data?.length || 0) === pageSize
-        }
-      }))
-
-      // Update cache with timestamp for better management
+      // Update cache for virtualized data
       setDataCache(prev => ({
         ...prev,
         [dataType]: {
           ...prev[dataType],
           [cacheKey]: {
-            data: transformedData || [],
-            count: count || 0,
+            data: transformedVirtualData || [],
+            count: virtualCount || 0,
             timestamp: Date.now()
           }
         }
       }))
 
-      return { data: transformedData || [], count: count || 0 }
+      return { data: transformedVirtualData || [], count: virtualCount || 0 }
     } catch (error) {
-      console.error(`Error loading ${dataType}:`, error)
+      console.error(`Error loading virtualized ${dataType}:`, error)
       return { data: [], count: 0 }
     }
   }
 
-  // Optimized column selection for reduced payload size
-  const getOptimizedColumns = (dataType) => {
-    const columnMap = {
-      chickens: 'id, date, customer, count, size, price, amount_paid, balance, status, batch_id, created_at',
-      stock: 'id, date, description, count, size, cost_per_kg, created_at',
-      transactions: 'id, date, type, amount, description, created_at',
-      live_chickens: 'id, batch_id, breed, initial_count, current_count, hatch_date, status, lifecycle_stage',
-      feed_inventory: 'id, batch_number, feed_type, brand, quantity_kg, status, purchase_date',
-      feed_consumption: 'id, feed_id, chicken_batch_id, quantity_consumed, consumption_date',
-      feed_batch_assignments: 'id, feed_id, chicken_batch_id, assigned_quantity_kg, assigned_date',
-      chicken_inventory_transactions: 'id, batch_id, transaction_type, quantity_changed, transaction_date',
-      weight_history: 'id, chicken_batch_id, weight, recorded_date',
-      dressed_chickens: 'id, batch_id, processing_date, initial_count, current_count, status, size_category',
-      batch_relationships: 'id, source_batch_id, target_batch_id, relationship_type, created_at'
+  // Helper function to get default ordering for each data type
+  const getDefaultOrderBy = (dataType) => {
+    const orderMap = {
+      chickens: { column: 'created_at', ascending: false },
+      stock: { column: 'date', ascending: false },
+      transactions: { column: 'date', ascending: false },
+      live_chickens: { column: 'hatch_date', ascending: false },
+      feed_inventory: { column: 'purchase_date', ascending: false },
+      feed_consumption: { column: 'consumption_date', ascending: false },
+      chicken_inventory_transactions: { column: 'created_at', ascending: false },
+      dressed_chickens: { column: 'processing_date', ascending: false },
+      batch_relationships: { column: 'created_at', ascending: false }
     }
-    return columnMap[dataType] || '*'
+    return orderMap[dataType] || { column: 'created_at', ascending: false }
+  }
+
+  // Enhanced column selection for reduced payload size with context awareness
+  const getOptimizedColumns = (dataType, context = 'list') => {
+    const columnMap = {
+      chickens: {
+        list: 'id, date, customer, phone, location, count, size, price, amount_paid, balance, status, calculation_mode, inventory_type, batch_id, part_type, created_at',
+        detail: 'id, date, customer, phone, location, count, size, price, amount_paid, balance, status, calculation_mode, inventory_type, batch_id, part_type, created_at, updated_at',
+        minimal: 'id, customer, status, balance, created_at'
+      },
+      stock: {
+        list: 'id, date, description, count, size, cost_per_kg, calculation_mode, created_at',
+        detail: 'id, date, description, count, size, cost_per_kg, calculation_mode, notes, created_at, updated_at',
+        minimal: 'id, description, count, size'
+      },
+      transactions: {
+        list: 'id, date, type, amount, description, created_at',
+        detail: 'id, date, type, amount, description, created_at, updated_at',
+        minimal: 'id, type, amount, date'
+      },
+      live_chickens: {
+        list: 'id, batch_id, breed, initial_count, current_count, hatch_date, expected_weight, current_weight, status, lifecycle_stage',
+        detail: 'id, batch_id, breed, initial_count, current_count, hatch_date, expected_weight, current_weight, feed_type, status, lifecycle_stage, mortality, notes, created_at, updated_at',
+        minimal: 'id, batch_id, breed, current_count, status'
+      },
+      feed_inventory: {
+        list: 'id, batch_number, feed_type, brand, quantity_kg, cost_per_kg, purchase_date, expiry_date, status',
+        detail: 'id, batch_number, feed_type, brand, quantity_kg, cost_per_kg, cost_per_bag, number_of_bags, purchase_date, expiry_date, supplier, status, notes, created_at, updated_at',
+        minimal: 'id, batch_number, feed_type, quantity_kg, status'
+      },
+      feed_consumption: {
+        list: 'id, feed_id, chicken_batch_id, quantity_consumed, consumption_date, created_at',
+        detail: 'id, feed_id, chicken_batch_id, quantity_consumed, consumption_date, notes, created_at, updated_at',
+        minimal: 'id, quantity_consumed, consumption_date'
+      },
+      chicken_inventory_transactions: {
+        list: 'id, batch_id, transaction_type, quantity_changed, reason, transaction_date, created_at',
+        detail: 'id, batch_id, transaction_type, quantity_changed, reason, reference_id, reference_type, transaction_date, created_at, updated_at',
+        minimal: 'id, transaction_type, quantity_changed, transaction_date'
+      },
+      dressed_chickens: {
+        list: 'id, batch_id, processing_date, initial_count, current_count, average_weight, size_category, status',
+        detail: 'id, batch_id, processing_date, initial_count, current_count, average_weight, size_category, status, storage_location, expiry_date, notes, parts_count, parts_weight, created_at, updated_at',
+        minimal: 'id, batch_id, size_category, current_count, status'
+      }
+    }
+
+    const contextColumns = columnMap[dataType]?.[context] || columnMap[dataType]?.list || '*'
+    return contextColumns
   }
 
   // Load data from Supabase with optimized loading
@@ -394,8 +421,17 @@ export function AppProvider({ children }) {
             setTransactions(recentTransactions)
           }
 
-          // Load recent chicken orders
-          const { data: recentChickens } = await recentChickensPromise
+          // Load recent chicken orders (last 30 days for better performance)
+          const thirtyDaysAgo = new Date()
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+          const { data: recentChickens } = await supabase
+            .from('chickens')
+            .select('id, date, customer, count, size, price, amount_paid, balance, status, batch_id')
+            .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
+            .order('created_at', { ascending: false })
+            .limit(100)
+
           if (recentChickens) {
             setChickens(recentChickens)
           }
@@ -413,9 +449,24 @@ export function AppProvider({ children }) {
             const localChickens = localStorage.getItem('chickens')
             if (localChickens && localChickens !== 'undefined') {
               try {
-                setChickens(JSON.parse(localChickens))
+                const parsedChickens = JSON.parse(localChickens)
+                // Handle both old format (direct array) and new format (object with data property)
+                let chickensArray = []
+                if (Array.isArray(parsedChickens)) {
+                  chickensArray = parsedChickens
+                } else if (parsedChickens && typeof parsedChickens === 'object' && Array.isArray(parsedChickens.data)) {
+                  chickensArray = parsedChickens.data
+                }
+
+                if (chickensArray.length > 0) {
+                  setChickens(chickensArray)
+                } else {
+                  console.warn('Chickens data in localStorage is empty or invalid, resetting to empty array')
+                  setChickens([])
+                }
               } catch (e) {
-                console.warn('Invalid chickens data in localStorage:', e)
+                console.warn('Invalid chickens data in localStorage, resetting to empty array:', e)
+                setChickens([])
               }
             }
 
@@ -533,7 +584,19 @@ export function AppProvider({ children }) {
                 // Update state with localStorage data
                 switch (key) {
                   case 'chickens':
-                    setChickens(parsedData)
+                    // Handle both old format (direct array) and new format (object with data property)
+                    let chickensArray = []
+                    if (Array.isArray(parsedData)) {
+                      chickensArray = parsedData
+                    } else if (parsedData && typeof parsedData === 'object' && Array.isArray(parsedData.data)) {
+                      chickensArray = parsedData.data
+                    }
+
+                    if (chickensArray.length > 0) {
+                      setChickens(chickensArray)
+                    } else {
+                      console.warn(`Chickens data from localStorage is empty or invalid, skipping:`, parsedData)
+                    }
                     break
                   case 'stock':
                     setStock(parsedData)
@@ -734,6 +797,9 @@ export function AppProvider({ children }) {
       // Log audit action
       await logAuditAction('CREATE', 'chickens', chicken.id, null, chicken)
 
+      // Invalidate cache for chickens table
+      invalidateCache('chickens')
+
       // Update local state
       setChickens(prev => [chicken, ...prev])
       return chicken
@@ -805,6 +871,9 @@ export function AppProvider({ children }) {
 
       // Log audit action
       await logAuditAction('UPDATE', 'chickens', id, oldChicken, updatedChicken)
+
+      // Invalidate cache for chickens table
+      invalidateCache('chickens', [id])
 
       // Update local state
       setChickens(prev =>
@@ -960,6 +1029,13 @@ export function AppProvider({ children }) {
       // Log audit action
       await logAuditAction('DELETE', 'chickens', id, chickenToDelete, null)
 
+      // Invalidate cache for chickens table and related inventory
+      invalidateCache('chickens', [id])
+      if (chickenToDelete.batch_id) {
+        // Also invalidate the inventory tables that might be affected
+        invalidateCache(chickenToDelete.inventory_type === 'live' ? 'live_chickens' : 'dressed_chickens', [chickenToDelete.batch_id])
+      }
+
       // Update local state for chickens
       setChickens(prev => prev.filter(chicken => chicken.id !== id))
     } catch (err) {
@@ -1016,6 +1092,10 @@ export function AppProvider({ children }) {
       // Add totalCost to stockItem for frontend display only
       const stockItemWithTotal = { ...stockItem, totalCost }
       
+      // Invalidate cache for stock and transactions tables
+      invalidateCache('stock')
+      invalidateCache('transactions')
+
       // Update local state
       setStock(prev => [stockItemWithTotal, ...prev])
       setTransactions(prev => [stockTransaction, ...prev])
@@ -1112,10 +1192,13 @@ export function AppProvider({ children }) {
       // Log audit action
       await logAuditAction('CREATE', 'transactions', transaction.id, null, transaction)
 
+      // Invalidate cache for transactions and balance
+      invalidateCache('transactions')
+
       // Update local state
       setTransactions(prev => [transaction, ...prev])
       setBalance(newBalance)
-      
+
       return transaction
     } catch (err) {
       console.error('Error adding funds:', err)
@@ -1147,10 +1230,13 @@ export function AppProvider({ children }) {
       // Log audit action
       await logAuditAction('CREATE', 'transactions', transaction.id, null, transaction)
 
+      // Invalidate cache for transactions
+      invalidateCache('transactions')
+
       // Update local state
       setTransactions(prev => [transaction, ...prev])
       setBalance(newBalance)
-      
+
       return transaction
     } catch (err) {
       console.error('Error adding expense:', err)
@@ -1235,21 +1321,24 @@ export function AppProvider({ children }) {
 
   // Memoized stats calculations for better performance
   const stats = useMemo(() => {
-    const totalChickens = chickens.reduce((sum, chicken) => sum + chicken.count, 0)
-    const totalRevenue = chickens.reduce((sum, chicken) => {
-      return sum + (chicken.count * chicken.size * chicken.price)
+    // Ensure chickens is always an array before using reduce
+    const chickensArray = Array.isArray(chickens) ? chickens : []
+
+    const totalChickens = chickensArray.reduce((sum, chicken) => sum + (chicken?.count || 0), 0)
+    const totalRevenue = chickensArray.reduce((sum, chicken) => {
+      return sum + ((chicken?.count || 0) * (chicken?.size || 0) * (chicken?.price || 0))
     }, 0)
-    
+
     const totalExpenses = transactions
-      .filter(t => t.type === 'expense' || t.type === 'stock_expense')
-      .reduce((sum, t) => sum + t.amount, 0)
-    
-    const outstandingBalance = chickens.reduce((sum, chicken) => sum + chicken.balance, 0)
-    
-    const paidCount = chickens.filter(c => c.status === 'paid').length
-    const partialCount = chickens.filter(c => c.status === 'partial').length
-    const pendingCount = chickens.filter(c => c.status === 'pending').length
-    
+      .filter(t => t?.type === 'expense' || t?.type === 'stock_expense')
+      .reduce((sum, t) => sum + (t?.amount || 0), 0)
+
+    const outstandingBalance = chickensArray.reduce((sum, chicken) => sum + (chicken?.balance || 0), 0)
+
+    const paidCount = chickensArray.filter(c => c?.status === 'paid').length
+    const partialCount = chickensArray.filter(c => c?.status === 'partial').length
+    const pendingCount = chickensArray.filter(c => c?.status === 'pending').length
+
     return {
       totalChickens,
       totalRevenue,
@@ -1393,7 +1482,10 @@ export function AppProvider({ children }) {
       
       // Only update local state if database operation succeeded
       setLiveChickens(prev => [chicken, ...prev])
-      
+
+      // Invalidate cache for live chickens table
+      invalidateCache('live_chickens')
+
       // Log audit action
       await logAuditAction('CREATE', 'live_chickens', chicken.id, null, chicken)
       
@@ -1437,11 +1529,14 @@ export function AppProvider({ children }) {
         console.warn('Supabase not available, updating locally only:', supabaseError)
       }
       
+      // Invalidate cache for live chickens table
+      invalidateCache('live_chickens', [id])
+
       // Update local state and localStorage
       setLiveChickens(prev => prev.map(chicken =>
         chicken.id === id ? updatedChicken : chicken
       ))
-      
+
       // Log audit action
       await logAuditAction('UPDATE', 'live_chickens', id, oldChicken, updatedChicken)
       
@@ -1469,9 +1564,12 @@ export function AppProvider({ children }) {
         console.warn('Supabase not available, deleting locally only:', supabaseError)
       }
       
+      // Invalidate cache for live chickens table
+      invalidateCache('live_chickens', [id])
+
       // Update local state and localStorage
       setLiveChickens(prev => prev.filter(chicken => chicken.id !== id))
-      
+
       // Log audit action
       await logAuditAction('DELETE', 'live_chickens', id, chickenToDelete, null)
       
@@ -1607,13 +1705,19 @@ export function AppProvider({ children }) {
       // Log audit action
       await logAuditAction('CREATE', 'feed_inventory', feed.id, null, feed)
       
+      // Invalidate cache for feed inventory and transactions if applicable
+      invalidateCache('feed_inventory')
+      if (feedTransaction) {
+        invalidateCache('transactions')
+      }
+
       // Update local state
       setFeedInventory(prev => [feed, ...prev])
       if (feedTransaction) {
         setTransactions(prev => [feedTransaction, ...prev])
         setBalance(newBalance)
       }
-      
+
       return feed
     } catch (err) {
       console.error('Error adding feed inventory:', err)
@@ -2189,6 +2293,9 @@ export function AppProvider({ children }) {
         throw new Error(`Database error: ${error.message}. Please check if the database tables are properly set up.`)
       }
 
+      // Invalidate cache for dressed chickens table
+      invalidateCache('dressed_chickens')
+
       // Update local state using helper function that also saves to localStorage
       setDressedChickens([dressedChicken, ...dressedChickens])
 
@@ -2274,9 +2381,116 @@ export function AppProvider({ children }) {
     }
   }
 
+  // Helper function for creating batch relationships with automatic field mapping
+  const createBatchRelationship = async (sourceBatch, targetBatch, relationshipType, options = {}) => {
+    try {
+      // Determine source batch type based on the source object or provided option
+      let sourceBatchType = options.sourceBatchType;
+      if (!sourceBatchType) {
+        if (sourceBatch.breed && sourceBatch.current_count !== undefined) {
+          sourceBatchType = 'live_chickens';
+        } else if (sourceBatch.processing_date && sourceBatch.average_weight !== undefined) {
+          sourceBatchType = 'dressed_chickens';
+        } else if (sourceBatch.feed_type && sourceBatch.quantity_kg !== undefined) {
+          sourceBatchType = 'feed_inventory';
+        } else {
+          throw new Error('Cannot determine source batch type. Please provide sourceBatchType in options.');
+        }
+      }
+
+      // Determine target batch type based on the target object or provided option
+      let targetBatchType = options.targetBatchType;
+      if (!targetBatchType) {
+        if (targetBatch.breed && targetBatch.current_count !== undefined) {
+          targetBatchType = 'live_chickens';
+        } else if (targetBatch.processing_date && targetBatch.average_weight !== undefined) {
+          targetBatchType = 'dressed_chickens';
+        } else if (targetBatch.feed_type && targetBatch.quantity_kg !== undefined) {
+          targetBatchType = 'feed_inventory';
+        } else {
+          throw new Error('Cannot determine target batch type. Please provide targetBatchType in options.');
+        }
+      }
+
+      // Extract batch IDs
+      const sourceBatchId = sourceBatch.batch_id || sourceBatch.id;
+      const targetBatchId = targetBatch.batch_id || targetBatch.id;
+
+      if (!sourceBatchId || !targetBatchId) {
+        throw new Error('Both source and target batches must have valid batch_id or id fields');
+      }
+
+      // Determine quantity (use provided quantity or infer from batches)
+      let quantity = options.quantity;
+      if (quantity === undefined) {
+        // Try to infer quantity from the most appropriate field
+        if (sourceBatchType === 'live_chickens' && sourceBatch.current_count !== undefined) {
+          quantity = sourceBatch.current_count;
+        } else if (sourceBatchType === 'dressed_chickens' && sourceBatch.current_count !== undefined) {
+          quantity = sourceBatch.current_count;
+        } else if (sourceBatchType === 'feed_inventory' && sourceBatch.quantity_kg !== undefined) {
+          quantity = Math.floor(sourceBatch.quantity_kg); // Convert to whole number for feed
+        } else if (targetBatchType === 'live_chickens' && targetBatch.current_count !== undefined) {
+          quantity = targetBatch.current_count;
+        } else if (targetBatchType === 'dressed_chickens' && targetBatch.current_count !== undefined) {
+          quantity = targetBatch.current_count;
+        } else if (targetBatchType === 'feed_inventory' && targetBatch.quantity_kg !== undefined) {
+          quantity = Math.floor(targetBatch.quantity_kg);
+        } else {
+          quantity = 0; // Default to 0 if cannot determine
+        }
+      }
+
+      // Prepare relationship data
+      const relationshipData = {
+        source_batch_id: sourceBatchId,
+        source_batch_type: sourceBatchType,
+        target_batch_id: targetBatchId,
+        target_batch_type: targetBatchType,
+        relationship_type: relationshipType,
+        quantity: quantity,
+        notes: options.notes || null
+      };
+
+      // Use the existing addBatchRelationship function with validation
+      return await addBatchRelationship(relationshipData);
+    } catch (err) {
+      console.error('Error creating batch relationship:', err);
+      throw err;
+    }
+  }
+
   // Batch Relationship CRUD operations
   const addBatchRelationship = async (relationshipData) => {
     try {
+      // Input validation for required fields
+      const requiredFields = ['source_batch_id', 'source_batch_type', 'target_batch_id', 'target_batch_type', 'relationship_type'];
+      const missingFields = requiredFields.filter(field => !relationshipData[field]);
+
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields for batch relationship: ${missingFields.join(', ')}`);
+      }
+
+      // Validate batch types are valid (updated to match schema constraints)
+      const validBatchTypes = ['live_chickens', 'dressed_chickens', 'feed_inventory'];
+      if (!validBatchTypes.includes(relationshipData.source_batch_type)) {
+        throw new Error(`Invalid source_batch_type: ${relationshipData.source_batch_type}. Must be one of: ${validBatchTypes.join(', ')}`);
+      }
+      if (!validBatchTypes.includes(relationshipData.target_batch_type)) {
+        throw new Error(`Invalid target_batch_type: ${relationshipData.target_batch_type}. Must be one of: ${validBatchTypes.join(', ')}`);
+      }
+
+      // Add soft delete awareness - new records are active by default
+      if (relationshipData.is_active === undefined) {
+        relationshipData.is_active = true;
+      }
+
+      // Validate relationship types (updated to match schema constraints)
+      const validRelationshipTypes = ['fed_to', 'processed_from', 'sold_to', 'transferred_to', 'split_from', 'partial_processed_from'];
+      if (!validRelationshipTypes.includes(relationshipData.relationship_type)) {
+        throw new Error(`Invalid relationship_type: ${relationshipData.relationship_type}. Must be one of: ${validRelationshipTypes.join(', ')}`);
+      }
+
       const relationship = {
         id: Date.now().toString(),
         ...relationshipData,
@@ -2339,24 +2553,63 @@ export function AppProvider({ children }) {
     try {
       const relationshipToDelete = batchRelationships.find(item => item.id === id)
       if (!relationshipToDelete) throw new Error('Batch relationship not found')
-      
-      // Delete from Supabase
+
+      // Soft delete from Supabase (set is_active to false and deleted_at timestamp)
       const { error } = await supabase
         .from('batch_relationships')
-        .delete()
+        .update({
+          is_active: false,
+          deleted_at: new Date().toISOString()
+        })
         .eq('id', id)
-      
+
       if (error) {
-        console.warn('Failed to delete from Supabase, deleting locally only:', error)
+        console.warn('Failed to soft delete from Supabase, falling back to hard delete:', error)
+        // Fallback to hard delete if soft delete fails
+        const { error: hardDeleteError } = await supabase
+          .from('batch_relationships')
+          .delete()
+          .eq('id', id)
+
+        if (hardDeleteError) {
+          console.warn('Hard delete also failed:', hardDeleteError)
+        }
       }
-      
+
       // Update local state using helper function that also saves to localStorage
       setBatchRelationships(batchRelationships.filter(item => item.id !== id))
-      
+
       // Log audit action
       await logAuditAction('DELETE', 'batch_relationships', id, relationshipToDelete, null)
     } catch (err) {
       console.error('Error deleting batch relationship:', err)
+      throw err
+    }
+  }
+
+  // Hard delete function for cases where soft delete is not appropriate
+  const hardDeleteBatchRelationship = async (id) => {
+    try {
+      const relationshipToDelete = batchRelationships.find(item => item.id === id)
+      if (!relationshipToDelete) throw new Error('Batch relationship not found')
+
+      // Hard delete from Supabase
+      const { error } = await supabase
+        .from('batch_relationships')
+        .delete()
+        .eq('id', id)
+
+      if (error) {
+        console.warn('Failed to hard delete from Supabase:', error)
+      }
+
+      // Update local state using helper function that also saves to localStorage
+      setBatchRelationships(batchRelationships.filter(item => item.id !== id))
+
+      // Log audit action
+      await logAuditAction('HARD_DELETE', 'batch_relationships', id, relationshipToDelete, null)
+    } catch (err) {
+      console.error('Error hard deleting batch relationship:', err)
       throw err
     }
   }
@@ -2429,6 +2682,8 @@ export function AppProvider({ children }) {
     addBatchRelationship,
     updateBatchRelationship,
     deleteBatchRelationship,
+    hardDeleteBatchRelationship,
+    createBatchRelationship,
   
     // Lazy loading functions
     loadLiveChickens,
@@ -2447,7 +2702,12 @@ export function AppProvider({ children }) {
     // Pagination and lazy loading
     pagination,
     loadPaginatedData,
-    dataCache
+    loadVirtualizedData,
+    dataCache,
+
+    // Column optimization helpers
+    getOptimizedColumns,
+    getDefaultOrderBy
   }
 
   return (

@@ -1,0 +1,185 @@
+.virtualized-table {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+}
+
+.virtual-header {
+  display: grid;
+  background: #f8f9fa;
+  border-bottom: 2px solid #e0e0e0;
+  padding: 12px 0;
+  font-weight: 600;
+  color: #333;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.virtual-header-cell {
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: default;
+  user-select: none;
+}
+
+.virtual-header-cell.sortable {
+  cursor: pointer;
+}
+
+.virtual-header-cell.sortable:hover {
+  background-color: #e9ecef;
+}
+
+.sort-indicator {
+  margin-left: 8px;
+  font-size: 14px;
+}
+
+.virtual-container {
+  flex: 1;
+  overflow: auto;
+}
+
+.virtual-scroller {
+  position: relative;
+}
+
+.virtual-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #666;
+}
+
+.virtual-row {
+  position: absolute;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s ease;
+}
+
+.virtual-row.clickable {
+  cursor: pointer;
+}
+
+.virtual-row.clickable:hover {
+  background-color: #f8f9fa;
+}
+
+.virtual-row:last-child {
+  border-bottom: none;
+}
+
+.virtual-row-content {
+  display: grid;
+  width: 100%;
+  padding: 8px 0;
+}
+
+.virtual-cell {
+  padding: 8px 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.virtual-footer {
+  padding: 12px;
+  background: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+  color: #666;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Responsive grid columns - adjust based on your needs */
+.virtual-row-content {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.virtual-header {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+/* Specific column widths for common use cases */
+.virtual-cell.id { max-width: 80px; }
+.virtual-cell.date { max-width: 100px; }
+.virtual-cell.customer { min-width: 150px; }
+.virtual-cell.description { min-width: 200px; }
+.virtual-cell.status { max-width: 100px; }
+.virtual-cell.amount { max-width: 120px; }
+.virtual-cell.actions { max-width: 100px; }
+
+/* Status badges */
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-paid {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-partial {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-pending {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+/* Loading states */
+@keyframes shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+
+.virtual-row.loading {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .virtualized-table {
+    border-color: #404040;
+    background: #1a1a1a;
+  }
+
+  .virtual-header {
+    background: #2d2d2d;
+    border-bottom-color: #404040;
+    color: #e0e0e0;
+  }
+
+  .virtual-row {
+    border-bottom-color: #333;
+  }
+
+  .virtual-row.clickable:hover {
+    background-color: #2d2d2d;
+  }
+
+  .virtual-footer {
+    background: #2d2d2d;
+    border-top-color: #404040;
+    color: #bbb;
+  }
+}

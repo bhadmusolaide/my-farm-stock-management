@@ -5,7 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import './ChickenLifecycle.css'
 
 const ChickenLifecycle = () => {
-  const { liveChickens, updateLiveChicken, chickenInventoryTransactions, weightHistory, feedConsumption, addDressedChicken, addBatchRelationship } = useAppContext()
+  const { liveChickens, updateLiveChicken, chickenInventoryTransactions, weightHistory, feedConsumption, addDressedChicken, createBatchRelationship } = useAppContext()
   const [selectedBatch, setSelectedBatch] = useState(null)
   const [lifecycleData, setLifecycleData] = useState({})
   const [showModal, setShowModal] = useState(false)
@@ -80,15 +80,15 @@ const ChickenLifecycle = () => {
           // Add the dressed chicken record
           const dressedChicken = await addDressedChicken(dressedChickenData)
 
-          // Create a batch relationship
-          const relationshipData = {
-            source_batch_id: batch.batch_id,
-            target_batch_id: batch.batch_id, // Use the same batch ID for the processed record
-            relationship_type: 'processed_from',
-            quantity: batch.current_count
-          }
-
-          await addBatchRelationship(relationshipData)
+          // Create a batch relationship using the helper function
+          await createBatchRelationship(
+            batch, // source batch (live chicken)
+            dressedChicken, // target batch (dressed chicken record that was just created)
+            'processed_from', // relationship type
+            {
+              notes: `Automatically created when moving batch ${batch.batch_id} to processing stage`
+            }
+          )
         }
 
         await updateLiveChicken(batch.id, {

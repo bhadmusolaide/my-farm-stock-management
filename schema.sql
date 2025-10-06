@@ -260,14 +260,20 @@ CREATE TABLE IF NOT EXISTS public.dressed_chickens (
 CREATE TABLE IF NOT EXISTS public.batch_relationships (
     id TEXT PRIMARY KEY,
     source_batch_id TEXT NOT NULL,
-    source_batch_type TEXT NOT NULL, -- 'live_chickens', 'dressed_chickens', 'feed_inventory'
+    source_batch_type TEXT NOT NULL CHECK (source_batch_type IN ('live_chickens', 'dressed_chickens', 'feed_inventory')),
     target_batch_id TEXT NOT NULL,
-    target_batch_type TEXT NOT NULL, -- 'live_chickens', 'dressed_chickens', 'feed_inventory'
-    relationship_type TEXT NOT NULL, -- 'fed_to', 'processed_from', 'sold_to', 'transferred_to'
-    quantity INTEGER,
+    target_batch_type TEXT NOT NULL CHECK (target_batch_type IN ('live_chickens', 'dressed_chickens', 'feed_inventory')),
+    relationship_type TEXT NOT NULL CHECK (relationship_type IN ('fed_to', 'processed_from', 'sold_to', 'transferred_to', 'split_from', 'partial_processed_from')),
+    quantity INTEGER CHECK (quantity IS NULL OR quantity >= 0),
     notes TEXT,
+    -- Enhanced audit fields for better tracking
+    created_by UUID REFERENCES auth.users(id),
+    updated_by UUID REFERENCES auth.users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    -- Soft delete capability
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    is_active BOOLEAN DEFAULT true
 );
 
 -- Enable RLS for the new tables
@@ -296,9 +302,13 @@ CREATE INDEX IF NOT EXISTS idx_dressed_chickens_size_category ON public.dressed_
 CREATE INDEX IF NOT EXISTS idx_dressed_chickens_expiry_date ON public.dressed_chickens(expiry_date);
 CREATE INDEX IF NOT EXISTS idx_dressed_chickens_processing_quantity ON public.dressed_chickens(processing_quantity);
 CREATE INDEX IF NOT EXISTS idx_dressed_chickens_remaining_batch_id ON public.dressed_chickens(remaining_batch_id);
+-- Enhanced indexes for better query performance and constraints
 CREATE INDEX IF NOT EXISTS idx_batch_relationships_source ON public.batch_relationships(source_batch_id, source_batch_type);
 CREATE INDEX IF NOT EXISTS idx_batch_relationships_target ON public.batch_relationships(target_batch_id, target_batch_type);
 CREATE INDEX IF NOT EXISTS idx_batch_relationships_type ON public.batch_relationships(relationship_type);
+CREATE INDEX IF NOT EXISTS idx_batch_relationships_active ON public.batch_relationships(is_active, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_batch_relationships_composite ON public.batch_relationships(source_batch_id, source_batch_type, target_batch_id, target_batch_type, relationship_type);
+CREATE INDEX IF NOT EXISTS idx_batch_relationships_quantity ON public.batch_relationships(quantity) WHERE quantity IS NOT NULL;
 
 -- Create trigger for updated_at column
 DROP TRIGGER IF EXISTS update_chicken_transactions_updated_at ON public.chicken_inventory_transactions;
@@ -318,11 +328,99 @@ COMMENT ON COLUMN public.dressed_chickens.remaining_birds IS 'Number of birds le
 COMMENT ON COLUMN public.dressed_chickens.create_new_batch_for_remaining IS 'Whether a new batch was created for remaining birds';
 COMMENT ON COLUMN public.dressed_chickens.remaining_batch_id IS 'ID of the new batch created for remaining birds';
 
--- Create trigger for updated_at column for batch relationships
+-- Create enhanced triggers for batch relationships
 DROP TRIGGER IF EXISTS update_batch_relationships_updated_at ON public.batch_relationships;
 CREATE TRIGGER update_batch_relationships_updated_at
     BEFORE UPDATE ON public.batch_relationships
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Create trigger to automatically set created_by from current user
+CREATE OR REPLACE FUNCTION public.handle_batch_relationships_audit()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Set created_by on insert if not provided
+    IF NEW.created_by IS NULL AND auth.uid() IS NOT NULL THEN
+        NEW.created_by := auth.uid();
+    END IF;
+
+    -- Set updated_by on update if not provided
+    IF OLD IS NOT NULL AND NEW.updated_by IS NULL AND auth.uid() IS NOT NULL THEN
+        NEW.updated_by := auth.uid();
+    END IF;
+
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS handle_batch_relationships_audit_trigger ON public.batch_relationships;
+CREATE TRIGGER handle_batch_relationships_audit_trigger
+    BEFORE INSERT OR UPDATE ON public.batch_relationships
+    FOR EACH ROW EXECUTE FUNCTION public.handle_batch_relationships_audit();
+
+/*
+==========================================
+SEPARATE MIGRATION FILE FOR EXISTING DATABASES
+==========================================
+If the main schema.sql fails due to existing tables, copy and paste
+the following script into a NEW file in your Supabase SQL Editor:
+*/
+
+-- ==========================================
+-- BATCH RELATIONSHIPS ENHANCEMENT MIGRATION
+-- ==========================================
+-- Run this script if your batch_relationships table already exists
+
+-- Step 1: Add new columns (safe for existing tables)
+ALTER TABLE public.batch_relationships ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES auth.users(id);
+ALTER TABLE public.batch_relationships ADD COLUMN IF NOT EXISTS updated_by UUID REFERENCES auth.users(id);
+ALTER TABLE public.batch_relationships ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.batch_relationships ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+
+-- Step 2: Set default values for existing records
+UPDATE public.batch_relationships SET is_active = true WHERE is_active IS NULL;
+
+-- Step 3: Add check constraints (will fail if existing data is invalid)
+-- Remove this section if you have existing invalid data
+ALTER TABLE public.batch_relationships ADD CONSTRAINT check_source_batch_type CHECK (source_batch_type IN ('live_chickens', 'dressed_chickens', 'feed_inventory'));
+ALTER TABLE public.batch_relationships ADD CONSTRAINT check_target_batch_type CHECK (target_batch_type IN ('live_chickens', 'dressed_chickens', 'feed_inventory'));
+ALTER TABLE public.batch_relationships ADD CONSTRAINT check_relationship_type CHECK (relationship_type IN ('fed_to', 'processed_from', 'sold_to', 'transferred_to', 'split_from', 'partial_processed_from'));
+ALTER TABLE public.batch_relationships ADD CONSTRAINT check_quantity_positive CHECK (quantity IS NULL OR quantity >= 0);
+
+-- Step 4: Create enhanced indexes
+CREATE INDEX IF NOT EXISTS idx_batch_relationships_active ON public.batch_relationships(is_active, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_batch_relationships_composite ON public.batch_relationships(source_batch_id, source_batch_type, target_batch_id, target_batch_type, relationship_type);
+CREATE INDEX IF NOT EXISTS idx_batch_relationships_quantity ON public.batch_relationships(quantity) WHERE quantity IS NOT NULL;
+
+-- Step 5: Create audit trigger
+CREATE OR REPLACE FUNCTION public.handle_batch_relationships_audit()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.created_by IS NULL AND auth.uid() IS NOT NULL THEN
+        NEW.created_by := auth.uid();
+    END IF;
+
+    IF OLD IS NOT NULL AND NEW.updated_by IS NULL AND auth.uid() IS NOT NULL THEN
+        NEW.updated_by := auth.uid();
+    END IF;
+
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS handle_batch_relationships_audit_trigger ON public.batch_relationships;
+CREATE TRIGGER handle_batch_relationships_audit_trigger
+    BEFORE INSERT OR UPDATE ON public.batch_relationships
+    FOR EACH ROW EXECUTE FUNCTION public.handle_batch_relationships_audit();
+
+-- Step 6: Verify the migration worked
+SELECT
+    column_name,
+    data_type,
+    is_nullable,
+    column_default
+FROM information_schema.columns
+WHERE table_name = 'batch_relationships'
+ORDER BY ordinal_position;
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
@@ -476,4 +574,67 @@ COMMENT ON TABLE public.feed_consumption IS 'Feed consumption tracking by chicke
 COMMENT ON TABLE public.site_settings IS 'Global site settings and configuration';
 COMMENT ON TABLE public.chicken_inventory_transactions IS 'Audit trail for all changes to live chicken inventory (sales, mortality, transfers, etc.)';
 COMMENT ON TABLE public.dressed_chickens IS 'Processed/dressed chicken inventory tracking with support for partial batch processing';
-COMMENT ON TABLE public.batch_relationships IS 'Relationships between different batches (feed to chickens, processing, etc.)';
+-- Enhanced comments for the batch_relationships table
+COMMENT ON TABLE public.batch_relationships IS 'Enhanced relationships between different batches with audit trails, validation constraints, and soft delete support';
+COMMENT ON COLUMN public.batch_relationships.source_batch_type IS 'Type of source batch with enforced constraints: live_chickens, dressed_chickens, feed_inventory';
+COMMENT ON COLUMN public.batch_relationships.target_batch_type IS 'Type of target batch with enforced constraints: live_chickens, dressed_chickens, feed_inventory';
+COMMENT ON COLUMN public.batch_relationships.relationship_type IS 'Type of relationship with enforced constraints: fed_to, processed_from, sold_to, transferred_to, split_from, partial_processed_from';
+COMMENT ON COLUMN public.batch_relationships.quantity IS 'Quantity associated with the relationship (must be >= 0)';
+COMMENT ON COLUMN public.batch_relationships.created_by IS 'User who created the relationship record (auto-populated)';
+COMMENT ON COLUMN public.batch_relationships.updated_by IS 'User who last updated the relationship record (auto-populated)';
+COMMENT ON COLUMN public.batch_relationships.deleted_at IS 'Soft delete timestamp (NULL means active record)';
+COMMENT ON COLUMN public.batch_relationships.is_active IS 'Whether the relationship is active (default: true)';
+
+/*
+==========================================
+BATCH RELATIONSHIPS MIGRATION SCRIPT
+==========================================
+If you get a "column does not exist" error, it means your database
+already has the batch_relationships table but it's missing the new columns.
+
+Run this script SEPARATELY in your Supabase SQL Editor:
+*/
+
+-- Step 1: Add new columns (only if they don't exist)
+ALTER TABLE public.batch_relationships ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES auth.users(id);
+ALTER TABLE public.batch_relationships ADD COLUMN IF NOT EXISTS updated_by UUID REFERENCES auth.users(id);
+ALTER TABLE public.batch_relationships ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.batch_relationships ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+
+-- Step 2: Set default values for existing records
+UPDATE public.batch_relationships SET is_active = true WHERE is_active IS NULL;
+
+-- Step 3: Add check constraints (these will only work if existing data is valid)
+-- Note: If you have existing invalid data, you'll need to clean it up first
+ALTER TABLE public.batch_relationships ADD CONSTRAINT check_source_batch_type CHECK (source_batch_type IN ('live_chickens', 'dressed_chickens', 'feed_inventory'));
+ALTER TABLE public.batch_relationships ADD CONSTRAINT check_target_batch_type CHECK (target_batch_type IN ('live_chickens', 'dressed_chickens', 'feed_inventory'));
+ALTER TABLE public.batch_relationships ADD CONSTRAINT check_relationship_type CHECK (relationship_type IN ('fed_to', 'processed_from', 'sold_to', 'transferred_to', 'split_from', 'partial_processed_from'));
+ALTER TABLE public.batch_relationships ADD CONSTRAINT check_quantity_positive CHECK (quantity IS NULL OR quantity >= 0);
+
+-- Step 4: Create the enhanced indexes
+CREATE INDEX IF NOT EXISTS idx_batch_relationships_active ON public.batch_relationships(is_active, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_batch_relationships_composite ON public.batch_relationships(source_batch_id, source_batch_type, target_batch_id, target_batch_type, relationship_type);
+CREATE INDEX IF NOT EXISTS idx_batch_relationships_quantity ON public.batch_relationships(quantity) WHERE quantity IS NOT NULL;
+
+-- Step 5: Create the audit trigger
+CREATE OR REPLACE FUNCTION public.handle_batch_relationships_audit()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Set created_by on insert if not provided
+    IF NEW.created_by IS NULL AND auth.uid() IS NOT NULL THEN
+        NEW.created_by := auth.uid();
+    END IF;
+
+    -- Set updated_by on update if not provided
+    IF OLD IS NOT NULL AND NEW.updated_by IS NULL AND auth.uid() IS NOT NULL THEN
+        NEW.updated_by := auth.uid();
+    END IF;
+
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS handle_batch_relationships_audit_trigger ON public.batch_relationships;
+CREATE TRIGGER handle_batch_relationships_audit_trigger
+    BEFORE INSERT OR UPDATE ON public.batch_relationships
+    FOR EACH ROW EXECUTE FUNCTION public.handle_batch_relationships_audit();

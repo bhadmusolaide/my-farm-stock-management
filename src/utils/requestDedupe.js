@@ -493,8 +493,371 @@ export class PerformanceMonitor {
   }
 }
 
+// Enhanced request deduplication with intelligent batching
+export class EnhancedRequestDeduper extends RequestDeduper {
+  constructor() {
+    super()
+    this.requestBatches = new Map()
+    this.batchTimeout = 50 // 50ms batch window
+    this.maxBatchSize = 10
+  }
+
+  // Enhanced batching for similar requests
+  async makeRequestWithBatching(method, url, params = {}, options = {}) {
+    const requestKey = this.generateKey(method, url, params)
+
+    // Check for exact duplicates first
+    if (method === 'GET' || method === 'SELECT') {
+      const cached = this.getCached(requestKey)
+      if (cached) return cached
+    }
+
+    if (this.isPending(requestKey)) {
+      return this.pendingRequests.get(requestKey)
+    }
+
+    // Check if this can be batched with similar requests
+    if (method === 'SELECT' && options.batchable !== false) {
+      const batchKey = this.getBatchKey(url, params)
+      if (batchKey && this.requestBatches.has(batchKey)) {
+        const batch = this.requestBatches.get(batchKey)
+        if (batch.requests.length < this.maxBatchSize) {
+          return this.addToBatch(batch, requestKey, method, url, params, options)
+        }
+      }
+    }
+
+    // Execute individual request
+    return this.makeRequest(method, url, params, options)
+  }
+
+  // Get batch key for similar requests
+  getBatchKey(url, params) {
+    if (url.includes('audit_logs') || url.includes('transactions')) {
+      return null // Don't batch these as they're usually unique
+    }
+    return `${url}_${JSON.stringify(this.getBatchableParams(params))}`
+  }
+
+  // Get only the batchable parameters
+  getBatchableParams(params) {
+    const batchableKeys = ['limit', 'order', 'select']
+    return Object.keys(params)
+      .filter(key => batchableKeys.includes(key))
+      .reduce((result, key) => {
+        result[key] = params[key]
+        return result
+      }, {})
+  }
+
+  // Add request to batch
+  addToBatch(batch, requestKey, method, url, params, options) {
+    return new Promise((resolve, reject) => {
+      const request = { resolve, reject, requestKey, params }
+      batch.requests.push(request)
+      batch.params.push(params)
+
+      // Set timeout for batch execution
+      if (!batch.timeout) {
+        batch.timeout = setTimeout(() => {
+          this.executeBatch(batch)
+        }, this.batchTimeout)
+      }
+
+      // Handle batch size limit
+      if (batch.requests.length >= this.maxBatchSize) {
+        clearTimeout(batch.timeout)
+        this.executeBatch(batch)
+      }
+    })
+  }
+
+  // Execute batched requests
+  async executeBatch(batch) {
+    const { batchKey, requests, url, method } = batch
+
+    try {
+      // Merge parameters from all requests in batch
+      const mergedParams = this.mergeBatchParams(batch.params)
+
+      // Execute single request with merged parameters
+      const result = await this.executeRequest(method, url, mergedParams, {})
+
+      // Distribute results to individual requests
+      requests.forEach((request, index) => {
+        const filteredResult = this.filterBatchResult(result, request.params, mergedParams)
+        this.setCache(request.requestKey, filteredResult)
+        request.resolve(filteredResult)
+      })
+
+    } catch (error) {
+      // Reject all requests in batch on error
+      requests.forEach(request => request.reject(error))
+    } finally {
+      this.requestBatches.delete(batchKey)
+    }
+  }
+
+  // Merge parameters for batched requests
+  mergeBatchParams(paramsList) {
+    const merged = {}
+
+    paramsList.forEach(params => {
+      Object.keys(params).forEach(key => {
+        if (!merged[key]) {
+          merged[key] = []
+        }
+        if (Array.isArray(params[key])) {
+          merged[key] = merged[key].concat(params[key])
+        } else {
+          merged[key].push(params[key])
+        }
+      })
+    })
+
+    return merged
+  }
+
+  // Filter batch result for individual request
+  filterBatchResult(result, requestParams, mergedParams) {
+    if (!result.data || !Array.isArray(result.data)) {
+      return result
+    }
+
+    // Filter results based on original request parameters
+    let filteredData = [...result.data]
+
+    Object.keys(requestParams).forEach(key => {
+      if (key !== 'limit' && key !== 'order' && key !== 'select') {
+        const value = requestParams[key]
+        filteredData = filteredData.filter(item => item[key] === value)
+      }
+    })
+
+    return { ...result, data: filteredData }
+  }
+
+  // Initialize batch for new requests
+  initializeBatch(batchKey, method, url) {
+    const batch = {
+      batchKey,
+      method,
+      url,
+      requests: [],
+      params: [],
+      created: Date.now()
+    }
+
+    this.requestBatches.set(batchKey, batch)
+    return batch
+  }
+}
+
+// Create enhanced deduper instance
+export const enhancedDeduper = new EnhancedRequestDeduper()
+
+// Enhanced usage analytics for database cost monitoring and optimization
+export class DatabaseUsageAnalytics {
+  constructor() {
+    this.metrics = {
+      requests: [],
+      costs: [],
+      performance: [],
+      cache: [],
+      errors: []
+    }
+    this.retentionPeriod = 30 * 24 * 60 * 60 * 1000 // 30 days
+    this.costPerGB = 0.09 // Supabase cost per GB (example rate)
+    this.costPerRequest = 0.0004 // Example cost per request
+    this.startTime = Date.now()
+  }
+
+  // Track database request with cost estimation
+  trackRequest(endpoint, method, options = {}) {
+    const {
+      dataSize = 0,
+      responseTime = 0,
+      cached = false,
+      error = null,
+      tableName = null
+    } = options
+
+    const request = {
+      timestamp: Date.now(),
+      endpoint,
+      method,
+      tableName,
+      dataSize,
+      responseTime,
+      cached,
+      error,
+      // Estimate costs
+      estimatedCost: this.estimateRequestCost(dataSize, cached),
+      // Performance metrics
+      isSlowQuery: responseTime > 1000, // > 1 second
+      isLargeResponse: dataSize > 1024 * 1024 // > 1MB
+    }
+
+    this.metrics.requests.push(request)
+    this.metrics.costs.push({
+      timestamp: request.timestamp,
+      cost: request.estimatedCost,
+      type: cached ? 'cached' : 'fresh',
+      tableName
+    })
+
+    if (error) {
+      this.metrics.errors.push({
+        timestamp: request.timestamp,
+        endpoint,
+        error: error.message || error,
+        tableName
+      })
+    }
+
+    // Cleanup old data
+    this.cleanupOldData()
+
+    return request
+  }
+
+  // Estimate the cost of a request
+  estimateRequestCost(dataSize, cached) {
+    const gbTransferred = dataSize / (1024 * 1024 * 1024)
+    const dataTransferCost = gbTransferred * this.costPerGB
+
+    // Cached requests have minimal compute cost
+    const requestCost = cached ? this.costPerRequest * 0.1 : this.costPerRequest
+
+    return dataTransferCost + requestCost
+  }
+
+  // Get cost summary for time period
+  getCostSummary(startTime = null, endTime = null) {
+    const start = startTime || (Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
+    const end = endTime || Date.now()
+
+    const relevantCosts = this.metrics.costs.filter(
+      cost => cost.timestamp >= start && cost.timestamp <= end
+    )
+
+    const totalCost = relevantCosts.reduce((sum, cost) => sum + cost.cost, 0)
+    const cachedCost = relevantCosts.filter(c => c.type === 'cached').reduce((sum, c) => sum + c.cost, 0)
+    const freshCost = relevantCosts.filter(c => c.type === 'fresh').reduce((sum, c) => sum + c.cost, 0)
+
+    return {
+      period: { start, end },
+      totalCost,
+      cachedCost,
+      freshCost,
+      savingsFromCache: freshCost - cachedCost,
+      savingsPercentage: freshCost > 0 ? ((freshCost - cachedCost) / freshCost) * 100 : 0,
+      requestCount: relevantCosts.length
+    }
+  }
+
+  // Get performance insights
+  getPerformanceInsights() {
+    const recentRequests = this.metrics.requests.filter(
+      req => Date.now() - req.timestamp < 60 * 60 * 1000 // Last hour
+    )
+
+    const slowQueries = recentRequests.filter(req => req.isSlowQuery)
+    const errors = this.metrics.errors.filter(
+      err => Date.now() - err.timestamp < 60 * 60 * 1000 // Last hour
+    )
+
+    const avgResponseTime = recentRequests.reduce((sum, req) => sum + req.responseTime, 0) / recentRequests.length || 0
+    const cacheHitRate = recentRequests.filter(req => req.cached).length / recentRequests.length * 100 || 0
+
+    return {
+      slowQueries: slowQueries.length,
+      errors: errors.length,
+      avgResponseTime: Math.round(avgResponseTime),
+      cacheHitRate: Math.round(cacheHitRate * 100) / 100,
+      totalRequests: recentRequests.length,
+      errorRate: (errors.length / recentRequests.length) * 100 || 0
+    }
+  }
+
+  // Get optimization recommendations
+  getOptimizationRecommendations() {
+    const insights = this.getPerformanceInsights()
+    const costSummary = this.getCostSummary()
+    const recommendations = []
+
+    // Cache optimization recommendations
+    if (insights.cacheHitRate < 70) {
+      recommendations.push({
+        type: 'cache',
+        priority: 'high',
+        title: 'Improve Cache Hit Rate',
+        description: 'Cache hit rate is below 70%. Consider increasing cache timeouts for stable data.',
+        potentialSavings: costSummary.totalCost * 0.3
+      })
+    }
+
+    // Performance recommendations
+    if (insights.slowQueries > 0) {
+      recommendations.push({
+        type: 'performance',
+        priority: 'medium',
+        title: 'Optimize Slow Queries',
+        description: `${insights.slowQueries} slow queries detected. Consider adding database indexes.`,
+        potentialSavings: insights.slowQueries * this.costPerRequest * 0.5
+      })
+    }
+
+    return recommendations.sort((a, b) => {
+      const priorityOrder = { high: 3, medium: 2, low: 1 }
+      return priorityOrder[b.priority] - priorityOrder[a.priority]
+    })
+  }
+
+  // Generate comprehensive report
+  generateReport(days = 7) {
+    const endTime = Date.now()
+    const startTime = endTime - (days * 24 * 60 * 60 * 1000)
+
+    const costSummary = this.getCostSummary(startTime, endTime)
+    const performanceInsights = this.getPerformanceInsights()
+    const recommendations = this.getOptimizationRecommendations()
+
+    return {
+      period: { start: startTime, end: endTime, days },
+      summary: costSummary,
+      performance: performanceInsights,
+      recommendations,
+      metadata: {
+        generatedAt: new Date().toISOString(),
+        retentionPeriod: this.retentionPeriod,
+        currentCostRates: {
+          perGB: this.costPerGB,
+          perRequest: this.costPerRequest
+        }
+      }
+    }
+  }
+
+  // Cleanup old metrics data
+  cleanupOldData() {
+    const cutoffTime = Date.now() - this.retentionPeriod
+
+    Object.keys(this.metrics).forEach(metricType => {
+      if (Array.isArray(this.metrics[metricType])) {
+        this.metrics[metricType] = this.metrics[metricType].filter(
+          item => item.timestamp > cutoffTime
+        )
+      }
+    })
+  }
+}
+
+// Create analytics instance
+export const usageAnalytics = new DatabaseUsageAnalytics()
+
 // Export instances
-export const optimizedLoader = new OptimizedDataLoader()
+export const optimizedLoader = new OptimizedDataLoader(enhancedDeduper)
 export const storageOptimizer = new StorageOptimizer()
 export const performanceMonitor = new PerformanceMonitor()
 
