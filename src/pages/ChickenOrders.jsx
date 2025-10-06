@@ -26,6 +26,8 @@ const ChickenOrders = () => {
     updateDressedChicken,
     logChickenTransaction,
     loadPaginatedData,
+    loadLiveChickensData,
+    loadDressedChickensData,
     pagination
   } = useAppContext()
 
@@ -147,6 +149,13 @@ const ChickenOrders = () => {
     loadChickensPage()
   }, [currentPage, debouncedFilters])
 
+  // Ensure batches are loaded for modal selects
+  useEffect(() => {
+    // Load live and dressed batches if not present
+    loadLiveChickensData && loadLiveChickensData()
+    loadDressedChickensData && loadDressedChickensData()
+  }, [])
+
   // Load chickens for current page with filters
   const loadChickensPage = async () => {
     try {
@@ -233,6 +242,12 @@ const ChickenOrders = () => {
     
     setFormData(prev => {
       const newFormData = { ...prev, [name]: value }
+
+      // When inventory type changes, clear batch and part selections
+      if (name === 'inventoryType') {
+        newFormData.batch_id = ''
+        newFormData.part_type = ''
+      }
       
       // Auto-populate amount paid when status is 'paid' or when calculation fields change while status is 'paid'
       if ((name === 'status' && value === 'paid') || 
@@ -1087,18 +1102,19 @@ const ChickenOrders = () => {
                     >
                       <option value="">No batch selected</option>
                       {formData.inventoryType === 'live' ? (
-                        liveChickens
+                        (liveChickens || [])
                           .filter(batch =>
-                            (batch.status === 'healthy' || batch.status === 'sick') &&
-                            batch.current_count > 0
+                            // Only show active live batches (exclude processing/in-storage/completed)
+                            ['healthy', 'sick', 'quarantine'].includes(String(batch.status).toLowerCase()) &&
+                            Number(batch.current_count) > 0
                           )
                           .map(batch => (
                             <option key={batch.id} value={batch.id}>
-                              {batch.batch_id} - {batch.breed} ({batch.current_count} available)
+                              {batch.batch_id} - {batch.breed} ({formatNumber(Number(batch.current_count))} available)
                             </option>
                           ))
                       ) : (
-                        dressedChickens
+                        (dressedChickens || [])
                           .filter(batch =>
                             batch.status === 'in-storage' &&
                             (formData.inventoryType === 'parts' ?
@@ -1132,10 +1148,10 @@ const ChickenOrders = () => {
                         required={formData.inventoryType === 'parts'}
                       >
                         <option value="">Select part type</option>
-                        <option value="neck">Neck ({dressedChickens.find(b => b.id === formData.batch_id)?.parts_count?.neck || 0} available)</option>
-                        <option value="feet">Feet ({dressedChickens.find(b => b.id === formData.batch_id)?.parts_count?.feet || 0} available)</option>
-                        <option value="gizzard">Gizzard ({dressedChickens.find(b => b.id === formData.batch_id)?.parts_count?.gizzard || 0} available)</option>
-                        <option value="dog_food">Dog Food ({dressedChickens.find(b => b.id === formData.batch_id)?.parts_count?.dog_food || 0} available)</option>
+                        <option value="neck">Neck ({(dressedChickens || []).find(b => String(b.id) === String(formData.batch_id))?.parts_count?.neck || 0} available)</option>
+                        <option value="feet">Feet ({(dressedChickens || []).find(b => String(b.id) === String(formData.batch_id))?.parts_count?.feet || 0} available)</option>
+                        <option value="gizzard">Gizzard ({(dressedChickens || []).find(b => String(b.id) === String(formData.batch_id))?.parts_count?.gizzard || 0} available)</option>
+                        <option value="dog_food">Dog Food ({(dressedChickens || []).find(b => String(b.id) === String(formData.batch_id))?.parts_count?.dog_food || 0} available)</option>
                       </select>
                     </div>
                   </div>
