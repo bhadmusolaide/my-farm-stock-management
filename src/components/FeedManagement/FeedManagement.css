@@ -1,0 +1,741 @@
+/* FeedManagement Components Styles */
+
+/* Feed Inventory View Styles */
+.feed-inventory-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.summary-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #ddd);
+  background: var(--card-bg, #fff);
+}
+
+.summary-card.warning {
+  border-left: 4px solid var(--warning-color, #ffc107);
+}
+
+.summary-card.danger {
+  border-left: 4px solid var(--danger-color, #dc3545);
+}
+
+.summary-card.info {
+  border-left: 4px solid var(--info-color, #17a2b8);
+}
+
+.summary-card .summary-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.summary-card .summary-content h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted, #666);
+}
+
+.summary-card .summary-value {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-color, #333);
+}
+
+.alerts-section {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.alerts-section h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text-color, #333);
+}
+
+.alerts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.alert-card {
+  padding: 0.75rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.alert-card.danger {
+  background-color: var(--danger-bg, #f8d7da);
+  color: var(--danger-color, #721c24);
+  border: 1px solid var(--danger-border, #f5c6cb);
+}
+
+.alert-card.warning {
+  background-color: var(--warning-bg, #fff3cd);
+  color: var(--warning-color, #856404);
+  border: 1px solid var(--warning-border, #ffeaa7);
+}
+
+.alert-card.info {
+  background-color: var(--info-bg, #d1ecf1);
+  color: var(--info-color, #0c5460);
+  border: 1px solid var(--info-border, #bee5eb);
+}
+
+.feed-type {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.feed-type-name {
+  font-weight: 500;
+  color: var(--text-color, #333);
+}
+
+.brand-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.brand-name {
+  font-weight: 500;
+  color: var(--text-color, #333);
+}
+
+.quantity-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.quantity-kg {
+  font-weight: 600;
+  color: var(--text-color, #333);
+}
+
+.quantity-bags {
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+}
+
+.cost-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cost-per-bag {
+  font-weight: 500;
+  color: var(--text-color, #333);
+}
+
+.total-cost {
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+}
+
+.expiry-date {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.expiry-date.expired {
+  color: var(--danger-color, #dc3545);
+}
+
+.expiry-date.expiring-soon {
+  color: var(--warning-color, #ffc107);
+}
+
+.expiry-warning {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.out-of-stock-row {
+  background-color: var(--danger-bg, #f8d7da);
+  opacity: 0.8;
+}
+
+.low-stock-row {
+  background-color: var(--warning-bg, #fff3cd);
+}
+
+.expired-row {
+  background-color: var(--danger-bg, #f8d7da);
+}
+
+.expiring-soon-row {
+  background-color: var(--warning-bg, #fff3cd);
+}
+
+/* Feed Form Styles */
+.feed-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.feed-form .form-section {
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 8px;
+  padding: 1rem;
+  background-color: var(--card-bg, #f8f9fa);
+}
+
+.feed-form .form-section h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text-color, #333);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.feed-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.feed-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.feed-form .form-group label {
+  font-weight: 500;
+  color: var(--text-color, #333);
+  font-size: 0.875rem;
+}
+
+.feed-form .required {
+  color: var(--danger-color, #dc3545);
+}
+
+.feed-form input,
+.feed-form select,
+.feed-form textarea {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.feed-form input:focus,
+.feed-form select:focus,
+.feed-form textarea:focus {
+  outline: none;
+  border-color: var(--primary-color, #007bff);
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.feed-form input.error,
+.feed-form select.error {
+  border-color: var(--danger-color, #dc3545);
+}
+
+.feed-form .error-message {
+  color: var(--danger-color, #dc3545);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.feed-form .form-help {
+  color: var(--text-muted, #666);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.calculated-value {
+  padding: 0.5rem 0.75rem;
+  background-color: var(--light-bg, #f8f9fa);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  font-weight: 600;
+  color: var(--text-color, #333);
+}
+
+.batch-assignments {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.batch-assignment {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  background: var(--card-bg, #fff);
+}
+
+.batch-info {
+  flex: 1;
+}
+
+.batch-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.batch-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.batch-details strong {
+  color: var(--text-color, #333);
+}
+
+.batch-details small {
+  color: var(--text-muted, #666);
+  font-size: 0.75rem;
+}
+
+.quantity-input {
+  min-width: 120px;
+}
+
+.quantity-input input {
+  width: 100%;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color, #ddd);
+}
+
+/* Feed Consumption View Styles */
+.feed-consumption-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.daily-consumption-trend {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.daily-consumption-trend h4 {
+  margin: 0 0 1rem 0;
+  color: var(--text-color, #333);
+}
+
+.trend-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+.trend-card {
+  padding: 0.75rem;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  text-align: center;
+  background: var(--card-bg, #f8f9fa);
+}
+
+.trend-date {
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+  margin-bottom: 0.25rem;
+}
+
+.trend-quantity {
+  font-weight: 600;
+  color: var(--text-color, #333);
+  margin-bottom: 0.25rem;
+}
+
+.trend-records {
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+}
+
+.feed-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.feed-type {
+  font-weight: 500;
+  color: var(--text-color, #333);
+}
+
+.feed-brand {
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+}
+
+.batch-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.batch-id {
+  font-weight: 500;
+  color: var(--text-color, #333);
+}
+
+.batch-breed {
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+}
+
+.quantity-consumed {
+  font-weight: 600;
+  color: var(--text-color, #333);
+}
+
+.cost-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cost-per-kg {
+  font-weight: 500;
+  color: var(--text-color, #333);
+}
+
+.total-cost {
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+}
+
+.fcr-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.fcr-per-bird {
+  font-weight: 500;
+  color: var(--text-color, #333);
+}
+
+.bird-count {
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+}
+
+/* Feed Consumption Form Styles */
+.consumption-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.feed-details-card,
+.batch-details-card {
+  background: var(--card-bg, #f8f9fa);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 0.5rem;
+}
+
+.feed-details-card h5,
+.batch-details-card h5 {
+  margin: 0 0 0.75rem 0;
+  color: var(--text-color, #333);
+  font-size: 0.875rem;
+}
+
+.feed-info-grid,
+.batch-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.5rem;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.info-item label {
+  color: var(--text-muted, #666);
+  font-weight: 500;
+}
+
+.info-item span {
+  color: var(--text-color, #333);
+  font-weight: 500;
+}
+
+.analysis-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.analysis-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 8px;
+  background: var(--card-bg, #f8f9fa);
+}
+
+.analysis-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.analysis-content h5 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  color: var(--text-muted, #666);
+}
+
+.analysis-value {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-color, #333);
+}
+
+.analysis-content small {
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+}
+
+.warning-message {
+  background-color: var(--warning-bg, #fff3cd);
+  color: var(--warning-color, #856404);
+  border: 1px solid var(--warning-border, #ffeaa7);
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
+
+/* Feed Analytics View Styles */
+.feed-analytics-view {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.analytics-overview,
+.batch-analysis,
+.feed-type-analysis,
+.brand-analysis,
+.efficiency-insights {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.analytics-overview h3,
+.batch-analysis h3,
+.feed-type-analysis h3,
+.brand-analysis h3,
+.efficiency-insights h3 {
+  margin: 0 0 1rem 0;
+  color: var(--text-color, #333);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #ddd);
+}
+
+.stat-card.primary {
+  border-left: 4px solid var(--primary-color, #007bff);
+}
+
+.stat-card.success {
+  border-left: 4px solid var(--success-color, #28a745);
+}
+
+.stat-card.info {
+  border-left: 4px solid var(--info-color, #17a2b8);
+}
+
+.stat-card.warning {
+  border-left: 4px solid var(--warning-color, #ffc107);
+}
+
+.stat-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.stat-content h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted, #666);
+}
+
+.stat-value {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-color, #333);
+}
+
+.negative-remaining {
+  color: var(--danger-color, #dc3545);
+  font-weight: 600;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.insight-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 8px;
+  background: var(--card-bg, #f8f9fa);
+}
+
+.insight-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.insight-content h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  color: var(--text-muted, #666);
+}
+
+.insight-value {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-color, #333);
+}
+
+.insight-content small {
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+}
+
+/* Status badges */
+.status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status-healthy {
+  background-color: var(--success-color, #28a745);
+  color: white;
+}
+
+.status-sick {
+  background-color: var(--warning-color, #ffc107);
+  color: white;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .feed-form .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .summary-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .trend-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .analysis-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .insights-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .feed-info-grid,
+  .batch-info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .batch-assignment {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .quantity-input {
+    min-width: auto;
+    width: 100%;
+  }
+}
