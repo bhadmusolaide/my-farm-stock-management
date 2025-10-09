@@ -1,8 +1,10 @@
-import React, { useState, useContext, useEffect, useCallback, memo } from 'react';
+import React, { useState, useContext, useEffect, useCallback, memo, useMemo } from 'react';
 import { AppContext } from '../context/AppContext';
+import { useNotification } from '../context/NotificationContext';
 import { formatWeight } from '../utils/formatters';
 import Modal from '../components/Modal';
 import ActionButtons from '../components/ActionButtons';
+import { validateDressedChickenData } from '../utils/chickenProcessingValidation';
 import './DressedChickenStock.css';
 
 
@@ -18,19 +20,31 @@ const DressedChickenStock = () => {
      addBatchRelationship,
      updateLiveChicken,
      addLiveChicken,
-     loadDressedChickens
+     loadDressedChickens,
+     loadBatchRelationships,
+     chickenSizeCategories,
+     loadChickenSizeCategories,
+     chickenPartTypes
    } = useContext(AppContext);
+
+  const { showSuccess, showError, showWarning } = useNotification();
 
   const [activeTab, setActiveTab] = useState('inventory');
   const [showProcessingModal, setShowProcessingModal] = useState(false);
   const [editingChicken, setEditingChicken] = useState(null);
+  const [viewingTraceability, setViewingTraceability] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Processing modal state
   const [selectedBatch, setSelectedBatch] = useState('');
   const [processingDate, setProcessingDate] = useState(new Date().toISOString().split('T')[0]);
-  const [sizeCategory, setSizeCategory] = useState('medium');
+  const [sizeCategoryId, setSizeCategoryId] = useState(''); // Changed to use ID
+  const [sizeCategoryCustom, setSizeCategoryCustom] = useState(''); // For custom size names
   const [processingQuantity, setProcessingQuantity] = useState('');
+  const [storageLocation, setStorageLocation] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [notes, setNotes] = useState('');
   const [createNewBatchForRemaining, setCreateNewBatchForRemaining] = useState(false);
   const [remainingBatchId, setRemainingBatchId] = useState('');
   const [neckCount, setNeckCount] = useState('');
@@ -42,34 +56,86 @@ const DressedChickenStock = () => {
   const [dogFoodCount, setDogFoodCount] = useState('');
   const [dogFoodWeight, setDogFoodWeight] = useState('');
 
-  // Edit modal state
-   const [editBatchId, setEditBatchId] = useState('');
-   const [editWholeChickenCount, setEditWholeChickenCount] = useState(''); // Independent whole chicken count editing
-   const [editSizeCategoryId, setEditSizeCategoryId] = useState(''); // Use new flexible size category system
-   const [editSizeCategoryCustom, setEditSizeCategoryCustom] = useState(''); // Custom size name if not using predefined
-   const [editStatus, setEditStatus] = useState('in-storage');
-   const [editStorageLocation, setEditStorageLocation] = useState('');
-   const [editExpiryDate, setEditExpiryDate] = useState('');
-   const [editNeckCount, setEditNeckCount] = useState('');
-   const [editNeckWeight, setEditNeckWeight] = useState('');
-   const [editFeetCount, setEditFeetCount] = useState('');
-   const [editFeetWeight, setEditFeetWeight] = useState('');
-   const [editGizzardCount, setEditGizzardCount] = useState('');
-   const [editGizzardWeight, setEditGizzardWeight] = useState('');
-   const [editDogFoodCount, setEditDogFoodCount] = useState('');
-   const [editDogFoodWeight, setEditDogFoodWeight] = useState('');
+  // ========== HELPER FUNCTIONS (defined before hooks that use them) ==========
 
-  // Memoized edit handler to prevent inline function churn
-  const handleEditChicken = useCallback((chicken) => {
-    setEditingChicken(chicken);
-  }, []);
+  // Helper to calculate default expiry date (3 months from processing date)
+  const calculateDefaultExpiryDate = (processingDateStr) => {
+    const date = new Date(processingDateStr);
+    date.setMonth(date.getMonth() + 3);
+    return date.toISOString().split('T')[0];
+  };
 
-  // Load dressed chickens data if not already loaded
-  useEffect(() => {
-    if (!dressedChickens || dressedChickens.length === 0) {
-      loadDressedChickens();
+  // Helper to check if item is expiring soon (within 7 days)
+  const isExpiringSoon = (expiryDateStr) => {
+    if (!expiryDateStr) return false;
+    const expiryDate = new Date(expiryDateStr);
+    const today = new Date();
+    const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+    return daysUntilExpiry <= 7 && daysUntilExpiry >= 0;
+  };
+
+  // Helper to check if item is expired
+  const isExpired = (expiryDateStr) => {
+    if (!expiryDateStr) return false;
+    const expiryDate = new Date(expiryDateStr);
+    const today = new Date();
+    return expiryDate < today;
+  };
+
+  // Helper to get expiry status badge
+  const getExpiryStatusBadge = (expiryDateStr) => {
+    if (!expiryDateStr) return null;
+
+    if (isExpired(expiryDateStr)) {
+      return <span style={{ color: '#c62828', fontWeight: 'bold' }}>⚠️ EXPIRED</span>;
     }
-  }, [dressedChickens, loadDressedChickens]);
+
+    if (isExpiringSoon(expiryDateStr)) {
+      return <span style={{ color: '#f57f17', fontWeight: 'bold' }}>⚠️ Expiring Soon</span>;
+    }
+
+    return null;
+  };
+
+  // Helper to get actual whole chicken count (handles old and new data formats)
+  const getWholeChickenCount = (chicken) => {
+    // Prefer explicit processing_quantity (new format - most reliable)
+    if (chicken.processing_quantity !== undefined && chicken.processing_quantity !== null) {
+      return chicken.processing_quantity;
+    }
+
+    // Fall back to current_count (standard field)
+    if (chicken.current_count !== undefined && chicken.current_count !== null) {
+      return chicken.current_count;
+    }
+
+    // Last resort: use initial_count
+    return chicken.initial_count || 0;
+  };
+
+  // Helper to get display name for size category (handles both old and new formats)
+  const getSizeCategoryDisplay = (chicken) => {
+    // Priority 1: Custom size name
+    if (chicken.size_category_custom) {
+      return chicken.size_category_custom;
+    }
+
+    // Priority 2: Look up size category by ID
+    if (chicken.size_category_id && chickenSizeCategories.length > 0) {
+      const category = chickenSizeCategories.find(sc => sc.id === chicken.size_category_id);
+      if (category) {
+        return category.name;
+      }
+    }
+
+    // Priority 3: Old format - direct string value
+    if (chicken.size_category) {
+      // Capitalize first letter for display
+      return chicken.size_category.charAt(0).toUpperCase() + chicken.size_category.slice(1);
+    }
+
+    return 'Not specified';
+  };
 
   // Format weight using existing formatter
   const formatPartWeight = (weight) => formatWeight(weight);
@@ -83,34 +149,71 @@ const DressedChickenStock = () => {
   const getTotalPartsWeight = (partsWeight) => {
     return Object.values(partsWeight || {}).reduce((sum, weight) => sum + weight, 0);
   };
-  
-  // Helper to get actual whole chicken count (handles old and new data formats)
-  const getWholeChickenCount = (chicken) => {
-    // If processing_quantity exists, use it (it represents the number of birds processed)
-    if (chicken.processing_quantity && chicken.processing_quantity > 0) {
-      return chicken.processing_quantity;
+
+  // ========== HOOKS AND CALLBACKS ==========
+
+  // Memoized edit handler to prevent inline function churn
+  const handleEditChicken = useCallback((chicken) => {
+    setEditingChicken(chicken);
+  }, []);
+
+  // Load dressed chickens, batch relationships, and size categories on mount
+  useEffect(() => {
+    if (!dressedChickens || dressedChickens.length === 0) {
+      loadDressedChickens();
     }
-    
-    // Otherwise, check if current_count looks like old format (sum of parts)
-    const totalPartsCount = getTotalPartsCount(chicken.parts_count);
-    
-    // If current_count equals total parts count, it's likely old format
-    // Use the smallest non-zero part count as a proxy for whole chicken count
-    if (chicken.current_count === totalPartsCount && totalPartsCount > 0) {
-      const partsCounts = Object.values(chicken.parts_count || {}).filter(c => c > 0);
-      return partsCounts.length > 0 ? Math.min(...partsCounts) : chicken.current_count;
+    if (!batchRelationships || batchRelationships.length === 0) {
+      loadBatchRelationships();
     }
-    
-    // For new format or when parts don't match, use current_count as-is
-    return chicken.current_count || 0;
-  };
+    if (!chickenSizeCategories || chickenSizeCategories.length === 0) {
+      loadChickenSizeCategories();
+    }
+  }, [dressedChickens, loadDressedChickens, batchRelationships, loadBatchRelationships, chickenSizeCategories, loadChickenSizeCategories]);
+
+  // Auto-calculate expiry date when processing date changes
+  useEffect(() => {
+    if (processingDate && !expiryDate) {
+      setExpiryDate(calculateDefaultExpiryDate(processingDate));
+    }
+  }, [processingDate, expiryDate]);
+
+  // Memoize expiry warnings calculation
+  const expiryWarnings = useMemo(() => {
+    const expiringSoon = dressedChickens.filter(dc =>
+      dc.status === 'in-storage' && isExpiringSoon(dc.expiry_date)
+    );
+    const expired = dressedChickens.filter(dc =>
+      dc.status === 'in-storage' && isExpired(dc.expiry_date)
+    );
+    return { expiringSoon, expired };
+  }, [dressedChickens]);
+
+  // Show expiry warnings on component mount
+  useEffect(() => {
+    if (expiryWarnings.expired.length > 0) {
+      showError(`${expiryWarnings.expired.length} batch(es) have EXPIRED! Please review immediately.`);
+    } else if (expiryWarnings.expiringSoon.length > 0) {
+      showWarning(`${expiryWarnings.expiringSoon.length} batch(es) expiring within 7 days.`);
+    }
+  }, [expiryWarnings.expired.length, expiryWarnings.expiringSoon.length]);
 
   const handleProcessChickenForm = async (e) => {
     e.preventDefault();
 
     // Validate batch selection
     if (!selectedBatch) {
-      alert('Please select a live chicken batch');
+      showError('Please select a live chicken batch');
+      return;
+    }
+
+    // Validate size category
+    if (!sizeCategoryId) {
+      showError('Please select a size category');
+      return;
+    }
+
+    if (sizeCategoryId === 'custom' && !sizeCategoryCustom.trim()) {
+      showError('Please enter a custom size name');
       return;
     }
 
@@ -120,18 +223,18 @@ const DressedChickenStock = () => {
     const quantityToProcess = parseInt(processingQuantity) || 0;
 
     if (quantityToProcess <= 0) {
-      alert('Please enter a valid quantity to process (must be greater than 0)');
+      showError('Please enter a valid quantity to process (must be greater than 0)');
       return;
     }
 
     if (quantityToProcess > availableBirds) {
-      alert(`Cannot process ${quantityToProcess} birds. Only ${availableBirds} birds available in this batch.`);
+      showError(`Cannot process ${quantityToProcess} birds. Only ${availableBirds} birds available in this batch.`);
       return;
     }
 
     // Validate remaining batch ID if creating new batch
     if (createNewBatchForRemaining && !remainingBatchId.trim()) {
-      alert('Please enter a batch ID for the remaining birds');
+      showError('Please enter a batch ID for the remaining birds');
       return;
     }
 
@@ -139,38 +242,47 @@ const DressedChickenStock = () => {
     if (createNewBatchForRemaining && remainingBatchId.trim()) {
       const isDuplicate = liveChickens.some(batch => batch.batch_id === remainingBatchId.trim());
       if (isDuplicate) {
-        alert(`Batch ID "${remainingBatchId}" already exists. Please choose a different ID.`);
+        showError(`Batch ID "${remainingBatchId}" already exists. Please choose a different ID.`);
         return;
       }
     }
 
     // Validate parts data - each part type should not exceed the processing quantity
     const neckCountVal = parseInt(neckCount) || 0;
+    const neckWeightVal = parseFloat(neckWeight) || 0;
     const feetCountVal = parseInt(feetCount) || 0;
+    const feetWeightVal = parseFloat(feetWeight) || 0;
     const gizzardCountVal = parseInt(gizzardCount) || 0;
+    const gizzardWeightVal = parseFloat(gizzardWeight) || 0;
     const dogFoodCountVal = parseInt(dogFoodCount) || 0;
+    const dogFoodWeightVal = parseFloat(dogFoodWeight) || 0;
 
     // Check if at least one part has a count
     if (neckCountVal === 0 && feetCountVal === 0 && gizzardCountVal === 0 && dogFoodCountVal === 0) {
-      alert('Please enter at least one part count');
+      showError('Please enter at least one part count');
+      return;
+    }
+
+    // Validate weights are non-negative
+    if (neckWeightVal < 0 || feetWeightVal < 0 || gizzardWeightVal < 0 || dogFoodWeightVal < 0) {
+      showError('Part weights cannot be negative');
       return;
     }
 
     // Check individual part counts don't exceed processing quantity
     if (neckCountVal > quantityToProcess) {
-      alert(`Neck count (${neckCountVal}) cannot exceed processing quantity (${quantityToProcess})`);
+      showError(`Neck count (${neckCountVal}) cannot exceed processing quantity (${quantityToProcess})`);
       return;
     }
-    if (feetCountVal > quantityToProcess) {
-      alert(`Feet count (${feetCountVal}) cannot exceed processing quantity (${quantityToProcess})`);
-      return;
+    if (feetCountVal > quantityToProcess * 2) { // Feet come in pairs
+      showWarning(`Feet count (${feetCountVal}) seems high for ${quantityToProcess} birds (expected ~${quantityToProcess * 2})`);
     }
     if (gizzardCountVal > quantityToProcess) {
-      alert(`Gizzard count (${gizzardCountVal}) cannot exceed processing quantity (${quantityToProcess})`);
+      showError(`Gizzard count (${gizzardCountVal}) cannot exceed processing quantity (${quantityToProcess})`);
       return;
     }
     if (dogFoodCountVal > quantityToProcess) {
-      alert(`Dog food count (${dogFoodCountVal}) cannot exceed processing quantity (${quantityToProcess})`);
+      showError(`Dog food count (${dogFoodCountVal}) cannot exceed processing quantity (${quantityToProcess})`);
       return;
     }
 
@@ -201,10 +313,17 @@ const DressedChickenStock = () => {
       initial_count: quantityToProcess, // Number of whole chickens processed
       current_count: quantityToProcess, // Current number of whole chickens available
       average_weight: averageWeight,
-      size_category: sizeCategory,
+      // Use new format: size_category_id and size_category_custom
+      size_category_id: sizeCategoryId === 'custom' ? null : (sizeCategoryId || null),
+      size_category_custom: sizeCategoryId === 'custom' ? sizeCategoryCustom : null,
+      // Keep old format for backward compatibility (will be removed in future)
+      size_category: sizeCategoryId && sizeCategoryId !== 'custom'
+        ? chickenSizeCategories.find(sc => sc.id === sizeCategoryId)?.name?.toLowerCase()
+        : (sizeCategoryId === 'custom' ? sizeCategoryCustom : 'medium'),
       status: 'in-storage',
-      storage_location: '',
-      expiry_date: new Date(new Date(processingDate).setMonth(new Date(processingDate).getMonth() + 3)).toISOString().split('T')[0], // 3 months expiry
+      storage_location: storageLocation || '',
+      expiry_date: expiryDate || calculateDefaultExpiryDate(processingDate),
+      notes: notes || '',
       parts_count: partsCount,
       parts_weight: partsWeight,
       processing_quantity: quantityToProcess,
@@ -213,9 +332,11 @@ const DressedChickenStock = () => {
       remaining_batch_id: remainingBatchId
     };
 
+    setIsProcessing(true);
+
     try {
       // Add the dressed chicken record first
-      const savedDressedChicken = await addDressedChicken(data);
+      await addDressedChicken(data);
 
       // Update live chicken count
       const sourceBatch = liveChickens.find(batch => batch.id === data.batch_id);
@@ -284,6 +405,11 @@ const DressedChickenStock = () => {
       // Reset form
       setSelectedBatch('');
       setProcessingQuantity('');
+      setSizeCategoryId('');
+      setSizeCategoryCustom('');
+      setStorageLocation('');
+      setExpiryDate('');
+      setNotes('');
       setCreateNewBatchForRemaining(false);
       setRemainingBatchId('');
       setNeckCount('');
@@ -295,105 +421,24 @@ const DressedChickenStock = () => {
       setDogFoodCount('');
       setDogFoodWeight('');
 
+      // Refresh data to show new record
+      await loadDressedChickens();
+      await loadBatchRelationships();
+
+      showSuccess(`Successfully processed ${quantityToProcess} birds from batch ${selectedBatchData.batch_id}`);
+
       // Close modal after all operations complete
       setShowProcessingModal(false);
     } catch (error) {
       console.error('Error processing chicken:', error);
-      alert(`Error processing chicken: ${error.message}
-
-Please check:
-1. Database connection
-2. Table permissions
-3. Required database tables exist
-
-Check the browser console for more details.`);
-      setShowProcessingModal(false);
+      showError(`Failed to process chicken: ${error.message}`);
+      // Keep modal open so user can retry
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleProcessChicken = async (data) => {
-    try {
-      // Add the dressed chicken record first
-      const savedDressedChicken = await addDressedChicken(data);
 
-      // Update live chicken count
-      const sourceBatch = liveChickens.find(batch => batch.id === data.batch_id);
-      if (sourceBatch) {
-        const newCount = Math.max(0, sourceBatch.current_count - data.processing_quantity);
-
-        // Update the source batch
-        await updateLiveChicken(data.batch_id, {
-          ...sourceBatch,
-          current_count: newCount,
-          updated_at: new Date().toISOString()
-        });
-
-        // If there are remaining birds and user wants to create a new batch
-        if (data.remaining_birds > 0 && data.create_new_batch_for_remaining && data.remaining_batch_id) {
-          // Create a new batch for remaining birds
-          const newBatch = {
-            id: Date.now().toString() + '_remaining',
-            batch_id: data.remaining_batch_id,
-            breed: sourceBatch.breed,
-            initial_count: data.remaining_birds,
-            current_count: data.remaining_birds,
-            hatch_date: sourceBatch.hatch_date,
-            expected_weight: sourceBatch.expected_weight,
-            current_weight: sourceBatch.current_weight,
-            feed_type: sourceBatch.feed_type,
-            status: 'healthy',
-            mortality: 0,
-            notes: `Split from batch ${sourceBatch.batch_id} - Remaining birds after processing ${data.processing_quantity} birds`,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-
-          await addLiveChicken(newBatch);
-
-          // Create batch relationship for the split
-          await addBatchRelationship({
-            id: Date.now().toString() + '_split',
-            source_batch_id: data.batch_id,
-            source_batch_type: 'live_chickens',
-            target_batch_id: newBatch.id,
-            target_batch_type: 'live_chickens',
-            relationship_type: 'split_from',
-            quantity: data.remaining_birds,
-            notes: `Split ${data.remaining_birds} birds from original batch`,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-        }
-
-        // Create batch relationship for processing
-        await addBatchRelationship({
-          id: Date.now().toString() + '_processed',
-          source_batch_id: data.batch_id,
-          source_batch_type: 'live_chickens',
-          target_batch_id: data.id,
-          target_batch_type: 'dressed_chickens',
-          relationship_type: 'partial_processed_from',
-          quantity: data.processing_quantity,
-          notes: `Processed ${data.processing_quantity} birds from batch ${sourceBatch.batch_id}`,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-      }
-      // Close modal after all operations complete
-      setShowProcessingModal(false);
-    } catch (error) {
-      console.error('Error processing chicken:', error);
-      alert(`Error processing chicken: ${error.message}
-
-Please check:
-1. Database connection
-2. Table permissions
-3. Required database tables exist
-
-Check the browser console for more details.`);
-      setShowProcessingModal(false);
-    }
-  };
 
   const handleUpdateChickenForm = async (e) => {
     e.preventDefault();
@@ -414,10 +459,10 @@ Check the browser console for more details.`);
       dog_food: parseFloat(editingChicken.parts_weight?.dog_food) || 0
     };
 
-    // Calculate total parts weight and average weight based on current whole chicken count
+    // Calculate total parts weight and average weight based on processing quantity (not current count)
     const totalPartsWeight = Object.values(partsWeight).reduce((a, b) => a + b, 0);
-    const currentCount = editingChicken.current_count || editingChicken.initial_count || 0;
-    const averageWeight = currentCount > 0 ? (totalPartsWeight / currentCount) : 0;
+    const processingQuantity = editingChicken.processing_quantity || editingChicken.initial_count || 0;
+    const averageWeight = processingQuantity > 0 ? (totalPartsWeight / processingQuantity) : 0;
 
     const data = {
       id: editingChicken.id,
@@ -429,51 +474,121 @@ Check the browser console for more details.`);
       // Use new flexible size category system
       size_category_id: editingChicken.size_category_id,
       size_category_custom: editingChicken.size_category_custom,
+      // Keep old format for backward compatibility
+      size_category: editingChicken.size_category,
       status: editingChicken.status,
       storage_location: editingChicken.storage_location,
       expiry_date: editingChicken.expiry_date,
       parts_count: partsCount,
       parts_weight: partsWeight,
+      processing_quantity: editingChicken.processing_quantity,
       // Add any additional custom fields
       custom_fields: editingChicken.custom_fields || {}
     };
 
-    try {
-      // Don't close modal immediately - wait for successful update
-      const result = await updateDressedChicken(data.id, data);
+    setIsUpdating(true);
 
-      // Only close modal after successful update
-      setTimeout(() => {
-        setEditingChicken(null);
-      }, 100); // Small delay to ensure state is properly updated
+    try {
+      await updateDressedChicken(data.id, data);
+
+      // Refresh data to show updated record
+      await loadDressedChickens();
+
+      showSuccess('Dressed chicken record updated successfully');
+
+      // Close modal after successful update
+      setEditingChicken(null);
 
     } catch (error) {
       console.error('Error updating chicken:', error);
-      alert(`Error updating chicken: ${error.message}`);
+      showError(`Failed to update chicken: ${error.message}`);
       // Don't close modal on error so user can retry
+    } finally {
+      setIsUpdating(false);
     }
   };
 
-  const handleUpdateChicken = async (data) => {
+  const handleDeleteChicken = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this dressed chicken record? This action cannot be undone.')) {
+      return;
+    }
+
     try {
-      // Don't close modal immediately - wait for successful update
-      const result = await updateDressedChicken(data.id, data);
-
-      // Only close modal after successful update
-      setTimeout(() => {
-        setEditingChicken(null);
-      }, 100); // Small delay to ensure state is properly updated
-
+      await deleteDressedChicken(id);
+      await loadDressedChickens();
+      showSuccess('Dressed chicken record deleted successfully');
     } catch (error) {
-      console.error('Error updating chicken:', error);
-      alert(`Error updating chicken: ${error.message}`);
-      // Don't close modal on error so user can retry
+      console.error('Error deleting chicken:', error);
+      showError(`Failed to delete chicken: ${error.message}`);
     }
   };
 
+  // Traceability Modal Component (Memoized)
+  const TraceabilityModal = memo(({ chicken, onClose }) => {
+    if (!chicken) return null;
 
-  // Inventory View Component
-  const InventoryView = ({ dressedChickens, onEdit, onDelete }) => {
+    // Find the source batch relationship
+    const sourceRelationship = batchRelationships.find(
+      br => br.target_batch_id === chicken.id && br.target_batch_type === 'dressed_chickens'
+    );
+    const sourceBatch = sourceRelationship
+      ? liveChickens.find(lc => lc.id === sourceRelationship.source_batch_id)
+      : null;
+
+    return (
+      <Modal onClose={onClose}>
+        <h2 style={{marginBottom: '20px'}}>Batch Traceability</h2>
+
+        <div style={{marginBottom: '20px'}}>
+          <h3 style={{fontSize: '1.1em', marginBottom: '10px', color: '#2e7d32'}}>
+            📦 Dressed Chicken Batch
+          </h3>
+          <div style={{padding: '15px', backgroundColor: '#f5f5f5', borderRadius: '8px'}}>
+            <p><strong>Batch ID:</strong> {chicken.batch_id}</p>
+            <p><strong>Processing Date:</strong> {new Date(chicken.processing_date).toLocaleDateString()}</p>
+            <p><strong>Processed Quantity:</strong> {chicken.processing_quantity || chicken.initial_count} birds</p>
+            <p><strong>Current Count:</strong> {chicken.current_count} birds</p>
+            <p><strong>Size Category:</strong> {getSizeCategoryDisplay(chicken)}</p>
+            <p><strong>Average Weight:</strong> {formatWeight(chicken.average_weight)}</p>
+            <p><strong>Storage:</strong> {chicken.storage_location || 'Not specified'}</p>
+            <p><strong>Expiry Date:</strong> {chicken.expiry_date ? new Date(chicken.expiry_date).toLocaleDateString() : 'Not set'}</p>
+            {chicken.notes && <p><strong>Notes:</strong> {chicken.notes}</p>}
+          </div>
+        </div>
+
+        {sourceRelationship && sourceBatch && (
+          <div style={{marginBottom: '20px'}}>
+            <h3 style={{fontSize: '1.1em', marginBottom: '10px', color: '#1976d2'}}>
+              🐔 Source Live Chicken Batch
+            </h3>
+            <div style={{padding: '15px', backgroundColor: '#e3f2fd', borderRadius: '8px'}}>
+              <p><strong>Batch ID:</strong> {sourceBatch.batch_id}</p>
+              <p><strong>Breed:</strong> {sourceBatch.breed}</p>
+              <p><strong>Hatch Date:</strong> {new Date(sourceBatch.hatch_date).toLocaleDateString()}</p>
+              <p><strong>Birds Processed:</strong> {sourceRelationship.quantity}</p>
+              <p><strong>Relationship Type:</strong> {sourceRelationship.relationship_type.replace(/_/g, ' ')}</p>
+              {sourceRelationship.notes && <p><strong>Notes:</strong> {sourceRelationship.notes}</p>}
+            </div>
+          </div>
+        )}
+
+        {!sourceRelationship && (
+          <div style={{padding: '15px', backgroundColor: '#fff3e0', borderRadius: '8px', marginBottom: '20px'}}>
+            <p style={{color: '#f57f17'}}>⚠️ No source batch information available</p>
+          </div>
+        )}
+
+        <div className="form-actions">
+          <button onClick={onClose} className="btn btn-secondary">
+            Close
+          </button>
+        </div>
+      </Modal>
+    );
+  });
+
+  // Inventory View Component (Memoized)
+  const InventoryView = memo(({ dressedChickens, onEdit, onDelete, onViewTraceability }) => {
     return (
       <div className="table-container">
         <div className="overflow-x-auto">
@@ -484,6 +599,8 @@ Check the browser console for more details.`);
                 <th>Size Category</th>
                 <th>Whole Chickens</th>
                 <th>Avg Weight</th>
+                <th>Storage Location</th>
+                <th>Expiry Date</th>
                 <th>Parts Inventory</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -491,10 +608,13 @@ Check the browser console for more details.`);
             </thead>
             <tbody>
               {dressedChickens.map((chicken) => (
-                <tr key={chicken.id}>
+                <tr key={chicken.id} style={{
+                  backgroundColor: isExpired(chicken.expiry_date) ? '#ffebee' :
+                                   isExpiringSoon(chicken.expiry_date) ? '#fff9c4' : 'transparent'
+                }}>
                   <td className="font-medium">{chicken.batch_id}</td>
                   <td>
-                    {chicken.size_category_custom || chicken.size_category || 'Not specified'}
+                    {getSizeCategoryDisplay(chicken)}
                   </td>
                   <td>
                     <strong>{getWholeChickenCount(chicken)}</strong>
@@ -503,6 +623,21 @@ Check the browser console for more details.`);
                     </small>
                   </td>
                   <td>{formatWeight(chicken.average_weight)}</td>
+                  <td>
+                    {chicken.storage_location || <span style={{color: '#999'}}>Not specified</span>}
+                  </td>
+                  <td>
+                    <div>
+                      {chicken.expiry_date ? new Date(chicken.expiry_date).toLocaleDateString() :
+                        <span style={{color: '#999'}}>Not set</span>
+                      }
+                      {getExpiryStatusBadge(chicken.expiry_date) && (
+                        <div style={{marginTop: '4px'}}>
+                          {getExpiryStatusBadge(chicken.expiry_date)}
+                        </div>
+                      )}
+                    </div>
+                  </td>
                   <td>
                     <div className="space-y-1">
                       <div className="flex justify-between">
@@ -529,11 +664,29 @@ Check the browser console for more details.`);
                     </span>
                   </td>
                   <td>
-                    <ActionButtons
-                      row={chicken}
-                      onEdit={onEdit}
-                      onDelete={onDelete}
-                    />
+                    <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                      <button
+                        onClick={() => onViewTraceability(chicken)}
+                        className="btn btn-sm"
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '0.85em',
+                          backgroundColor: '#1976d2',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                        title="View batch traceability"
+                      >
+                        🔍 Trace
+                      </button>
+                      <ActionButtons
+                        row={chicken}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -542,10 +695,10 @@ Check the browser console for more details.`);
         </div>
       </div>
     );
-  };
+  });
 
-  // Processing History View Component
-  const ProcessingHistoryView = ({ batchRelationships, liveChickens, dressedChickens }) => {
+  // Processing History View Component (Memoized)
+  const ProcessingHistoryView = memo(({ batchRelationships, liveChickens, dressedChickens }) => {
     const getLiveChickenById = (id) => {
       return liveChickens.find(lc => lc.id === id) || {};
     };
@@ -564,9 +717,9 @@ Check the browser console for more details.`);
             <thead>
               <tr>
                 <th>Live Batch</th>
-                <th>Live Count</th>
+                <th>Birds Processed</th>
                 <th>Processed Batch</th>
-                <th>Processed Count</th>
+                <th>Dressed Count</th>
                 <th>Processing Date</th>
                 <th>Yield Rate</th>
               </tr>
@@ -575,19 +728,33 @@ Check the browser console for more details.`);
               {processingRelationships.map((relationship) => {
                 const source = getLiveChickenById(relationship.source_batch_id);
                 const target = getDressedChickenById(relationship.target_batch_id);
-                const yieldRate = source.current_count && target.current_count ?
-                  ((target.current_count / source.current_count) * 100).toFixed(1) : '0';
+
+                // Use relationship.quantity (birds processed) for accurate calculation
+                const birdsProcessed = relationship.quantity || 0;
+                const dressedCount = target.processing_quantity || target.initial_count || 0;
+
+                // Yield rate: (dressed chickens / birds processed) * 100
+                // Should typically be 100% unless there were losses during processing
+                const yieldRate = birdsProcessed > 0
+                  ? ((dressedCount / birdsProcessed) * 100).toFixed(1)
+                  : '0';
 
                 return (
                   <tr key={relationship.id}>
                     <td className="font-medium">{source.batch_id || 'N/A'}</td>
-                    <td>{source.current_count || 0}</td>
+                    <td>{birdsProcessed}</td>
                     <td className="font-medium">{target.batch_id || 'N/A'}</td>
-                    <td>{target.current_count || 0}</td>
+                    <td>{dressedCount}</td>
                     <td>
                       {target.processing_date ? new Date(target.processing_date).toLocaleDateString() : 'N/A'}
                     </td>
-                    <td>{yieldRate}%</td>
+                    <td>
+                      <span style={{
+                        color: parseFloat(yieldRate) < 95 ? '#f57f17' : parseFloat(yieldRate) > 100 ? '#c62828' : '#2e7d32'
+                      }}>
+                        {yieldRate}%
+                      </span>
+                    </td>
                   </tr>
                 );
               })}
@@ -603,40 +770,43 @@ Check the browser console for more details.`);
         </div>
       </div>
     );
-  };
+  });
 
-  // Analytics View Component
-  const AnalyticsView = ({ dressedChickens }) => {
-    // Overall statistics
-    const totalBatches = dressedChickens.length;
-    const totalWholeChickens = dressedChickens.reduce((sum, dc) => sum + getWholeChickenCount(dc), 0);
-    const totalWeight = dressedChickens.reduce((sum, dc) => sum + (getWholeChickenCount(dc) * (dc.average_weight || 0)), 0);
-    
-    // Size distribution (based on whole chickens)
-    const sizeDistribution = dressedChickens.reduce((acc, dc) => {
-      acc[dc.size_category] = (acc[dc.size_category] || 0) + getWholeChickenCount(dc);
-      return acc;
-    }, {});
+  // Analytics View Component (Memoized)
+  const AnalyticsView = memo(({ dressedChickens }) => {
+    // Memoize expensive analytics calculations
+    const analytics = useMemo(() => {
+      const totalBatches = dressedChickens.length;
+      const totalWholeChickens = dressedChickens.reduce((sum, dc) => sum + getWholeChickenCount(dc), 0);
+      const totalWeight = dressedChickens.reduce((sum, dc) => sum + (getWholeChickenCount(dc) * (dc.average_weight || 0)), 0);
 
-    // Parts statistics
-    const partsStats = dressedChickens.reduce((acc, dc) => {
-      const partsCount = dc.parts_count || {};
-      const partsWeight = dc.parts_weight || {};
-      
-      // Count
-      acc.partsCount.neck = (acc.partsCount.neck || 0) + (partsCount.neck || 0);
-      acc.partsCount.feet = (acc.partsCount.feet || 0) + (partsCount.feet || 0);
-      acc.partsCount.gizzard = (acc.partsCount.gizzard || 0) + (partsCount.gizzard || 0);
-      acc.partsCount.dog_food = (acc.partsCount.dog_food || 0) + (partsCount.dog_food || 0);
-      
-      // Weight
-      acc.partsWeight.neck = (acc.partsWeight.neck || 0) + (partsWeight.neck || 0);
-      acc.partsWeight.feet = (acc.partsWeight.feet || 0) + (partsWeight.feet || 0);
-      acc.partsWeight.gizzard = (acc.partsWeight.gizzard || 0) + (partsWeight.gizzard || 0);
-      acc.partsWeight.dog_food = (acc.partsWeight.dog_food || 0) + (partsWeight.dog_food || 0);
-      
-      return acc;
-    }, { partsCount: {}, partsWeight: {} });
+      const sizeDistribution = dressedChickens.reduce((acc, dc) => {
+        const sizeKey = getSizeCategoryDisplay(dc);
+        acc[sizeKey] = (acc[sizeKey] || 0) + getWholeChickenCount(dc);
+        return acc;
+      }, {});
+
+      const partsStats = dressedChickens.reduce((acc, dc) => {
+        const partsCount = dc.parts_count || {};
+        const partsWeight = dc.parts_weight || {};
+
+        acc.partsCount.neck = (acc.partsCount.neck || 0) + (partsCount.neck || 0);
+        acc.partsCount.feet = (acc.partsCount.feet || 0) + (partsCount.feet || 0);
+        acc.partsCount.gizzard = (acc.partsCount.gizzard || 0) + (partsCount.gizzard || 0);
+        acc.partsCount.dog_food = (acc.partsCount.dog_food || 0) + (partsCount.dog_food || 0);
+
+        acc.partsWeight.neck = (acc.partsWeight.neck || 0) + (partsWeight.neck || 0);
+        acc.partsWeight.feet = (acc.partsWeight.feet || 0) + (partsWeight.feet || 0);
+        acc.partsWeight.gizzard = (acc.partsWeight.gizzard || 0) + (partsWeight.gizzard || 0);
+        acc.partsWeight.dog_food = (acc.partsWeight.dog_food || 0) + (partsWeight.dog_food || 0);
+
+        return acc;
+      }, { partsCount: {}, partsWeight: {} });
+
+      return { totalBatches, totalWholeChickens, totalWeight, sizeDistribution, partsStats };
+    }, [dressedChickens]);
+
+    const { totalBatches, totalWholeChickens, totalWeight, sizeDistribution, partsStats } = analytics;
 
     // Status distribution
     const statusDistribution = dressedChickens.reduce((acc, dc) => {
@@ -800,7 +970,7 @@ Check the browser console for more details.`);
         </div>
       </div>
     );
-  };
+  });
 
 
   return (
@@ -845,7 +1015,8 @@ Check the browser console for more details.`);
         <InventoryView
           dressedChickens={dressedChickens}
           onEdit={handleEditChicken}
-          onDelete={deleteDressedChicken}
+          onDelete={handleDeleteChicken}
+          onViewTraceability={setViewingTraceability}
         />
       )}
 
@@ -994,15 +1165,81 @@ Check the browser console for more details.`);
           <div className="form-group">
             <label>Size Category</label>
             <select
-              value={sizeCategory}
-              onChange={(e) => setSizeCategory(e.target.value)}
+              value={sizeCategoryId}
+              onChange={(e) => {
+                setSizeCategoryId(e.target.value);
+                if (e.target.value !== 'custom') {
+                  setSizeCategoryCustom(''); // Clear custom name if not custom
+                }
+              }}
               className="form-control"
+              required
             >
-              <option value="small">Small</option>
-              <option value="medium">Medium</option>
-              <option value="large">Large</option>
-              <option value="extra-large">Extra Large</option>
+              <option value="">Select Size Category</option>
+              {chickenSizeCategories
+                .filter(sc => sc.is_active)
+                .sort((a, b) => a.sort_order - b.sort_order)
+                .map(sc => (
+                  <option key={sc.id} value={sc.id}>
+                    {sc.name} ({sc.min_weight}-{sc.max_weight}kg)
+                  </option>
+                ))
+              }
+              <option value="custom">Custom Size</option>
             </select>
+          </div>
+
+          {sizeCategoryId === 'custom' && (
+            <div className="form-group">
+              <label>Custom Size Name</label>
+              <input
+                type="text"
+                placeholder="Enter custom size name (e.g., 'Farm Standard')"
+                value={sizeCategoryCustom}
+                onChange={(e) => setSizeCategoryCustom(e.target.value)}
+                className="form-control"
+                required
+              />
+            </div>
+          )}
+
+          <div className="form-group">
+            <label>Storage Location</label>
+            <input
+              type="text"
+              placeholder="e.g., Freezer A, Cold Room 2"
+              value={storageLocation}
+              onChange={(e) => setStorageLocation(e.target.value)}
+              className="form-control"
+            />
+            <small style={{color: '#666', fontSize: '0.85em'}}>
+              Optional: Specify where the dressed chickens will be stored
+            </small>
+          </div>
+
+          <div className="form-group">
+            <label>Expiry Date</label>
+            <input
+              type="date"
+              value={expiryDate}
+              onChange={(e) => setExpiryDate(e.target.value)}
+              className="form-control"
+              min={processingDate}
+            />
+            <small style={{color: '#666', fontSize: '0.85em'}}>
+              Default: 3 months from processing date
+            </small>
+          </div>
+
+          <div className="form-group">
+            <label>Notes</label>
+            <textarea
+              placeholder="Any additional notes about this processing batch..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="form-control"
+              rows="3"
+            />
           </div>
 
           <div className="form-section">
@@ -1122,14 +1359,16 @@ Check the browser console for more details.`);
               type="button"
               onClick={() => setShowProcessingModal(false)}
               className="btn btn-secondary"
+              disabled={isProcessing}
             >
               Cancel
             </button>
             <button
               type="submit"
               className="btn btn-primary"
+              disabled={isProcessing}
             >
-              Save Processing
+              {isProcessing ? 'Processing...' : 'Save Processing'}
             </button>
           </div>
         </form>
@@ -1197,13 +1436,25 @@ Check the browser console for more details.`);
                 setEditingChicken({
                   ...editingChicken,
                   size_category_id: value,
-                  size_category_custom: value === 'custom' ? editingChicken?.size_category_custom || '' : ''
+                  size_category_custom: value === 'custom' ? editingChicken?.size_category_custom || '' : '',
+                  // Update old format for backward compatibility
+                  size_category: value && value !== 'custom'
+                    ? chickenSizeCategories.find(sc => sc.id === value)?.name?.toLowerCase()
+                    : (value === 'custom' ? editingChicken?.size_category_custom : '')
                 });
               }}
               className="form-control"
             >
               <option value="">Select Size Category</option>
-              {/* This will be populated with data from chicken_size_categories */}
+              {chickenSizeCategories
+                .filter(sc => sc.is_active)
+                .sort((a, b) => a.sort_order - b.sort_order)
+                .map(sc => (
+                  <option key={sc.id} value={sc.id}>
+                    {sc.name} ({sc.min_weight}-{sc.max_weight}kg)
+                  </option>
+                ))
+              }
               <option value="custom">Custom Size</option>
             </select>
           </div>
@@ -1215,8 +1466,14 @@ Check the browser console for more details.`);
                 type="text"
                 placeholder="Enter custom size name"
                 value={editingChicken?.size_category_custom || ''}
-                onChange={(e) => setEditingChicken({...editingChicken, size_category_custom: e.target.value})}
+                onChange={(e) => setEditingChicken({
+                  ...editingChicken,
+                  size_category_custom: e.target.value,
+                  // Update old format for backward compatibility
+                  size_category: e.target.value
+                })}
                 className="form-control"
+                required
               />
             </div>
           )}
@@ -1252,6 +1509,33 @@ Check the browser console for more details.`);
               value={editingChicken?.expiry_date || ''}
               onChange={(e) => setEditingChicken({...editingChicken, expiry_date: e.target.value})}
               className="form-control"
+              min={editingChicken?.processing_date}
+            />
+            {editingChicken?.expiry_date && (
+              <small style={{
+                color: isExpired(editingChicken.expiry_date) ? '#c62828' :
+                       isExpiringSoon(editingChicken.expiry_date) ? '#f57f17' : '#666',
+                fontSize: '0.85em',
+                display: 'block',
+                marginTop: '4px'
+              }}>
+                {isExpired(editingChicken.expiry_date) && '⚠️ EXPIRED'}
+                {isExpiringSoon(editingChicken.expiry_date) && !isExpired(editingChicken.expiry_date) && '⚠️ Expiring Soon'}
+                {!isExpired(editingChicken.expiry_date) && !isExpiringSoon(editingChicken.expiry_date) &&
+                  `Expires: ${new Date(editingChicken.expiry_date).toLocaleDateString()}`
+                }
+              </small>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label>Notes</label>
+            <textarea
+              placeholder="Any additional notes..."
+              value={editingChicken?.notes || ''}
+              onChange={(e) => setEditingChicken({...editingChicken, notes: e.target.value})}
+              className="form-control"
+              rows="3"
             />
           </div>
 
@@ -1422,19 +1706,29 @@ Check the browser console for more details.`);
                 setEditingChicken(null);
               }}
               className="btn btn-secondary"
+              disabled={isUpdating}
             >
               Cancel
             </button>
             <button
               type="submit"
               className="btn btn-primary"
+              disabled={isUpdating}
             >
-              Save Changes
+              {isUpdating ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>
         </Modal>
         </>
+      )}
+
+      {/* Traceability Modal */}
+      {viewingTraceability && (
+        <TraceabilityModal
+          chicken={viewingTraceability}
+          onClose={() => setViewingTraceability(null)}
+        />
       )}
     </div>
   );

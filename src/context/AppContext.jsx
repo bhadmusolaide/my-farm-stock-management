@@ -2096,7 +2096,7 @@ export function AppProvider({ children }) {
 
   // Helper function to update chicken inventory transactions and save to localStorage
   const updateChickenInventoryTransactions = (newTransactions) => {
-    setChickenInventoryTransactionsState(newTransactions)
+    setChickenInventoryTransactions(newTransactions)
     localStorage.setItem('chickenInventoryTransactions', JSON.stringify(newTransactions))
   }
 
@@ -2249,30 +2249,24 @@ export function AppProvider({ children }) {
 
   // Batch Relationships state and functions
   // Load batch relationships from Supabase
-  // useEffect(() => {
-  //   async function loadBatchRelationships() {
-  //     try {
-  //       const { data, error } = await supabase
-  //         .from('batch_relationships')
-  //         .select('*')
-  //         .order('created_at', { ascending: false })
-  //       
-  //       if (error && !error.message.includes('relation "batch_relationships" does not exist')) {
-  //         throw error
-  //       }
-  //       
-  //       if (data) {
-  //         setBatchRelationships(data)
-  //       }
-  //     } catch (err) {
-  //       console.warn('Batch relationships table not available yet:', err)
-  //     }
-  //   }
-  //   
-  //   if (!loading && (!migrationStatus.needed || migrationStatus.completed)) {
-  //     loadBatchRelationships()
-  //   }
-  // }, [loading, migrationStatus.needed, migrationStatus.completed])
+  const loadBatchRelationships = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('batch_relationships')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error && !error.message.includes('relation "batch_relationships" does not exist')) {
+        throw error
+      }
+
+      if (data) {
+        setBatchRelationships(data)
+      }
+    } catch (err) {
+      console.warn('Batch relationships table not available yet:', err)
+    }
+  }
 
   const addDressedChicken = async (dressedChickenData) => {
     try {
@@ -2635,7 +2629,7 @@ export function AppProvider({ children }) {
       }
 
       if (data) {
-        setChickenSizeCategories(data)
+        setChickenSizeCategoriesState(data)
       }
     } catch (err) {
       console.error('Error loading chicken size categories:', err)
@@ -2655,7 +2649,7 @@ export function AppProvider({ children }) {
       }
 
       if (data) {
-        setChickenPartTypes(data)
+        setChickenPartTypesState(data)
       }
     } catch (err) {
       console.error('Error loading chicken part types:', err)
@@ -2679,7 +2673,7 @@ export function AppProvider({ children }) {
       }
 
       if (data) {
-        setChickenPartStandards(data)
+        setChickenPartStandardsState(data)
       }
     } catch (err) {
       console.error('Error loading chicken part standards:', err)
@@ -2702,7 +2696,7 @@ export function AppProvider({ children }) {
       }
 
       if (data) {
-        setChickenProcessingConfigs(data)
+        setChickenProcessingConfigsState(data)
       }
     } catch (err) {
       console.error('Error loading chicken processing configs:', err)
@@ -2978,7 +2972,8 @@ export function AppProvider({ children }) {
     deleteBatchRelationship,
     hardDeleteBatchRelationship,
     createBatchRelationship,
-  
+    loadBatchRelationships,
+
     // Lazy loading functions
     loadLiveChickens,
     loadDressedChickens,
