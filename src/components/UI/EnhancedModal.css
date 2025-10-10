@@ -314,22 +314,67 @@
   border-color: var(--danger-hover, #c82333);
 }
 
-/* Dark Mode Support */
-@media (prefers-color-scheme: dark) {
-  .enhanced-modal {
-    --modal-bg: #2d3748;
-    --modal-border: #4a5568;
-    --modal-title-color: #e2e8f0;
-    --modal-close-color: #a0aec0;
-    --modal-close-hover-bg: #4a5568;
-    --modal-close-hover-color: #e2e8f0;
-    --form-header-bg: #4a5568;
-    --info-header-bg: #2c5282;
-    --info-header-color: #bee3f8;
-    --error-bg: #fed7d7;
-    --error-color: #9b2c2c;
-    --error-border: #feb2b2;
-  }
+/* Dark Mode Support - Using data-theme attribute */
+[data-theme="dark"] .enhanced-modal-overlay {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+[data-theme="dark"] .enhanced-modal {
+  --modal-bg: var(--card-background);
+  --modal-border: var(--border-color);
+  --modal-title-color: var(--text-color);
+  --modal-close-color: var(--text-light);
+  --modal-close-hover-bg: rgba(255, 255, 255, 0.1);
+  --modal-close-hover-color: var(--text-color);
+  --form-header-bg: rgba(255, 255, 255, 0.05);
+  --info-header-bg: rgba(59, 130, 246, 0.2);
+  --info-header-color: #93c5fd;
+  --error-bg: rgba(220, 53, 69, 0.15);
+  --error-color: #f87171;
+  --error-border: rgba(220, 53, 69, 0.3);
+  background-color: var(--card-background) !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="dark"] .enhanced-modal__header {
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .enhanced-modal__title {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .enhanced-modal__close {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .enhanced-modal__close:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .enhanced-modal__footer {
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .enhanced-modal__error {
+  background-color: rgba(220, 53, 69, 0.15) !important;
+  color: #f87171 !important;
+  border-color: rgba(220, 53, 69, 0.3) !important;
+}
+
+[data-theme="dark"] .enhanced-modal--form .enhanced-modal__header {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme="dark"] .enhanced-modal--info .enhanced-modal__header {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  color: #93c5fd !important;
+}
+
+[data-theme="dark"] .loading-spinner {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  border-top-color: var(--primary-color) !important;
 }
 
 /* Responsive Design */

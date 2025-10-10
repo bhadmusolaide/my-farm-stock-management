@@ -8,15 +8,15 @@
 }
 
 .order-form .form-section {
-  border: 1px solid var(--border-color, #ddd);
+  border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 8px;
   padding: 1rem;
-  background-color: var(--card-bg, #f8f9fa);
+  background-color: var(--background-color, #f9fafb);
 }
 
 .order-form .form-section h4 {
   margin: 0 0 1rem 0;
-  color: var(--text-color, #333);
+  color: var(--text-color, #374151);
   font-size: 1rem;
   font-weight: 600;
 }
@@ -35,7 +35,7 @@
 
 .order-form .form-group label {
   font-weight: 500;
-  color: var(--text-color, #333);
+  color: var(--text-color, #374151);
   font-size: 0.875rem;
 }
 
@@ -47,17 +47,25 @@
 .order-form select,
 .order-form textarea {
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border-color, #ddd);
+  border: 1px solid var(--input-border, #d1d5db);
   border-radius: 4px;
   font-size: 0.875rem;
+  background-color: var(--input-background, #fff);
+  color: var(--input-text, #374151);
+}
+
+.order-form input::placeholder,
+.order-form select::placeholder,
+.order-form textarea::placeholder {
+  color: var(--input-placeholder, #9ca3af);
 }
 
 .order-form input:focus,
 .order-form select:focus,
 .order-form textarea:focus {
   outline: none;
-  border-color: var(--primary-color, #007bff);
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  border-color: var(--input-focus-border, #4caf50);
+  box-shadow: 0 0 0 2px var(--input-focus-shadow, rgba(76, 175, 80, 0.2));
 }
 
 .order-form input.error,
@@ -93,44 +101,7 @@
   gap: 1.5rem;
 }
 
-.summary-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.summary-card {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  border-radius: 8px;
-  border: 1px solid var(--border-color, #ddd);
-  background: var(--card-bg, #fff);
-}
-
-.summary-card .summary-icon {
-  font-size: 2rem;
-  flex-shrink: 0;
-}
-
-.summary-card .summary-content h4 {
-  margin: 0 0 0.5rem 0;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-muted, #666);
-}
-
-.summary-card .summary-value {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-color, #333);
-}
-
-.summary-card .balance-due {
-  color: var(--warning-color, #ffc107);
-}
+/* Legacy summary card styles removed - now using global Card component */
 
 .status-distribution {
   background: var(--card-bg, #fff);
@@ -300,12 +271,15 @@
   background: var(--card-bg, #fff);
   border: 1px solid var(--border-color, #ddd);
   border-radius: 8px;
-  padding: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .top-customers h4 {
   margin: 0 0 1rem 0;
   color: var(--text-color, #333);
+  font-weight: 600;
+  font-size: 1rem;
 }
 
 .top-customer-list {
@@ -322,22 +296,37 @@
   border: 1px solid var(--border-color, #ddd);
   border-radius: 8px;
   background: var(--card-bg, #f8f9fa);
+  transition: all 0.2s ease;
+}
+
+.top-customer-item:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transform: translateX(2px);
+  border-color: var(--primary-color, #007bff);
 }
 
 .customer-rank {
   font-weight: 700;
   color: var(--primary-color, #007bff);
   font-size: 1.25rem;
-  min-width: 30px;
+  min-width: 35px;
+  text-align: center;
 }
 
 .customer-info {
   flex: 1;
 }
 
+.customer-info .customer-name {
+  font-weight: 600;
+  color: var(--text-color, #333);
+  margin-bottom: 0.25rem;
+}
+
 .customer-stats {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: var(--text-muted, #666);
+  font-weight: 500;
 }
 
 .customer-actions {
@@ -410,6 +399,7 @@
   border: 1px solid var(--border-color, #ddd);
   border-radius: 8px;
   padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .analytics-overview h3,
@@ -422,6 +412,8 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-weight: 600;
+  font-size: 1.1rem;
 }
 
 .stats-grid {
@@ -430,54 +422,7 @@
   gap: 1rem;
 }
 
-.stat-card {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  border-radius: 8px;
-  border: 1px solid var(--border-color, #ddd);
-}
-
-.stat-card.primary {
-  border-left: 4px solid var(--primary-color, #007bff);
-}
-
-.stat-card.success {
-  border-left: 4px solid var(--success-color, #28a745);
-}
-
-.stat-card.info {
-  border-left: 4px solid var(--info-color, #17a2b8);
-}
-
-.stat-card.warning {
-  border-left: 4px solid var(--warning-color, #ffc107);
-}
-
-.stat-icon {
-  font-size: 2rem;
-  flex-shrink: 0;
-}
-
-.stat-content h4 {
-  margin: 0 0 0.5rem 0;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-muted, #666);
-}
-
-.stat-value {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-color, #333);
-}
-
-.stat-content small {
-  font-size: 0.75rem;
-  color: var(--text-muted, #666);
-}
+/* Legacy stat card styles removed - now using global MetricCard component */
 
 .status-cards {
   display: grid;
@@ -486,46 +431,59 @@
 }
 
 .status-card {
-  padding: 1rem;
+  padding: 1.25rem;
   border-radius: 8px;
   text-align: center;
   border: 1px solid var(--border-color, #ddd);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.status-card:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
 }
 
 .status-card.status-pending {
   background-color: var(--warning-bg, #fff3cd);
-  border-color: var(--warning-border, #ffeaa7);
+  border-color: var(--warning-border, #ffc107);
+  border-left: 4px solid #ffc107;
 }
 
 .status-card.status-confirmed {
   background-color: var(--info-bg, #d1ecf1);
-  border-color: var(--info-border, #bee5eb);
+  border-color: var(--info-border, #17a2b8);
+  border-left: 4px solid #17a2b8;
 }
 
 .status-card.status-completed {
   background-color: var(--success-bg, #d4edda);
-  border-color: var(--success-border, #c3e6cb);
+  border-color: var(--success-border, #28a745);
+  border-left: 4px solid #28a745;
 }
 
 .status-card.status-cancelled {
   background-color: var(--danger-bg, #f8d7da);
-  border-color: var(--danger-border, #f5c6cb);
+  border-color: var(--danger-border, #dc3545);
+  border-left: 4px solid #dc3545;
 }
 
 .status-header {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .status-count {
-  font-size: 1.5rem;
+  font-size: 2rem;
   font-weight: 700;
   color: var(--text-color, #333);
   margin-bottom: 0.25rem;
+  line-height: 1;
 }
 
 .status-percentage {
   font-size: 0.875rem;
   color: var(--text-muted, #666);
+  font-weight: 600;
 }
 
 .inventory-cards {
@@ -535,10 +493,32 @@
 }
 
 .inventory-card {
-  padding: 1rem;
+  padding: 1.25rem;
   border-radius: 8px;
   border: 1px solid var(--border-color, #ddd);
-  background: var(--card-bg, #f8f9fa);
+  background: var(--card-bg, #fff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.inventory-card:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.inventory-card.type-live {
+  border-left: 4px solid #28a745;
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.02) 0%, transparent 100%);
+}
+
+.inventory-card.type-dressed {
+  border-left: 4px solid #17a2b8;
+  background: linear-gradient(135deg, rgba(23, 162, 184, 0.02) 0%, transparent 100%);
+}
+
+.inventory-card.type-parts {
+  border-left: 4px solid #ffc107;
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.02) 0%, transparent 100%);
 }
 
 .inventory-header {
@@ -548,7 +528,7 @@
 .inventory-stats {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .inventory-count,
@@ -558,19 +538,27 @@
   justify-content: space-between;
   align-items: center;
   font-size: 0.875rem;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
 }
 
 .inventory-count label,
 .inventory-revenue label,
 .inventory-percentage label {
   color: var(--text-muted, #666);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
 }
 
 .inventory-count span,
 .inventory-revenue span,
 .inventory-percentage span {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-color, #333);
+  font-size: 1rem;
 }
 
 /* Batch Update Modal Styles */
@@ -734,46 +722,361 @@
   color: white;
 }
 
+/* Dark Mode Styles */
+
+/* Form Section Dark Mode */
+[data-theme="dark"] .order-form .form-section {
+  background-color: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .order-form .form-section h4 {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .order-form .form-group label {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .order-form input,
+[data-theme="dark"] .order-form select,
+[data-theme="dark"] .order-form textarea {
+  background-color: var(--input-background);
+  border-color: var(--input-border);
+  color: var(--input-text);
+}
+
+[data-theme="dark"] .order-form input::placeholder,
+[data-theme="dark"] .order-form select::placeholder,
+[data-theme="dark"] .order-form textarea::placeholder {
+  color: var(--input-placeholder);
+}
+
+[data-theme="dark"] .order-form .form-help {
+  color: var(--text-light);
+}
+
+/* Legacy summary card dark mode styles removed */
+
+/* Status Distribution Dark Mode */
+[data-theme="dark"] .status-distribution {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .status-distribution h4 {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .status-card {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .status-count {
+  color: var(--text-color);
+}
+
+/* Type Badges Dark Mode */
+[data-theme="dark"] .type-badge.type-live {
+  background-color: rgba(76, 175, 80, 0.2);
+  color: #81c784;
+}
+
+[data-theme="dark"] .type-badge.type-dressed {
+  background-color: rgba(33, 150, 243, 0.2);
+  color: #64b5f6;
+}
+
+[data-theme="dark"] .type-badge.type-parts {
+  background-color: rgba(255, 152, 0, 0.2);
+  color: #ffb74d;
+}
+
+/* Customer Management Dark Mode */
+[data-theme="dark"] .customer-details .customer-name {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .customer-phone,
+[data-theme="dark"] .customer-location {
+  color: var(--text-light);
+}
+
+[data-theme="dark"] .value-amount,
+[data-theme="dark"] .paid-amount {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .last-order {
+  color: var(--text-light);
+}
+
+[data-theme="dark"] .status-count {
+  color: var(--text-light);
+}
+
+/* Top Customers Dark Mode */
+[data-theme="dark"] .top-customers {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .top-customers h4 {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .top-customer-item {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .customer-rank {
+  color: var(--primary-color);
+}
+
+[data-theme="dark"] .customer-stats {
+  color: var(--text-light);
+}
+
+/* Customer Detail Modal Dark Mode */
+[data-theme="dark"] .customer-info-section {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .info-item {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .info-item label {
+  color: var(--text-light);
+}
+
+[data-theme="dark"] .info-item span {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .customer-orders-section h4 {
+  color: var(--text-color);
+}
+
+/* Order Analytics Dark Mode */
+[data-theme="dark"] .analytics-overview,
+[data-theme="dark"] .status-analysis,
+[data-theme="dark"] .inventory-analysis,
+[data-theme="dark"] .monthly-trends,
+[data-theme="dark"] .top-customers-analytics {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .analytics-overview h3,
+[data-theme="dark"] .status-analysis h3,
+[data-theme="dark"] .inventory-analysis h3,
+[data-theme="dark"] .monthly-trends h3,
+[data-theme="dark"] .top-customers-analytics h3 {
+  color: var(--text-color);
+}
+
+/* Legacy stat card dark mode styles removed */
+
+/* Status Cards Dark Mode - Analytics */
+[data-theme="dark"] .status-card.status-pending {
+  background-color: rgba(255, 152, 0, 0.15);
+  border-color: rgba(255, 152, 0, 0.3);
+}
+
+[data-theme="dark"] .status-card.status-confirmed {
+  background-color: rgba(33, 150, 243, 0.15);
+  border-color: rgba(33, 150, 243, 0.3);
+}
+
+[data-theme="dark"] .status-card.status-completed {
+  background-color: rgba(76, 175, 80, 0.15);
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+[data-theme="dark"] .status-card.status-cancelled {
+  background-color: rgba(244, 67, 54, 0.15);
+  border-color: rgba(244, 67, 54, 0.3);
+}
+
+[data-theme="dark"] .status-percentage {
+  color: var(--text-light);
+}
+
+/* Inventory Cards Dark Mode */
+[data-theme="dark"] .inventory-card {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .inventory-count label,
+[data-theme="dark"] .inventory-revenue label,
+[data-theme="dark"] .inventory-percentage label {
+  color: var(--text-light);
+}
+
+[data-theme="dark"] .inventory-count span,
+[data-theme="dark"] .inventory-revenue span,
+[data-theme="dark"] .inventory-percentage span {
+  color: var(--text-color);
+}
+
+/* Batch Update Modal Dark Mode */
+[data-theme="dark"] .selection-summary {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .selection-summary h4 {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .summary-item {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .summary-item label {
+  color: var(--text-light);
+}
+
+[data-theme="dark"] .summary-value {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .update-preview {
+  background-color: rgba(33, 150, 243, 0.15);
+  border-color: rgba(33, 150, 243, 0.3);
+}
+
+[data-theme="dark"] .update-preview h4 {
+  color: #64b5f6;
+}
+
+[data-theme="dark"] .preview-content p,
+[data-theme="dark"] .preview-content li {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .affected-orders {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .affected-orders h4 {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .order-item {
+  background: var(--card-background);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .order-customer {
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .order-details {
+  color: var(--text-light);
+}
+
+[data-theme="dark"] .more-orders {
+  color: var(--text-light);
+}
+
+/* Status Badges Dark Mode */
+[data-theme="dark"] .status-pending {
+  background-color: rgba(255, 152, 0, 0.2);
+  color: #ffb74d;
+}
+
+[data-theme="dark"] .status-confirmed {
+  background-color: rgba(33, 150, 243, 0.2);
+  color: #64b5f6;
+}
+
+[data-theme="dark"] .status-completed {
+  background-color: rgba(76, 175, 80, 0.2);
+  color: #81c784;
+}
+
+[data-theme="dark"] .status-cancelled {
+  background-color: rgba(244, 67, 54, 0.2);
+  color: #e57373;
+}
+
+/* Additional Dark Mode Overrides for Forms */
+[data-theme="dark"] .order-form .form-section {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .order-form .form-section h4 {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .order-form input,
+[data-theme="dark"] .order-form select,
+[data-theme="dark"] .order-form textarea {
+  background-color: var(--input-background) !important;
+  border-color: var(--input-border) !important;
+  color: var(--input-text) !important;
+}
+
+[data-theme="dark"] .order-form input::placeholder,
+[data-theme="dark"] .order-form select::placeholder,
+[data-theme="dark"] .order-form textarea::placeholder {
+  color: var(--input-placeholder) !important;
+}
+
+[data-theme="dark"] .order-form .form-group label {
+  color: var(--text-color) !important;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .order-form .form-row {
     grid-template-columns: 1fr;
   }
-  
+
   .summary-cards {
     grid-template-columns: 1fr;
   }
-  
+
   .status-cards {
     flex-direction: column;
   }
-  
+
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .inventory-cards {
     grid-template-columns: 1fr;
   }
-  
+
   .status-cards {
     grid-template-columns: 1fr;
   }
-  
+
   .info-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .summary-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .top-customer-item {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
   }
-  
+
   .customer-actions {
     align-self: flex-end;
   }

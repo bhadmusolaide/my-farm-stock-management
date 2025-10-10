@@ -1,4 +1,29 @@
 // Export all UI components for easy importing
+
+// Card Components
+export {
+  Card,
+  SummaryCard,
+  StatCard,
+  MetricCard,
+  AlertCard,
+  HealthStatusCard
+} from './Card';
+
+// Table Components
+export {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHeaderCell,
+  TableCell,
+  DataTable as EnhancedDataTable,
+  PerformanceTable,
+  StatusTable
+} from './Table';
+
+// Existing Components
 export { default as DataTable } from './DataTable';
 export { default as StatusBadge, HealthStatusBadge, OrderStatusBadge, ProcessingStatusBadge, ExpiryStatusBadge } from './StatusBadge';
 export { default as TabNavigation, PageTabs, CardTabs, PillTabs, VerticalTabs } from './TabNavigation';

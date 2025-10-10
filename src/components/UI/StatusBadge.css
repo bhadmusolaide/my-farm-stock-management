@@ -163,20 +163,44 @@
   background-color: var(--secondary-color, #6c757d);
 }
 
-/* Dark Mode Support */
-@media (prefers-color-scheme: dark) {
-  .status-badge {
-    --success-color: #20c997;
-    --success-text: #000;
-    --warning-color: #ffc107;
-    --warning-text: #000;
-    --danger-color: #dc3545;
-    --danger-text: #fff;
-    --info-color: #0dcaf0;
-    --info-text: #000;
-    --secondary-color: #adb5bd;
-    --secondary-text: #000;
-  }
+/* Dark Mode Support - Using data-theme attribute */
+[data-theme="dark"] .status-badge {
+  --success-color: #4caf50;
+  --success-text: #fff;
+  --warning-color: #fbbf24;
+  --warning-text: #000;
+  --danger-color: #ef4444;
+  --danger-text: #fff;
+  --info-color: #3b82f6;
+  --info-text: #fff;
+  --secondary-color: #9ca3af;
+  --secondary-text: #000;
+}
+
+/* Dark mode outline variants need better contrast */
+[data-theme="dark"] .status-badge--outline.status-badge--success {
+  color: #4ade80 !important;
+  border-color: #4ade80 !important;
+}
+
+[data-theme="dark"] .status-badge--outline.status-badge--warning {
+  color: #fbbf24 !important;
+  border-color: #fbbf24 !important;
+}
+
+[data-theme="dark"] .status-badge--outline.status-badge--danger {
+  color: #f87171 !important;
+  border-color: #f87171 !important;
+}
+
+[data-theme="dark"] .status-badge--outline.status-badge--info {
+  color: #60a5fa !important;
+  border-color: #60a5fa !important;
+}
+
+[data-theme="dark"] .status-badge--outline.status-badge--secondary {
+  color: #d1d5db !important;
+  border-color: #d1d5db !important;
 }
 
 /* Animation for status changes */

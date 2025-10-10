@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { formatNumber } from '../../utils/formatters';
+import { SummaryCard } from '../UI';
 import './LiveChicken.css';
 
 const SummaryCards = ({ batches = [] }) => {
@@ -57,58 +58,55 @@ const SummaryCards = ({ batches = [] }) => {
     };
   }, [batches]);
 
-  const cards = [
-    {
-      title: 'Total Batches',
-      value: summaryStats.totalBatches,
-      icon: '📦',
-      className: 'primary'
-    },
-    {
-      title: 'Live Chickens',
-      value: formatNumber(summaryStats.totalChickens),
-      icon: '🐔',
-      className: 'success'
-    },
-    {
-      title: 'Average Age',
-      value: `${summaryStats.averageAge} weeks`,
-      icon: '📅',
-      className: 'info'
-    },
-    {
-      title: 'Total Mortality',
-      value: summaryStats.totalMortality,
-      icon: '⚠️',
-      className: summaryStats.totalMortality > 0 ? 'warning' : 'success'
-    },
-    {
-      title: 'Healthy Batches',
-      value: `${summaryStats.healthyBatches}/${summaryStats.totalBatches}`,
-      icon: '✅',
-      className: 'success'
-    },
-    {
-      title: 'Avg Mortality Rate',
-      value: `${summaryStats.averageMortalityRate}%`,
-      icon: '📊',
-      className: parseFloat(summaryStats.averageMortalityRate) > 10 ? 'danger' : 'success'
-    }
-  ];
-
   return (
     <div className="summary-cards">
-      {cards.map((card, index) => (
-        <div key={index} className={`summary-card ${card.className}`}>
-          <div className="summary-card__icon">
-            {card.icon}
-          </div>
-          <div className="summary-card__content">
-            <h3 className="summary-card__title">{card.title}</h3>
-            <p className="summary-card__value">{card.value}</p>
-          </div>
-        </div>
-      ))}
+      <SummaryCard
+        title="Total Batches"
+        value={summaryStats.totalBatches}
+        icon="📦"
+        variant="primary"
+        subtitle="Active batches"
+      />
+
+      <SummaryCard
+        title="Live Chickens"
+        value={formatNumber(summaryStats.totalChickens)}
+        icon="🐔"
+        variant="success"
+        subtitle="Current livestock"
+      />
+
+      <SummaryCard
+        title="Average Age"
+        value={`${summaryStats.averageAge} weeks`}
+        icon="📅"
+        variant="info"
+        subtitle="Batch maturity"
+      />
+
+      <SummaryCard
+        title="Total Mortality"
+        value={summaryStats.totalMortality}
+        icon="⚠️"
+        variant={summaryStats.totalMortality > 0 ? "warning" : "success"}
+        subtitle="Lost chickens"
+      />
+
+      <SummaryCard
+        title="Healthy Batches"
+        value={`${summaryStats.healthyBatches}/${summaryStats.totalBatches}`}
+        icon="✅"
+        variant="success"
+        subtitle="Status overview"
+      />
+
+      <SummaryCard
+        title="Avg Mortality Rate"
+        value={`${summaryStats.averageMortalityRate}%`}
+        icon="📊"
+        variant={parseFloat(summaryStats.averageMortalityRate) > 10 ? "danger" : "success"}
+        subtitle="Performance metric"
+      />
     </div>
   );
 };

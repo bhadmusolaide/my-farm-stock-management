@@ -2,10 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
 import { formatDate } from '../utils/formatters';
+import { DataTable, StatusBadge } from '../components/UI';
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner';
-import SortableTableHeader from '../components/UI/SortableTableHeader';
-import SortControls from '../components/UI/SortControls';
-import useTableSort from '../hooks/useTableSort';
 import './UserManagement.css';
 
 const UserManagement = () => {
@@ -21,8 +19,66 @@ const UserManagement = () => {
   const [formLoading, setFormLoading] = useState(false);
   const { user, logAuditAction, createUser } = useAuth();
 
-  // Sorting hook
-  const { sortedData, sortConfig, requestSort, resetSort, getSortIcon } = useTableSort(users);
+  // Table columns configuration
+  const userColumns = [
+    { key: 'full_name', label: 'User' },
+    { key: 'role', label: 'Role' },
+    { key: 'is_active', label: 'Status' },
+    { key: 'created_at', label: 'Created' },
+    { key: 'actions', label: 'Actions' }
+  ];
+
+  // Custom cell renderer for users table
+  const renderUserCell = (value, row, column) => {
+    switch (column.key) {
+      case 'full_name':
+        return (
+          <div className="user-info">
+            <div className="user-name">{row.full_name}</div>
+            <div className="user-email">{row.email}</div>
+          </div>
+        );
+      case 'role':
+        return (
+          <StatusBadge
+            status={row.role}
+            type={row.role === 'admin' ? 'primary' : 'default'}
+          >
+            {row.role}
+          </StatusBadge>
+        );
+      case 'is_active':
+        return (
+          <StatusBadge
+            status={row.is_active ? 'active' : 'inactive'}
+            type={row.is_active ? 'success' : 'danger'}
+          >
+            {row.is_active ? 'Active' : 'Inactive'}
+          </StatusBadge>
+        );
+      case 'created_at':
+        return formatDate(row.created_at);
+      case 'actions':
+        return (
+          <div className="action-buttons">
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => handleToggleStatus(row)}
+            >
+              {row.is_active ? 'Deactivate' : 'Activate'}
+            </button>
+            <button
+              className="btn btn-danger btn-sm"
+              onClick={() => handleDeleteUser(row.id)}
+            >
+              Delete
+            </button>
+          </div>
+        );
+      default:
+        return value;
+    }
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -116,6 +172,30 @@ const UserManagement = () => {
     setFormData({ email: '', full_name: '', role: 'user' });
   };
 
+  // Handler functions for DataTable actions
+  const handleToggleStatus = (userData) => {
+    toggleUserStatus(userData.id, userData.is_active);
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (window.confirm('Are you sure you want to delete this user?')) {
+      try {
+        const { error } = await supabase
+          .from('users')
+          .delete()
+          .eq('id', userId);
+
+        if (error) throw error;
+
+        await logAuditAction('DELETE_USER', 'users', userId);
+        fetchUsers(); // Refresh the users list
+      } catch (err) {
+        setError('Failed to delete user');
+        console.error('Error deleting user:', err);
+      }
+    }
+  };
+
 
 
   const getRoleBadgeClass = (role) => {
@@ -163,88 +243,32 @@ const UserManagement = () => {
         </div>
       )}
 
-      {/* Sort Controls */}
-      <SortControls 
-        sortConfig={sortConfig}
-        onReset={resetSort}
-      />
+      {/* Users Table */}
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h3 className="section-title">
+            <span className="section-title-icon">👥</span>
+            System Users
+          </h3>
+          <div className="section-actions">
+            <button className="btn btn-primary" onClick={openModal}>
+              Add User
+            </button>
+          </div>
+        </div>
 
-      <div className="users-table-container">
-        <table className="users-table">
-          <thead>
-            <tr>
-              <SortableTableHeader sortKey="full_name" onSort={requestSort} getSortIcon={getSortIcon}>
-                User
-              </SortableTableHeader>
-              <SortableTableHeader sortKey="role" onSort={requestSort} getSortIcon={getSortIcon}>
-                Role
-              </SortableTableHeader>
-              <SortableTableHeader sortKey="is_active" onSort={requestSort} getSortIcon={getSortIcon}>
-                Status
-              </SortableTableHeader>
-              <SortableTableHeader sortKey="created_at" onSort={requestSort} getSortIcon={getSortIcon}>
-                Created
-              </SortableTableHeader>
-              <SortableTableHeader sortable={false}>
-                Actions
-              </SortableTableHeader>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedData.length === 0 ? (
-              <tr>
-                <td colSpan="5" className="no-data">
-                  <div className="no-data-content">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    <p>No users found</p>
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              sortedData.map((userData) => (
-                <tr key={userData.id}>
-                  <td>
-                    <div className="user-info">
-                      <div className="user-avatar">
-                        {userData.full_name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="user-details">
-                        <div className="user-name">{userData.full_name}</div>
-                        <div className="user-email">{userData.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={getRoleBadgeClass(userData.role)}>
-                      {userData.role.charAt(0).toUpperCase() + userData.role.slice(1)}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`status-badge ${userData.is_active ? 'status-active' : 'status-inactive'}`}>
-                      {userData.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="date-cell">
-                    {formatDate(userData.created_at)}
-                  </td>
-                  <td>
-                    <button
-                      className={`action-btn ${userData.is_active ? 'btn-deactivate' : 'btn-activate'}`}
-                      onClick={() => toggleUserStatus(userData.id, userData.is_active)}
-                      disabled={userData.id === user?.id} // Prevent self-deactivation
-                    >
-                      {userData.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+        <DataTable
+          data={users}
+          columns={userColumns}
+          renderCell={renderUserCell}
+          enableSorting
+          enablePagination
+          pageSize={10}
+          emptyMessage="No users found"
+          loading={loading}
+          rowKey="id"
+        />
+      </section>
 
       {/* Add User Modal */}
       {showModal && (

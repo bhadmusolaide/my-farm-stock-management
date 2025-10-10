@@ -11,6 +11,7 @@ import {
   usePerformanceMetrics
 } from '../../hooks';
 import { useAppContext } from '../../context';
+import { MetricCard, PerformanceTable } from '../UI';
 import './Reports.css';
 
 const OverviewDashboard = ({ dateRange }) => {
@@ -95,51 +96,58 @@ const OverviewDashboard = ({ dateRange }) => {
     }
   };
 
+  // Prepare performance data for PerformanceTable
+  const financialPerformanceData = [
+    {
+      metric: 'Revenue',
+      value: financialMetrics.formatted.orderRevenue,
+      change: 0 // You can calculate change from previous period if available
+    },
+    {
+      metric: 'Expenses',
+      value: financialMetrics.formatted.totalExpenses,
+      change: 0
+    },
+    {
+      metric: 'Net Profit',
+      value: financialMetrics.formatted.grossProfit,
+      change: financialMetrics.grossProfit >= 0 ? 5 : -5 // Example change
+    },
+    {
+      metric: 'Profit Margin',
+      value: financialMetrics.formatted.profitMargin,
+      change: 0
+    },
+    {
+      metric: 'ROI',
+      value: financialMetrics.formatted.roi,
+      change: 0
+    }
+  ];
+
   return (
     <div className="overview-dashboard">
-      {/* Key Metrics Overview */}
-      <div className="metrics-overview">
-        <div className="metrics-grid">
-          {/* Financial Metrics */}
-          <div className="metric-card financial">
-            <div className="metric-header">
-              <h3>💰 Financial Overview</h3>
-              <div className="performance-badge">
-                <span className={`badge ${performanceMetrics.performanceGrade}`}>
-                  {performanceMetrics.formatted.performanceGrade}
-                </span>
-              </div>
-            </div>
-            <div className="metric-content">
-              <div className="metric-item">
-                <span className="metric-label">Revenue</span>
-                <span className="metric-value">{financialMetrics.formatted.orderRevenue}</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">Expenses</span>
-                <span className="metric-value">{financialMetrics.formatted.totalExpenses}</span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">Net Profit</span>
-                <span className={`metric-value ${financialMetrics.grossProfit >= 0 ? 'positive' : 'negative'}`}>
-                  {financialMetrics.formatted.grossProfit}
-                </span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">Profit Margin</span>
-                <span className="metric-value">
-                  {financialMetrics.formatted.profitMargin}
-                </span>
-              </div>
-              <div className="metric-item">
-                <span className="metric-label">ROI</span>
-                <span className="metric-value">
-                  {financialMetrics.formatted.roi}
-                </span>
-              </div>
+        {/* Key Metrics Overview */}
+        <section className="dashboard-section">
+          <div className="section-header">
+            <h2 className="section-title">
+              <span className="section-title-icon">📊</span>
+              Financial Performance Overview
+            </h2>
+            <div className="section-actions">
+              <span className={`badge ${performanceMetrics.performanceGrade}`}>
+                {performanceMetrics.formatted.performanceGrade}
+              </span>
             </div>
           </div>
 
+          <PerformanceTable
+            title="Financial Metrics"
+            data={financialPerformanceData}
+          />
+        </section>
+
+        <div className="metrics-grid">
           {/* Funds Metrics */}
           <div className="metric-card funds">
             <div className="metric-header">
@@ -228,7 +236,6 @@ const OverviewDashboard = ({ dateRange }) => {
             </div>
           </div>
         </div>
-      </div>
 
       {/* Charts Section */}
       <div className="charts-section">

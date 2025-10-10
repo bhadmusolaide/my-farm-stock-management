@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context';
+import { Card, StatusBadge } from '../components/UI';
 import Modal from '../components/Modal';
 import './ProcessingConfiguration.css';
 
@@ -312,12 +313,15 @@ const ProcessingConfiguration = () => {
 
       <div className="config-grid">
         {chickenSizeCategories.map(category => (
-          <div key={category.id} className="config-card">
+          <Card key={category.id} className="config-card" hover={true}>
             <div className="card-header">
               <h3>{category.name}</h3>
-              <span className={`status-badge ${category.is_active ? 'active' : 'inactive'}`}>
+              <StatusBadge
+                status={category.is_active ? 'active' : 'inactive'}
+                type={category.is_active ? 'success' : 'danger'}
+              >
                 {category.is_active ? 'Active' : 'Inactive'}
-              </span>
+              </StatusBadge>
             </div>
             <div className="card-content">
               <p>{category.description}</p>
@@ -340,7 +344,7 @@ const ProcessingConfiguration = () => {
                 Delete
               </button>
             </div>
-          </div>
+          </Card>
         ))}
       </div>
     </div>

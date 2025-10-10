@@ -4,7 +4,22 @@ import {
   StatusBadge,
   TabNavigation,
   EnhancedModal,
-  FilterPanel
+  FilterPanel,
+  Card,
+  SummaryCard,
+  StatCard,
+  MetricCard,
+  AlertCard,
+  HealthStatusCard,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHeaderCell,
+  TableCell,
+  EnhancedDataTable,
+  PerformanceTable,
+  StatusTable
 } from './index';
 
 // Example component showing how to use the new reusable components
@@ -30,6 +45,7 @@ const ComponentExamples = () => {
 
   // Tab configuration
   const tabs = [
+    { key: 'cards', label: 'Card Components', icon: '🃏' },
     { key: 'table', label: 'Data Table', icon: '📊' },
     { key: 'status', label: 'Status Badges', icon: '🏷️' },
     { key: 'modal', label: 'Modal Example', icon: '🪟' },
@@ -94,6 +110,77 @@ const ComponentExamples = () => {
       />
 
       <div style={{ marginTop: '2rem' }}>
+        {/* Card Components Example */}
+        {activeTab === 'cards' && (
+          <div>
+            <h2>Card Components</h2>
+
+            <h3>Summary Cards</h3>
+            <div className="summary-cards" style={{ marginBottom: '2rem' }}>
+              <SummaryCard
+                title="Total Chickens"
+                value="1,250"
+                icon="🐔"
+                variant="primary"
+                subtitle="Active livestock"
+              />
+              <SummaryCard
+                title="Feed Stock"
+                value="2.5 tons"
+                icon="🌾"
+                variant="warning"
+                trend="+5% this week"
+              />
+              <SummaryCard
+                title="Revenue"
+                value="$12,450"
+                icon="💰"
+                variant="success"
+                subtitle="This month"
+              />
+            </div>
+
+            <h3>Health Status Cards</h3>
+            <div className="health-status-cards" style={{ marginBottom: '2rem' }}>
+              <HealthStatusCard
+                status="healthy"
+                count="1,100"
+                percentage="88"
+                icon="✅"
+              />
+              <HealthStatusCard
+                status="sick"
+                count="120"
+                percentage="9.6"
+                icon="🤒"
+              />
+              <HealthStatusCard
+                status="critical"
+                count="25"
+                percentage="2"
+                icon="🚨"
+              />
+            </div>
+
+            <h3>Alert Cards</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '600px' }}>
+              <AlertCard
+                type="danger"
+                title="Critical Mortality Alert"
+                message="Batch Vertex 51 has exceeded critical mortality threshold (39.2%)"
+                icon="🚨"
+                dismissible={true}
+              />
+              <AlertCard
+                type="warning"
+                title="Feed Stock Low"
+                message="Current feed stock is below recommended levels"
+                icon="⚠️"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Data Table Example */}
         {activeTab === 'table' && (
           <div>

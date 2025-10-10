@@ -118,6 +118,18 @@ const FilterPanel = ({
           />
         );
 
+      case 'search':
+        return (
+          <input
+            type="search"
+            id={config.key}
+            value={value}
+            onChange={(e) => handleFilterChange(config.key, e.target.value)}
+            placeholder={config.placeholder}
+            className="filter-input filter-search"
+          />
+        );
+
       case 'select':
         return (
           <select

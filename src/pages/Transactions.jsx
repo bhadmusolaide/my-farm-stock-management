@@ -2,16 +2,12 @@ import { useState, useEffect } from 'react'
 import { useAppContext } from '../context'
 import { formatNumber, formatDate } from '../utils/formatters'
 import { supabase } from '../utils/supabaseClient'
-import Pagination from '../components/UI/Pagination'
-import usePagination from '../hooks/usePagination'
-import SortableTableHeader from '../components/UI/SortableTableHeader'
-import SortControls from '../components/UI/SortControls'
-import useTableSort from '../hooks/useTableSort'
+import { DataTable, StatusBadge } from '../components/UI'
 import LoadingSpinner from '../components/LoadingSpinner/LoadingSpinner'
 import './Transactions.css'
 
 const Transactions = () => {
-  const { addFunds, addExpense, withdrawFunds, deleteTransaction, chickens } = useAppContext()
+  const { addFunds, addExpense, withdrawFunds, deleteTransaction } = useAppContext()
 
   // Local state for all transactions (not just recent ones)
   const [allTransactions, setAllTransactions] = useState([])
@@ -135,14 +131,38 @@ const Transactions = () => {
   
   const filteredTransactions = getFilteredTransactions()
   
-  // Sorting hook with initial sort by date descending
-  const { sortedData, sortConfig, requestSort, resetSort, getSortIcon } = useTableSort(
-    filteredTransactions, 
-    { key: 'date', direction: 'desc' } // Initial sort by date descending
-  )
-  
-  // Pagination for transactions
-  const transactionsPagination = usePagination(sortedData, 10)
+  // Table columns configuration
+  const transactionColumns = [
+    { key: 'date', label: 'Date' },
+    { key: 'type', label: 'Type' },
+    { key: 'description', label: 'Description' },
+    { key: 'amount', label: 'Amount' }
+  ]
+
+  // Custom cell renderer for transactions table
+  const renderTransactionCell = (value, row, column) => {
+    switch (column.key) {
+      case 'date':
+        return formatDate(row.date);
+      case 'type':
+        return (
+          <StatusBadge
+            status={row.type}
+            type={getTransactionTypeVariant(row.type)}
+          >
+            {getTransactionTypeDisplay(row.type)}
+          </StatusBadge>
+        );
+      case 'amount':
+        return (
+          <span className={`amount ${row.type === 'fund' ? 'positive' : 'negative'}`}>
+            {row.type === 'fund' ? '+' : '-'}₦{formatNumber(row.amount, 2)}
+          </span>
+        );
+      default:
+        return value;
+    }
+  }
   
   // Calculate totals
   const calculateTotals = () => {
@@ -234,18 +254,18 @@ const Transactions = () => {
     }
   }
   
-  // Get transaction type class
-  const getTransactionTypeClass = (type) => {
+  // Get transaction type variant for StatusBadge
+  const getTransactionTypeVariant = (type) => {
     switch (type) {
       case 'fund':
-        return 'transaction-fund'
+        return 'success'
       case 'expense':
       case 'stock_expense':
-        return 'transaction-expense'
+        return 'warning'
       case 'withdrawal':
-        return 'transaction-withdrawal'
+        return 'danger'
       default:
-        return ''
+        return 'default'
     }
   }
   
@@ -330,70 +350,28 @@ const Transactions = () => {
         </div>
       </div>
       
-      {/* Sort Controls */}
-      <SortControls 
-        sortConfig={sortConfig}
-        onReset={resetSort}
-      />
+      {/* Transactions Table */}
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h3 className="section-title">
+            <span className="section-title-icon">📊</span>
+            Transaction History
+          </h3>
+        </div>
 
-      <div className="table-container">
-        <table className="transactions-table">
-          <thead>
-            <tr>
-              <SortableTableHeader sortKey="date" onSort={requestSort} getSortIcon={getSortIcon}>
-                Date
-              </SortableTableHeader>
-              <SortableTableHeader sortKey="type" onSort={requestSort} getSortIcon={getSortIcon}>
-                Type
-              </SortableTableHeader>
-              <SortableTableHeader sortKey="description" onSort={requestSort} getSortIcon={getSortIcon}>
-                Description
-              </SortableTableHeader>
-              <SortableTableHeader sortKey="amount" onSort={requestSort} getSortIcon={getSortIcon}>
-                Amount
-              </SortableTableHeader>
-            </tr>
-          </thead>
-          <tbody>
-            {transactionsPagination.currentData.length > 0 ? (
-              transactionsPagination.currentData.map(transaction => (
-                <tr 
-                  key={transaction.id}
-                  className={getTransactionTypeClass(transaction.type)}
-                >
-                  <td>{formatDate(transaction.date)}</td>
-                  <td>
-                    <span className={`transaction-type ${transaction.type}`}>
-                      {getTransactionTypeDisplay(transaction.type)}
-                    </span>
-                  </td>
-                  <td>{transaction.description}</td>
-                  <td className="amount">
-                    {transaction.type === 'fund' ? '+' : '-'}
-                    ₦{formatNumber(transaction.amount, 2)}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="4" className="no-data">
-                  No transactions found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      
-      {/* Transactions Pagination */}
-      <Pagination
-        currentPage={transactionsPagination.currentPage}
-        totalPages={transactionsPagination.totalPages}
-        onPageChange={transactionsPagination.handlePageChange}
-        pageSize={transactionsPagination.pageSize}
-        onPageSizeChange={transactionsPagination.handlePageSizeChange}
-        totalItems={transactionsPagination.totalItems}
-      />
+        <DataTable
+          data={filteredTransactions}
+          columns={transactionColumns}
+          renderCell={renderTransactionCell}
+          enableSorting
+          enablePagination
+          defaultSort={{ key: 'date', direction: 'desc' }}
+          pageSize={10}
+          emptyMessage="No transactions found"
+          loading={loading}
+          rowClassName={(row) => `transaction-row ${row.type}`}
+        />
+      </section>
       
       {/* Transaction Modal */}
       {activeModal && (

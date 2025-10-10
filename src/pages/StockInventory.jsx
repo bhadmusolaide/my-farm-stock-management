@@ -1,13 +1,7 @@
 import { useState } from 'react'
 import { useAppContext } from '../context'
 import { formatNumber, formatDate } from '../utils/formatters'
-import ColumnFilter from '../components/UI/ColumnFilter'
-import SortableTableHeader from '../components/UI/SortableTableHeader'
-import SortControls from '../components/UI/SortControls'
-import useColumnConfig from '../hooks/useColumnConfig'
-import useTableSort from '../hooks/useTableSort'
-import Pagination from '../components/UI/Pagination'
-import usePagination from '../hooks/usePagination'
+import { DataTable } from '../components/UI'
 import './StockInventory.css'
 
 const StockInventory = () => {
@@ -25,6 +19,10 @@ const StockInventory = () => {
   // State for modal
   const [showModal, setShowModal] = useState(false)
   
+  // Modal functions
+  const openModal = () => setShowModal(true)
+  const closeModal = () => setShowModal(false)
+  
   // Form state
   const [formData, setFormData] = useState({
     description: '',
@@ -34,7 +32,7 @@ const StockInventory = () => {
     calculation_mode: 'count_size_cost' // 'count_size_cost', 'count_cost', 'size_cost'
   })
 
-  // Column configuration
+  // Table columns configuration for DataTable
   const stockColumns = [
     { key: 'date', label: 'Date' },
     { key: 'description', label: 'Description' },
@@ -44,9 +42,6 @@ const StockInventory = () => {
     { key: 'total_cost', label: 'Total Cost' },
     { key: 'actions', label: 'Actions' }
   ]
-
-  // Column visibility hook
-  const columnConfig = useColumnConfig('stockInventory', stockColumns)
   
   // Get filtered stock
   const getFilteredStock = () => {
@@ -75,11 +70,32 @@ const StockInventory = () => {
   
   const filteredStock = getFilteredStock()
   
-  // Sorting hook
-  const { sortedData, sortConfig, requestSort, resetSort, getSortIcon } = useTableSort(filteredStock)
-  
-  // Pagination for stock inventory
-  const stockPagination = usePagination(sortedData, 10)
+  // Custom cell renderer for stock table
+  const renderStockCell = (value, row, column) => {
+    switch (column.key) {
+      case 'date':
+        return formatDate(row.date);
+      case 'count':
+        return formatNumber(row.count);
+      case 'size':
+        return `${formatNumber(row.size, 2)} kg`;
+      case 'cost_per_kg':
+        return `₦${formatNumber(row.cost_per_kg, 2)}`;
+      case 'total_cost':
+        return `₦${formatNumber(row.total_cost, 2)}`;
+      case 'actions':
+        return (
+          <button
+            className="btn btn-danger btn-sm"
+            onClick={() => handleDelete(row.id)}
+          >
+            Delete
+          </button>
+        );
+      default:
+        return value;
+    }
+  }
   
   // Handle filter changes
   const handleFilterChange = (e) => {
@@ -114,10 +130,6 @@ const StockInventory = () => {
     setShowModal(true)
   }
   
-  // Close modal
-  const closeModal = () => {
-    setShowModal(false)
-  }
   
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -260,104 +272,31 @@ const StockInventory = () => {
         </div>
       </div>
       
-      <div className="table-header-controls">
-        <h3>Stock Inventory</h3>
-        <ColumnFilter 
+      {/* Stock Inventory Table */}
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h3 className="section-title">
+            <span className="section-title-icon">📦</span>
+            Stock Inventory
+          </h3>
+          <div className="section-actions">
+            <button className="btn btn-primary" onClick={openModal}>
+              Add Stock
+            </button>
+          </div>
+        </div>
+
+        <DataTable
+          data={filteredStock}
           columns={stockColumns}
-          visibleColumns={columnConfig.visibleColumns}
-          onColumnToggle={columnConfig.toggleColumn}
-        />      </div>
-      
-      {/* Sort Controls */}
-      <SortControls 
-        sortConfig={sortConfig}
-        onReset={resetSort}
-      />
-      
-      <div className="table-container">
-        <table className="stock-table">
-          <thead>
-            <tr>
-              {columnConfig.isColumnVisible('date') && (
-                <SortableTableHeader sortKey="date" onSort={requestSort} getSortIcon={getSortIcon}>
-                  Date
-                </SortableTableHeader>
-              )}
-              {columnConfig.isColumnVisible('description') && (
-                <SortableTableHeader sortKey="description" onSort={requestSort} getSortIcon={getSortIcon}>
-                  Description
-                </SortableTableHeader>
-              )}
-              {columnConfig.isColumnVisible('count') && (
-                <SortableTableHeader sortKey="count" onSort={requestSort} getSortIcon={getSortIcon}>
-                  Count
-                </SortableTableHeader>
-              )}
-              {columnConfig.isColumnVisible('size') && (
-                <SortableTableHeader sortKey="size" onSort={requestSort} getSortIcon={getSortIcon}>
-                  Size (kg)
-                </SortableTableHeader>
-              )}
-              {columnConfig.isColumnVisible('cost_per_kg') && (
-                <SortableTableHeader sortKey="cost_per_kg" onSort={requestSort} getSortIcon={getSortIcon}>
-                  Cost per kg
-                </SortableTableHeader>
-              )}
-              {columnConfig.isColumnVisible('total_cost') && (
-                <SortableTableHeader sortKey="total_cost" onSort={requestSort} getSortIcon={getSortIcon}>
-                  Total Cost
-                </SortableTableHeader>
-              )}
-              {columnConfig.isColumnVisible('actions') && (
-                <SortableTableHeader sortable={false}>
-                  Actions
-                </SortableTableHeader>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {stockPagination.currentData.length > 0 ? (
-              stockPagination.currentData.map(item => (
-                <tr key={item.id}>
-                  {columnConfig.isColumnVisible('date') && <td>{formatDate(item.date)}</td>}
-                  {columnConfig.isColumnVisible('description') && <td>{item.description}</td>}
-                  {columnConfig.isColumnVisible('count') && <td>{formatNumber(item.count)}</td>}
-                  {columnConfig.isColumnVisible('size') && <td>{formatNumber(item.size)}</td>}
-                  {columnConfig.isColumnVisible('cost_per_kg') && <td>₦{formatNumber(item.cost_per_kg || 0, 2)}</td>}
-                  {columnConfig.isColumnVisible('total_cost') && <td>₦{formatNumber(item.total_cost || 0, 2)}</td>}
-                  {columnConfig.isColumnVisible('actions') && (
-                    <td>
-                      <button 
-                        className="delete-btn" 
-                        onClick={() => handleDelete(item.id)}
-                        aria-label="Delete"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={columnConfig.visibleColumns.length} className="no-data">
-                  No stock items found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      
-      {/* Stock Inventory Pagination */}
-      <Pagination
-        currentPage={stockPagination.currentPage}
-        totalPages={stockPagination.totalPages}
-        onPageChange={stockPagination.handlePageChange}
-        pageSize={stockPagination.pageSize}
-        onPageSizeChange={stockPagination.handlePageSizeChange}
-        totalItems={stockPagination.totalItems}
-      />
+          renderCell={renderStockCell}
+          enableSorting
+          enablePagination
+          pageSize={10}
+          emptyMessage="No stock items found"
+          rowKey="id"
+        />
+      </section>
       
       {/* Add Stock Modal */}
       {showModal && (

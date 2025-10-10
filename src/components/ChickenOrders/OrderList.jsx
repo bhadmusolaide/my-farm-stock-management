@@ -79,7 +79,10 @@ const OrderList = ({
   // Handler for filter changes
   const onFiltersChange = (newFilters) => {
     Object.entries(newFilters).forEach(([key, value]) => {
-      if (value === null || value === undefined || value === '') {
+      if (key === 'search') {
+        // Handle search separately using setSearchTerm
+        setSearchTerm(value || '');
+      } else if (value === null || value === undefined || value === '') {
         removeFilter(key);
       } else {
         updateFilter(key, value);
@@ -103,21 +106,23 @@ const OrderList = ({
   };
 
   // Enhanced filter configuration using custom hooks
+  // Combine search term and filters for FilterPanel
+  const combinedFilters = {
+    search: searchTerm,
+    ...filters
+  };
+
   const filterConfig = [
     {
       key: 'search',
       type: 'search',
       label: 'Search Orders',
-      placeholder: 'Search by customer, phone, address...',
-      value: searchTerm,
-      onChange: setSearchTerm
+      placeholder: 'Search by customer, phone, address...'
     },
     {
       key: 'inventoryType',
       type: 'select',
       label: 'Inventory Type',
-      value: filters.inventoryType || '',
-      onChange: (value) => updateFilter('inventoryType', value),
       options: [
         { value: '', label: 'All Types' },
         { value: 'live', label: 'Live Chickens' },
@@ -129,8 +134,6 @@ const OrderList = ({
       key: 'paymentStatus',
       type: 'select',
       label: 'Payment Status',
-      value: filters.paymentStatus || '',
-      onChange: (value) => updateFilter('paymentStatus', value),
       options: [
         { value: '', label: 'All Payment Status' },
         { value: 'paid', label: 'Fully Paid' },
@@ -417,7 +420,7 @@ const OrderList = ({
 
       {/* Filters */}
       <FilterPanel
-        filters={filters}
+        filters={combinedFilters}
         onFiltersChange={onFiltersChange}
         filterConfig={filterConfig}
         collapsible
@@ -431,8 +434,7 @@ const OrderList = ({
         loading={loading}
         enableSorting
         enablePagination
-        enableSearch
-        searchPlaceholder="Search orders..."
+        enableSearch={false}
         renderActions={renderActions}
         headerActions={headerActions}
         emptyMessage="No orders found"
