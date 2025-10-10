@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { EnhancedModal } from '../UI';
-import { formatNumber } from '../../utils/formatters';
+import { formatNumber, formatDate } from '../../utils/formatters';
+import { supabase } from '../../utils/supabaseClient';
 import './ChickenOrders.css';
 
 const OrderForm = ({
@@ -28,6 +29,9 @@ const OrderForm = ({
   });
 
   const [errors, setErrors] = useState({});
+  const [showHistory, setShowHistory] = useState(false);
+  const [editHistory, setEditHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Helper to get actual whole chicken count from dressed chicken batch
   const getWholeChickenCount = (dressedChicken) => {
@@ -83,8 +87,37 @@ const OrderForm = ({
         });
       }
       setErrors({});
+      setShowHistory(false);
+      setEditHistory([]);
     }
   }, [isOpen, editingOrder]);
+
+  // Fetch edit history when showing history
+  useEffect(() => {
+    const fetchEditHistory = async () => {
+      if (showHistory && editingOrder && editingOrder.id) {
+        setHistoryLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('audit_logs')
+            .select('*, users(full_name)')
+            .eq('table_name', 'chickens')
+            .eq('record_id', editingOrder.id)
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+          setEditHistory(data || []);
+        } catch (err) {
+          console.error('Failed to fetch edit history:', err);
+          setEditHistory([]);
+        } finally {
+          setHistoryLoading(false);
+        }
+      }
+    };
+
+    fetchEditHistory();
+  }, [showHistory, editingOrder]);
 
   // Auto-calculate amount paid when relevant fields change
   useEffect(() => {
@@ -247,6 +280,70 @@ const OrderForm = ({
     { value: 'cancelled', label: 'Cancelled' }
   ];
 
+  // Render edit history item
+  const renderHistoryItem = (log) => {
+    // Parse old and new values
+    let oldValues = {};
+    let newValues = {};
+    
+    try {
+      oldValues = log.old_values ? JSON.parse(log.old_values) : {};
+      newValues = log.new_values ? JSON.parse(log.new_values) : {};
+    } catch (e) {
+      console.error('Error parsing audit log values:', e);
+    }
+    
+    // Get changed fields
+    const changedFields = [];
+    const allKeys = new Set([...Object.keys(oldValues), ...Object.keys(newValues)]);
+    
+    allKeys.forEach(key => {
+      const oldValue = oldValues[key];
+      const newValue = newValues[key];
+      
+      // Only show fields that actually changed
+      if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+        changedFields.push({ key, oldValue, newValue });
+      }
+    });
+    
+    // Skip if no relevant changes
+    if (changedFields.length === 0) {
+      return null;
+    }
+    
+    return (
+      <div key={log.id} className="history-item">
+        <div className="history-header">
+          <div className="history-meta">
+            <span className="history-timestamp">{formatDate(log.created_at)}</span>
+            <span className="history-user">{log.users?.full_name || 'Unknown User'}</span>
+          </div>
+        </div>
+        <div className="history-changes">
+          <div className="changes-list">
+            {changedFields.map(({ key, oldValue, newValue }) => (
+              <div key={key} className="change-item">
+                <div className="change-field">
+                  <span className="field-label">{key.replace(/_/g, ' ')}</span>
+                </div>
+                <div className="change-values">
+                  <span className="old-value">
+                    {oldValue === null || oldValue === undefined ? 'N/A' : oldValue.toString()}
+                  </span>
+                  <span className="change-arrow">→</span>
+                  <span className="new-value">
+                    {newValue === null || newValue === undefined ? 'N/A' : newValue.toString()}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <EnhancedModal
       isOpen={isOpen}
@@ -257,6 +354,55 @@ const OrderForm = ({
       error={errors.submit}
     >
       <form onSubmit={handleSubmit} className="order-form">
+        {/* Modal Header with History Toggle */}
+        {editingOrder && (
+          <div className="modal-header">
+            <h2>{editingOrder ? 'Edit Order' : 'Add New Order'}</h2>
+            <button
+              type="button"
+              className="btn-history-toggle"
+              onClick={() => setShowHistory(!showHistory)}
+              disabled={historyLoading}
+            >
+              {showHistory ? 'Hide History' : 'Show Edit History'}
+            </button>
+          </div>
+        )}
+
+        {/* Edit History Section */}
+        {editingOrder && showHistory && (
+          <div className="edit-history-section">
+            <h3>Edit History</h3>
+            {historyLoading ? (
+              <div className="history-loading">Loading edit history...</div>
+            ) : editHistory.length > 0 ? (
+              <div className="history-list">
+                {editHistory.map(renderHistoryItem).filter(item => item !== null)}
+                {editHistory.filter(log => {
+                  try {
+                    const oldValues = log.old_values ? JSON.parse(log.old_values) : {};
+                    const newValues = log.new_values ? JSON.parse(log.new_values) : {};
+                    const allKeys = new Set([...Object.keys(oldValues), ...Object.keys(newValues)]);
+                    return Array.from(allKeys).some(key => 
+                      JSON.stringify(oldValues[key]) !== JSON.stringify(newValues[key])
+                    );
+                  } catch (e) {
+                    return false;
+                  }
+                }).length === 0 && (
+                  <div className="no-relevant-changes">
+                    <p>No relevant changes found in edit history</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="no-history">
+                <p>No edit history available for this order</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Customer Information */}
         <div className="form-section">
           <h4>Customer Information</h4>

@@ -131,14 +131,14 @@ const ProcessingHistory = ({
 
     if (filters?.yieldThreshold) {
       filtered = filtered.filter(rel => {
-        const yield = rel.yieldRate;
+        const yieldRate = rel.yieldRate;
         switch (filters.yieldThreshold) {
           case 'low':
-            return yield < 95;
+            return yieldRate < 95;
           case 'normal':
-            return yield >= 95 && yield <= 100;
+            return yieldRate >= 95 && yieldRate <= 100;
           case 'high':
-            return yield > 100;
+            return yieldRate > 100;
           default:
             return true;
         }

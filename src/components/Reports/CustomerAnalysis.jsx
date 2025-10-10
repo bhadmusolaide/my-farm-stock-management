@@ -181,7 +181,7 @@ const CustomerAnalysis = ({ customerLifetimeValue }) => {
             <div className="segment-content">
               <h4>Loyal Customers</h4>
               <p className="segment-value">{loyalCustomers.length}</p>
-              <small>Retention rate > 50%</small>
+              <small>Retention rate &gt; 50%</small>
             </div>
           </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context';
 import { formatNumber, formatDate } from '../utils/formatters';
 import ColumnFilter from '../components/UI/ColumnFilter';
 import SortableTableHeader from '../components/UI/SortableTableHeader';

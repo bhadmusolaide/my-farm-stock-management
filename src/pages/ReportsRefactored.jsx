@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context';
 import { TabNavigation } from '../components/UI';
 import { formatDate, getAggregatedReportData } from '../utils/formatters';
 import { supabase } from '../utils/supabaseClient';

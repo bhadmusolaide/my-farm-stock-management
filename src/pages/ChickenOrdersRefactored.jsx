@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context';
 import { useNotification } from '../context/NotificationContext';
 import { TabNavigation } from '../components/UI';
 import {
@@ -59,7 +59,7 @@ const ChickenOrders = () => {
     const loadOrdersData = async () => {
       try {
         setLoading(true);
-        const result = await loadPaginatedData('chicken_orders', currentPage, 20, orderFilters);
+        const result = await loadPaginatedData('chickens', currentPage, 20, orderFilters);
         setPaginatedOrders(result);
       } catch (error) {
         console.error('Failed to load orders:', error);
@@ -224,7 +224,7 @@ const ChickenOrders = () => {
       }
 
       // Refresh orders data
-      const result = await loadPaginatedData('chicken_orders', currentPage, 20, orderFilters);
+      const result = await loadPaginatedData('chickens', currentPage, 20, orderFilters);
       setPaginatedOrders(result);
 
     } catch (error) {
@@ -248,7 +248,7 @@ const ChickenOrders = () => {
         await deleteChicken(orderId);
         
         // Refresh orders data
-        const result = await loadPaginatedData('chicken_orders', currentPage, 20, orderFilters);
+        const result = await loadPaginatedData('chickens', currentPage, 20, orderFilters);
         setPaginatedOrders(result);
         
         showSuccess('Order deleted successfully');
@@ -282,7 +282,7 @@ const ChickenOrders = () => {
       await Promise.all(updatePromises);
       
       // Refresh orders data
-      const result = await loadPaginatedData('chicken_orders', currentPage, 20, orderFilters);
+      const result = await loadPaginatedData('chickens', currentPage, 20, orderFilters);
       setPaginatedOrders(result);
       
       setSelectedOrders([]);

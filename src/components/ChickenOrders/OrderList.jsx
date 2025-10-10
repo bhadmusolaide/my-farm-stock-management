@@ -1,6 +1,12 @@
 import React, { useMemo } from 'react';
 import { DataTable, StatusBadge, FilterPanel } from '../UI';
 import { formatNumber, formatDate } from '../../utils/formatters';
+import {
+  useTableFilters,
+  useStatusFilter,
+  useDateRangeFilter,
+  useTableOperations
+} from '../../hooks';
 import './ChickenOrders.css';
 
 const OrderList = ({
@@ -8,37 +14,110 @@ const OrderList = ({
   onEdit,
   onDelete,
   onBatchUpdate,
-  filters,
-  onFiltersChange,
-  selectedOrders = [],
-  onOrderSelect,
-  onSelectAll,
   loading = false
 }) => {
-  // Filter configuration
+  // Use custom hooks for filtering and table operations
+  const {
+    filteredData: filteredOrders,
+    filters,
+    searchTerm,
+    updateFilter,
+    removeFilter,
+    clearAllFilters,
+    setSearchTerm,
+    handleSort,
+    getFilterSummary
+  } = useTableFilters(orders, {
+    searchFields: ['customer', 'phone', 'address', 'notes'],
+    defaultFilters: {},
+    caseSensitive: false
+  });
+
+  const {
+    filteredData: statusFilteredOrders,
+    selectedStatuses,
+    availableStatuses,
+    toggleStatus,
+    clearStatusFilter,
+    getStatusSummary
+  } = useStatusFilter(filteredOrders, 'status', {
+    allowMultiple: true,
+    defaultStatuses: []
+  });
+
+  const {
+    filteredData: dateFilteredOrders,
+    dateRange,
+    selectedPreset,
+    presets,
+    applyPreset,
+    setCustomRange,
+    clearDateFilter
+  } = useDateRangeFilter(statusFilteredOrders, 'date');
+
+  const {
+    selectedItems: selectedOrders,
+    selectedCount,
+    isAllSelected,
+    isIndeterminate,
+    selectItem,
+    handleItemClick,
+    selectAll,
+    deselectAll,
+    toggleSelectAll,
+    isSelected,
+    getSelectedItems,
+    bulkAction
+  } = useTableOperations(dateFilteredOrders, {
+    idField: 'id',
+    allowMultiSelect: true
+  });
+
+  // Final filtered data
+  const finalFilteredOrders = dateFilteredOrders;
+
+  // Handler for filter changes
+  const onFiltersChange = (newFilters) => {
+    Object.entries(newFilters).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === '') {
+        removeFilter(key);
+      } else {
+        updateFilter(key, value);
+      }
+    });
+  };
+
+  // Handler for order selection
+  const onOrderSelect = (orderId) => {
+    selectItem(orderId);
+  };
+
+  // Handler for select all
+  const onSelectAll = (orderIds) => {
+    if (orderIds.length === 0) {
+      deselectAll();
+    } else {
+      // Select all provided order IDs
+      orderIds.forEach(id => selectItem(id));
+    }
+  };
+
+  // Enhanced filter configuration using custom hooks
   const filterConfig = [
     {
-      key: 'customer',
-      type: 'text',
-      label: 'Customer',
-      placeholder: 'Search by customer name...'
-    },
-    {
-      key: 'status',
-      type: 'select',
-      label: 'Status',
-      options: [
-        { value: '', label: 'All Statuses' },
-        { value: 'pending', label: 'Pending' },
-        { value: 'confirmed', label: 'Confirmed' },
-        { value: 'completed', label: 'Completed' },
-        { value: 'cancelled', label: 'Cancelled' }
-      ]
+      key: 'search',
+      type: 'search',
+      label: 'Search Orders',
+      placeholder: 'Search by customer, phone, address...',
+      value: searchTerm,
+      onChange: setSearchTerm
     },
     {
       key: 'inventoryType',
       type: 'select',
       label: 'Inventory Type',
+      value: filters.inventoryType || '',
+      onChange: (value) => updateFilter('inventoryType', value),
       options: [
         { value: '', label: 'All Types' },
         { value: 'live', label: 'Live Chickens' },
@@ -47,46 +126,42 @@ const OrderList = ({
       ]
     },
     {
-      key: 'dateRange',
-      type: 'dateRange',
-      label: 'Date Range',
-      startKey: 'startDate',
-      endKey: 'endDate'
+      key: 'paymentStatus',
+      type: 'select',
+      label: 'Payment Status',
+      value: filters.paymentStatus || '',
+      onChange: (value) => updateFilter('paymentStatus', value),
+      options: [
+        { value: '', label: 'All Payment Status' },
+        { value: 'paid', label: 'Fully Paid' },
+        { value: 'partial', label: 'Partially Paid' },
+        { value: 'unpaid', label: 'Unpaid' }
+      ]
     }
   ];
 
-  // Apply filters to orders
-  const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
-      // Customer filter
-      if (filters.customer && !order.customer.toLowerCase().includes(filters.customer.toLowerCase())) {
-        return false;
-      }
+  // Status filter component data
+  const statusFilterData = {
+    selectedStatuses,
+    availableStatuses,
+    onToggleStatus: toggleStatus,
+    onClearFilter: clearStatusFilter,
+    summary: getStatusSummary()
+  };
 
-      // Status filter
-      if (filters.status && order.status !== filters.status) {
-        return false;
-      }
-
-      // Inventory type filter
-      if (filters.inventoryType && order.inventory_type !== filters.inventoryType) {
-        return false;
-      }
-
-      // Date range filter
-      if (filters.startDate || filters.endDate) {
-        const orderDate = new Date(order.date);
-        if (filters.startDate && orderDate < new Date(filters.startDate)) {
-          return false;
-        }
-        if (filters.endDate && orderDate > new Date(filters.endDate)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [orders, filters]);
+  // Date range filter data
+  const dateFilterData = {
+    dateRange,
+    selectedPreset,
+    presets,
+    onApplyPreset: applyPreset,
+    onSetCustomRange: setCustomRange,
+    onClearFilter: clearDateFilter,
+    type: 'dateRange',
+    label: 'Date Range',
+    startKey: 'startDate',
+    endKey: 'endDate'
+  };
 
   // Table columns configuration
   const columns = [
@@ -258,7 +333,7 @@ const OrderList = ({
   // Summary statistics
   const summaryStats = useMemo(() => {
     const stats = {
-      totalOrders: filteredOrders.length,
+      totalOrders: finalFilteredOrders.length,
       totalValue: 0,
       totalPaid: 0,
       totalBalance: 0,
@@ -270,7 +345,7 @@ const OrderList = ({
       }
     };
 
-    filteredOrders.forEach(order => {
+    finalFilteredOrders.forEach(order => {
       // Calculate total value
       let total = 0;
       if (order.calculation_mode === 'count_cost') {
@@ -288,7 +363,7 @@ const OrderList = ({
     });
 
     return stats;
-  }, [filteredOrders]);
+  }, [finalFilteredOrders]);
 
   return (
     <div className="order-list">
@@ -351,7 +426,7 @@ const OrderList = ({
 
       {/* Data Table */}
       <DataTable
-        data={filteredOrders}
+        data={finalFilteredOrders}
         columns={columns}
         loading={loading}
         enableSorting
@@ -373,12 +448,12 @@ const OrderList = ({
         }}
         onSelectAll={(checked) => {
           if (checked) {
-            onSelectAll(filteredOrders.map(order => order.id));
+            onSelectAll(finalFilteredOrders.map(order => order.id));
           } else {
             onSelectAll([]);
           }
         }}
-        selectAllChecked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+        selectAllChecked={selectedOrders.length === finalFilteredOrders.length && finalFilteredOrders.length > 0}
         storageKey="orderList"
       />
     </div>

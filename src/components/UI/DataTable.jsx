@@ -125,7 +125,7 @@ const DataTable = ({
     return (
       <div className={`data-table-container ${containerClassName}`}>
         <div className="data-table-error">
-          <p>Error loading data: {error}</p>
+          <p>Error loading data: {typeof error === 'string' ? error : error?.message || 'Unknown error occurred'}</p>
         </div>
       </div>
     );

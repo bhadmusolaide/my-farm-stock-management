@@ -1,18 +1,99 @@
 import React from 'react';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
-import { 
+import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts';
+import {
+  useFinancialCalculations,
+  useLivestockMetrics,
+  useChartData,
+  usePerformanceMetrics
+} from '../../hooks';
+import { useAppContext } from '../../context';
 import './Reports.css';
 
-const OverviewDashboard = ({
-  keyMetrics,
-  revenueChartData,
-  expensesChartData,
-  liveChickensData
-}) => {
-  const COLORS = ['#4caf50', '#2196f3', '#ff9800', '#f44336', '#9c27b0'];
+const OverviewDashboard = ({ dateRange }) => {
+  const { transactions, chickens, liveChickens, weightHistory } = useAppContext();
+
+  // Use custom hooks for calculations
+  const financialMetrics = useFinancialCalculations(transactions, chickens, {
+    currency: '₦',
+    dateRange
+  });
+
+  const livestockMetrics = useLivestockMetrics(liveChickens, weightHistory);
+
+  const performanceMetrics = usePerformanceMetrics({
+    financial: {
+      revenue: financialMetrics.orderRevenue,
+      expenses: financialMetrics.totalExpenses,
+      profit: financialMetrics.grossProfit
+    },
+    livestock: {
+      mortalityRate: livestockMetrics.mortalityRate,
+      averageWeight: livestockMetrics.averageWeight,
+      feedConversion: livestockMetrics.averageFCR
+    }
+  });
+
+  // Prepare chart data using custom hooks
+  const revenueChartData = useChartData(financialMetrics.monthlyBreakdown, {
+    chartType: 'bar',
+    xField: 'month',
+    yField: 'income',
+    sortBy: 'x',
+    sortOrder: 'asc'
+  });
+
+  const expensesChartData = useChartData(financialMetrics.monthlyBreakdown, {
+    chartType: 'bar',
+    xField: 'month',
+    yField: 'expenses',
+    sortBy: 'x',
+    sortOrder: 'asc'
+  });
+
+  const liveChickensChartData = useChartData(livestockMetrics.batchMetrics, {
+    chartType: 'pie',
+    xField: 'breed',
+    yField: 'current_count'
+  });
+
+  const COLORS = revenueChartData.colors;
+
+  // Construct keyMetrics object from various metrics
+  const keyMetrics = {
+    financial: {
+      revenue: financialMetrics.orderRevenue || 0,
+      expenses: financialMetrics.totalExpenses || 0,
+      profit: financialMetrics.grossProfit || 0,
+      profitMargin: financialMetrics.profitMargin || 0
+    },
+    funds: {
+      added: financialMetrics.fundsAdded || 0,
+      withdrawn: financialMetrics.fundsWithdrawn || 0,
+      balance: financialMetrics.currentBalance || 0
+    },
+    stock: {
+      items: financialMetrics.totalStockItems || 0,
+      value: financialMetrics.totalStockValue || 0
+    },
+    feed: {
+      stock: financialMetrics.feedStock || 0
+    },
+    customers: {
+      total: financialMetrics.totalCustomers || 0,
+      outstandingBalance: financialMetrics.outstandingBalance || 0,
+      pending: financialMetrics.pendingOrders || 0,
+      partial: financialMetrics.partiallyPaidOrders || 0
+    },
+    liveChickens: {
+      total: livestockMetrics.totalChickens || 0,
+      mortality: livestockMetrics.totalMortality || 0,
+      mortalityRate: livestockMetrics.mortalityRate || 0
+    }
+  };
 
   return (
     <div className="overview-dashboard">
@@ -23,26 +104,37 @@ const OverviewDashboard = ({
           <div className="metric-card financial">
             <div className="metric-header">
               <h3>💰 Financial Overview</h3>
+              <div className="performance-badge">
+                <span className={`badge ${performanceMetrics.performanceGrade}`}>
+                  {performanceMetrics.formatted.performanceGrade}
+                </span>
+              </div>
             </div>
             <div className="metric-content">
               <div className="metric-item">
                 <span className="metric-label">Revenue</span>
-                <span className="metric-value">{formatCurrency(keyMetrics.financial.revenue)}</span>
+                <span className="metric-value">{financialMetrics.formatted.orderRevenue}</span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Expenses</span>
-                <span className="metric-value">{formatCurrency(keyMetrics.financial.expenses)}</span>
+                <span className="metric-value">{financialMetrics.formatted.totalExpenses}</span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Net Profit</span>
-                <span className={`metric-value ${keyMetrics.financial.profit >= 0 ? 'positive' : 'negative'}`}>
-                  {formatCurrency(keyMetrics.financial.profit)}
+                <span className={`metric-value ${financialMetrics.grossProfit >= 0 ? 'positive' : 'negative'}`}>
+                  {financialMetrics.formatted.grossProfit}
                 </span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Profit Margin</span>
                 <span className="metric-value">
-                  {keyMetrics.financial.profitMargin.toFixed(1)}%
+                  {financialMetrics.formatted.profitMargin}
+                </span>
+              </div>
+              <div className="metric-item">
+                <span className="metric-label">ROI</span>
+                <span className="metric-value">
+                  {financialMetrics.formatted.roi}
                 </span>
               </div>
             </div>
@@ -142,15 +234,15 @@ const OverviewDashboard = ({
       <div className="charts-section">
         <div className="chart-container">
           <h3>📈 Revenue Trend</h3>
-          {revenueChartData.length > 0 ? (
+          {!revenueChartData.isEmpty ? (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={revenueChartData}>
+              <BarChart data={revenueChartData.data}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
+                <XAxis dataKey="x" />
                 <YAxis />
                 <Tooltip formatter={(value) => [formatCurrency(value), 'Revenue']} />
                 <Legend />
-                <Bar dataKey="revenue" fill="#4caf50" name="Revenue" />
+                <Bar dataKey="y" fill="#4caf50" name="Revenue" />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -162,15 +254,15 @@ const OverviewDashboard = ({
 
         <div className="chart-container">
           <h3>📉 Expenses Trend</h3>
-          {expensesChartData.length > 0 ? (
+          {!expensesChartData.isEmpty ? (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={expensesChartData}>
+              <BarChart data={expensesChartData.data}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
+                <XAxis dataKey="x" />
                 <YAxis />
                 <Tooltip formatter={(value) => [formatCurrency(value), 'Expenses']} />
                 <Legend />
-                <Bar dataKey="expenses" fill="#f44336" name="Expenses" />
+                <Bar dataKey="y" fill="#f44336" name="Expenses" />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -182,20 +274,20 @@ const OverviewDashboard = ({
 
         <div className="chart-container">
           <h3>🐔 Live Chicken Stock Distribution</h3>
-          {liveChickensData.length > 0 ? (
+          {!liveChickensChartData.isEmpty ? (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={liveChickensData}
+                  data={liveChickensChartData.data}
                   cx="50%"
                   cy="50%"
                   outerRadius={100}
                   fill="#8884d8"
-                  dataKey="count"
+                  dataKey="value"
                   nameKey="name"
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percentage }) => `${name}: ${percentage.toFixed(0)}%`}
                 >
-                  {liveChickensData.map((entry, index) => (
+                  {liveChickensChartData.data.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>

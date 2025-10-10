@@ -1,5 +1,5 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { AppContext } from '../context/AppContext';
+import React, { useState, useEffect } from 'react';
+import { useAppContext } from '../context';
 import { useNotification } from '../context/NotificationContext';
 import { TabNavigation } from '../components/UI';
 import {
@@ -26,7 +26,7 @@ const DressedChickenStock = () => {
     loadBatchRelationships,
     chickenSizeCategories,
     loadChickenSizeCategories
-  } = useContext(AppContext);
+  } = useAppContext();
 
   const { showSuccess, showError } = useNotification();
 

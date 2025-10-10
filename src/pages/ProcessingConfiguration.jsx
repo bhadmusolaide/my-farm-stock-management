@@ -1,5 +1,5 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { AppContext } from '../context/AppContext';
+import React, { useState, useEffect } from 'react';
+import { useAppContext } from '../context';
 import Modal from '../components/Modal';
 import './ProcessingConfiguration.css';
 
@@ -25,7 +25,7 @@ const ProcessingConfiguration = () => {
     addChickenProcessingConfig,
     updateChickenProcessingConfig,
     deleteChickenProcessingConfig
-  } = useContext(AppContext);
+  } = useAppContext();
 
   const [activeTab, setActiveTab] = useState('size-categories');
   const [showModal, setShowModal] = useState(false);

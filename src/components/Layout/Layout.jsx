@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { useAppContext } from '../../context/AppContext'
+import { useAppContext } from '../../context'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import { useSiteSettings } from '../../context/SiteSettingsContext'
@@ -9,7 +9,7 @@ import './Layout.css'
 
 const Layout = ({ children }) => {
   const location = useLocation()
-  const { calculateStats } = useAppContext()
+  const { calculateStats, balance } = useAppContext()
   const { user, logout, isAdmin } = useAuth()
   const { theme } = useTheme()
   const { settings } = useSiteSettings()
@@ -18,7 +18,7 @@ const Layout = ({ children }) => {
   const [showInventoryDropdown, setShowInventoryDropdown] = useState(false)
   const userMenuRef = useRef(null)
   const inventoryDropdownRef = useRef(null)
-  
+
   const stats = calculateStats()
   
   // Close menus when clicking outside
@@ -151,7 +151,7 @@ const Layout = ({ children }) => {
               <li className="nav-user-menu">
                 <div className="balance-display">
                   <span className="balance-label">Current Balance:</span>
-                  <span className="balance-amount">₦{stats.balance.toFixed(2)}</span>
+                  <span className="balance-amount">₦{(balance || 0).toFixed(2)}</span>
                 </div>
                 <div className="user-menu-container" ref={userMenuRef}>
                   <button 

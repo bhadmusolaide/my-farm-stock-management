@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAppContext } from '../context/AppContext'
+import { useAppContext } from '../context'
 import { formatNumber, formatDate } from '../utils/formatters'
 import { supabase } from '../utils/supabaseClient'
 import Pagination from '../components/UI/Pagination'

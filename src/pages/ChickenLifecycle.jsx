@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAppContext } from '../context/AppContext'
+import { useAppContext } from '../context'
 import { formatDate, formatNumber } from '../utils/formatters'
 import { supabase } from '../utils/supabaseClient'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'

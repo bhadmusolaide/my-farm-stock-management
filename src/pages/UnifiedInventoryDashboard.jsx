@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context';
 import { formatNumber } from '../utils/formatters';
 import './UnifiedInventoryDashboard.css';
 

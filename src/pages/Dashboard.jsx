@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useAppContext } from '../context/AppContext'
+import { useAppContext } from '../context'
 import { formatNumber, formatDate, formatDateWithTime } from '../utils/formatters'
 import { 
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,

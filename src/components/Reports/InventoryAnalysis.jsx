@@ -200,7 +200,7 @@ const InventoryAnalysis = ({ inventoryTurnover }) => {
             <div className="performance-content">
               <h4>Low Turnover Items</h4>
               <p className="performance-value">{summaryStats.lowTurnoverItems}</p>
-              <small>Turnover rate < 1x</small>
+              <small>Turnover rate &lt; 1x</small>
             </div>
           </div>
 
