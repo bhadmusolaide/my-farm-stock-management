@@ -79,7 +79,7 @@ const Dashboard = () => {
   const recentTransactions = useMemo(() => {
     // Create a copy of transactions and sort by date descending
     const sortedTransactions = [...transactions].sort((a, b) => 
-      new Date(b.date) - new Date(a.date)
+      new Date(b.created_at || b.date) - new Date(a.created_at || a.date)
     )
     return sortedTransactions.slice(0, 5)
   }, [transactions])

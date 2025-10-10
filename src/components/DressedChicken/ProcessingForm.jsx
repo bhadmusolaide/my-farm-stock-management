@@ -213,26 +213,27 @@ const ProcessingForm = ({
       dog_food: parseFloat(formData.dogFoodWeight) || 0
     };
 
-    // Prepare data matching database schema
+    // Prepare data matching handler expectations (camelCase for handler, will be converted to snake_case in context)
     const processingData = {
-      batch_id: formData.batch_id,
-      processing_date: formData.processing_date,
-      initial_count: parseInt(formData.initial_count),
-      current_count: parseInt(formData.current_count),
-      average_weight: parseFloat(formData.average_weight),
-      size_category_id: formData.size_category_id === 'custom' ? null : formData.size_category_id,
-      size_category_custom: formData.size_category_id === 'custom' ? formData.size_category_custom : null,
+      selectedBatch: formData.selectedBatch,
+      processingDate: formData.processing_date,
+      initialCount: parseInt(formData.initial_count),
+      currentCount: parseInt(formData.current_count),
+      averageWeight: parseFloat(formData.average_weight),
+      sizeCategoryId: formData.size_category_id === 'custom' ? null : formData.size_category_id,
+      sizeCategoryCustom: formData.size_category_id === 'custom' ? formData.size_category_custom : null,
       status: formData.status,
-      storage_location: formData.storage_location,
-      expiry_date: formData.expiry_date || null,
+      storageLocation: formData.storage_location,
+      expiryDate: formData.expiry_date || null,
       notes: formData.notes || null,
-      parts_count: parts_count,
-      parts_weight: parts_weight,
-      processing_quantity: quantityToProcess,
-      remaining_birds: remainingBirds,
-      create_new_batch_for_remaining: formData.create_new_batch_for_remaining,
-      remaining_batch_id: formData.remaining_batch_id || null,
-      created_by: user?.id || null,
+      partsCount: parts_count,
+      partsWeight: parts_weight,
+      processingQuantity: quantityToProcess,
+      quantityToProcess: quantityToProcess,
+      remainingBirds: remainingBirds,
+      createNewBatchForRemaining: formData.create_new_batch_for_remaining,
+      remainingBatchId: formData.remaining_batch_id || null,
+      createdBy: user?.id || null,
       // Additional data for context processing
       selectedBatchData: selectedBatchData
     };

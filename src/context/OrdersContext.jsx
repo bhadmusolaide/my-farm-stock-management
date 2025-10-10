@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo } from '
 import { supabase } from '../utils/supabaseClient';
 import { storageOptimizer } from '../utils/requestDedupe';
 import { useAuth } from './AuthContext';
+import { useFinancialContext } from './FinancialContext';
 
 const OrdersContext = createContext();
 
@@ -11,6 +12,7 @@ export function useOrdersContext() {
 
 export function OrdersProvider({ children }) {
   const { logAuditAction } = useAuth();
+  const { addFunds, addExpense } = useFinancialContext();
   
   // State management
   const [chickens, setChickensState] = useState([]);
@@ -140,6 +142,13 @@ export function OrdersProvider({ children }) {
       const { error } = await supabase.from('chickens').insert(chicken);
       if (error) throw error;
 
+      // Create financial transaction if payment was made
+      if (amountPaid && amountPaid > 0) {
+        const customerName = chicken.customer || 'Unknown Customer';
+        const description = `Payment received from ${customerName} (Order #${chicken.id.substring(0, 8)})`;
+        await addFunds(amountPaid, description);
+      }
+
       setChickens(prev => [chicken, ...prev]);
 
       // Log audit action
@@ -206,6 +215,26 @@ export function OrdersProvider({ children }) {
         .eq('id', id);
 
       if (error) throw error;
+
+      // Update financial balance if amount_paid changed
+      const oldAmountPaid = oldChicken.amount_paid || 0;
+      const newAmountPaid = amountPaid !== undefined ? amountPaid : oldAmountPaid;
+      const paymentDifference = newAmountPaid - oldAmountPaid;
+
+      if (paymentDifference !== 0) {
+        // Create a financial transaction for the payment change
+        const customerName = updatedChicken.customer || 'Unknown Customer';
+
+        if (paymentDifference > 0) {
+          // Payment received - increase balance
+          const description = `Payment received from ${customerName} (Order #${id.substring(0, 8)})`;
+          await addFunds(paymentDifference, description);
+        } else {
+          // Refund - decrease balance
+          const description = `Payment refund to ${customerName} (Order #${id.substring(0, 8)})`;
+          await addExpense(Math.abs(paymentDifference), description);
+        }
+      }
 
       // Update local state - handle case where order wasn't in local state
       setChickens(prev => {

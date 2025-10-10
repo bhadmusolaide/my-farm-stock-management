@@ -269,8 +269,8 @@ const BatchUpdateModal = ({
                     {updateData.status.charAt(0).toUpperCase() + updateData.status.slice(1)}
                   </span></li>
                 )}
-                {(updateData.updateType === 'payment' || updateData.updateType === 'both') && updateData.amountPaid && (
-                  <li>Amount Paid: <strong>₦{formatNumber(parseFloat(updateData.amountPaid), 2)}</strong> each</li>
+                {(updateData.updateType === 'payment' || updateData.updateType === 'both') && updateData.amount_paid && (
+                  <li>Amount Paid: <strong>₦{formatNumber(parseFloat(updateData.amount_paid), 2)}</strong> each</li>
                 )}
               </ul>
             </div>

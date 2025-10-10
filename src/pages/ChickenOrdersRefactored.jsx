@@ -199,10 +199,10 @@ const ChickenOrders = () => {
           count: orderData.count,
           size: orderData.size,
           price: orderData.price,
-          amountPaid: orderData.amountPaid, // Use camelCase for consistency
+          amountPaid: orderData.amount_paid, // Convert from snake_case to camelCase
           status: orderData.status,
-          calculationMode: orderData.calculationMode, // Use camelCase for consistency
-          inventoryType: orderData.inventoryType, // Use camelCase for consistency
+          calculationMode: orderData.calculation_mode, // Convert from snake_case to camelCase
+          inventoryType: orderData.inventory_type, // Convert from snake_case to camelCase
           batch_id: orderData.batch_id || null,
           part_type: orderData.part_type || null
         });
@@ -215,10 +215,10 @@ const ChickenOrders = () => {
           count: orderData.count,
           size: orderData.size,
           price: orderData.price,
-          amountPaid: orderData.amountPaid, // Use camelCase for consistency
+          amountPaid: orderData.amount_paid, // Convert from snake_case to camelCase
           status: orderData.status,
-          calculationMode: orderData.calculationMode, // Use camelCase for consistency
-          inventoryType: orderData.inventoryType, // Use camelCase for consistency
+          calculationMode: orderData.calculation_mode, // Convert from snake_case to camelCase
+          inventoryType: orderData.inventory_type, // Convert from snake_case to camelCase
           batch_id: orderData.batch_id || null,
           part_type: orderData.part_type || null
         });
@@ -278,18 +278,18 @@ const ChickenOrders = () => {
   const handleBatchUpdate = async (batchData) => {
     try {
       setLoading(true);
-      
+
       const updatePromises = batchData.orderIds.map(orderId => {
         const updateData = {};
-        
+
         if (batchData.status) {
           updateData.status = batchData.status;
         }
-        
-        if (batchData.amountPaid !== undefined) {
-          updateData.amount_paid = batchData.amountPaid;
+
+        if (batchData.amount_paid !== undefined) {
+          updateData.amountPaid = batchData.amount_paid;
         }
-        
+
         return updateChicken(orderId, updateData);
       });
 
