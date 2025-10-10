@@ -354,6 +354,124 @@ const EditForm = ({
           />
         </div>
 
+        {/* Parts Data */}
+        <h3 className="form-section-title">Chicken Parts Inventory</h3>
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="neckCount">Neck Count</label>
+            <input
+              type="number"
+              id="neckCount"
+              name="neckCount"
+              value={formData.neckCount}
+              onChange={handleInputChange}
+              min="0"
+              step="1"
+              placeholder="Neck count"
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="neckWeight">Neck Weight (kg)</label>
+            <input
+              type="number"
+              id="neckWeight"
+              name="neckWeight"
+              value={formData.neckWeight}
+              onChange={handleInputChange}
+              min="0"
+              step="0.01"
+              placeholder="Neck weight in kg"
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="feetCount">Feet Count</label>
+            <input
+              type="number"
+              id="feetCount"
+              name="feetCount"
+              value={formData.feetCount}
+              onChange={handleInputChange}
+              min="0"
+              step="1"
+              placeholder="Feet count"
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="feetWeight">Feet Weight (kg)</label>
+            <input
+              type="number"
+              id="feetWeight"
+              name="feetWeight"
+              value={formData.feetWeight}
+              onChange={handleInputChange}
+              min="0"
+              step="0.01"
+              placeholder="Feet weight in kg"
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="gizzardCount">Gizzard Count</label>
+            <input
+              type="number"
+              id="gizzardCount"
+              name="gizzardCount"
+              value={formData.gizzardCount}
+              onChange={handleInputChange}
+              min="0"
+              step="1"
+              placeholder="Gizzard count"
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="gizzardWeight">Gizzard Weight (kg)</label>
+            <input
+              type="number"
+              id="gizzardWeight"
+              name="gizzardWeight"
+              value={formData.gizzardWeight}
+              onChange={handleInputChange}
+              min="0"
+              step="0.01"
+              placeholder="Gizzard weight in kg"
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="dogFoodCount">Dog Food Count</label>
+            <input
+              type="number"
+              id="dogFoodCount"
+              name="dogFoodCount"
+              value={formData.dogFoodCount}
+              onChange={handleInputChange}
+              min="0"
+              step="1"
+              placeholder="Dog Food count"
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="dogFoodWeight">Dog Food Weight (kg)</label>
+            <input
+              type="number"
+              id="dogFoodWeight"
+              name="dogFoodWeight"
+              value={formData.dogFoodWeight}
+              onChange={handleInputChange}
+              min="0"
+              step="0.01"
+              placeholder="Dog Food weight in kg"
+            />
+          </div>
+        </div>
+
         {/* Form Actions */}
         <div className="form-actions">
           <button type="button" onClick={onClose} className="btn btn-secondary" disabled={loading}>

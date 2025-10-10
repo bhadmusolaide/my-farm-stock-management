@@ -295,14 +295,13 @@ const OrderForm = ({
   // Get available batches based on inventory type
   const getAvailableBatches = () => {
     if (formData.inventory_type === 'live') {
-      return liveChickens.filter(batch => batch.current_count > 0);
+      return liveChickens.filter(batch => batch.current_count > 0 && batch.status !== 'processing' && batch.status !== 'completed');
     } else if (formData.inventory_type === 'dressed') {
       return dressedChickens.filter(batch => {
-        if (formData.inventory_type === 'parts') {
-          return batch.parts_count && Object.values(batch.parts_count).some(count => count > 0);
-        }
-        return getWholeChickenCount(batch) > 0;
+        return batch.status !== 'sold' && getWholeChickenCount(batch) > 0;
       });
+    } else if (formData.inventory_type === 'parts') {
+      return dressedChickens.filter(batch => batch.parts_count && Object.values(batch.parts_count).some(count => count > 0));
     }
     return [];
   };
