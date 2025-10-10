@@ -21,7 +21,7 @@
 
 .batch-form .form-group label {
   font-weight: 500;
-  color: var(--text-color, #333);
+  color: var(--text-color, #374151);
 }
 
 .batch-form .required {
@@ -32,17 +32,25 @@
 .batch-form select,
 .batch-form textarea {
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border-color, #ddd);
+  border: 1px solid var(--input-border, #d1d5db);
   border-radius: 4px;
   font-size: 0.875rem;
+  background-color: var(--input-background, #fff);
+  color: var(--input-text, #374151);
+}
+
+.batch-form input::placeholder,
+.batch-form select::placeholder,
+.batch-form textarea::placeholder {
+  color: var(--input-placeholder, #9ca3af);
 }
 
 .batch-form input:focus,
 .batch-form select:focus,
 .batch-form textarea:focus {
   outline: none;
-  border-color: var(--primary-color, #007bff);
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  border-color: var(--input-focus-border, #4caf50);
+  box-shadow: 0 0 0 2px var(--input-focus-shadow, rgba(76, 175, 80, 0.2));
 }
 
 .batch-form input.error,
@@ -74,8 +82,8 @@
 }
 
 .summary-card {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #ddd);
+  background: var(--card-background, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 8px;
   padding: 1.5rem;
   display: flex;
@@ -425,10 +433,46 @@
 .no-batch-selected {
   text-align: center;
   padding: 3rem;
-  color: var(--text-muted, #666);
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border-color, #ddd);
+  color: var(--text-light, #6b7280);
+  background: var(--card-background, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 8px;
+}
+
+/* ============================================
+   DARK MODE OVERRIDES - LiveChicken Components
+   ============================================ */
+
+/* Batch Form */
+[data-theme="dark"] .batch-form .form-group label {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .batch-form input,
+[data-theme="dark"] .batch-form select,
+[data-theme="dark"] .batch-form textarea {
+  background-color: var(--input-background) !important;
+  border-color: var(--input-border) !important;
+  color: var(--input-text) !important;
+}
+
+[data-theme="dark"] .batch-form input::placeholder,
+[data-theme="dark"] .batch-form select::placeholder,
+[data-theme="dark"] .batch-form textarea::placeholder {
+  color: var(--input-placeholder) !important;
+}
+
+/* Summary Cards */
+[data-theme="dark"] .summary-card {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* No Batch Selected */
+[data-theme="dark"] .no-batch-selected {
+  color: var(--text-light) !important;
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
 }
 
 /* Responsive Design */
@@ -436,19 +480,19 @@
   .batch-form .form-row {
     grid-template-columns: 1fr;
   }
-  
+
   .summary-cards {
     grid-template-columns: 1fr;
   }
-  
+
   .health-status-cards {
     grid-template-columns: 1fr;
   }
-  
+
   .metrics-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .section-header {
     flex-direction: column;
     align-items: stretch;

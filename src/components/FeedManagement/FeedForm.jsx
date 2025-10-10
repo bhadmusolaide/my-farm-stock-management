@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { EnhancedModal } from '../UI';
-import { FEED_BRANDS, kgToBags, bagsToKg } from '../../utils/constants';
+import { FEED_BRANDS, FEED_TYPES, kgToBags, bagsToKg } from '../../utils/constants';
 import { formatNumber } from '../../utils/formatters';
 import './FeedManagement.css';
 
@@ -13,6 +13,7 @@ const FeedForm = ({
   loading = false
 }) => {
   const [formData, setFormData] = useState({
+    batch_number: '',
     feed_type: '',
     brand: '',
     custom_brand: '',
@@ -20,10 +21,13 @@ const FeedForm = ({
     number_of_bags: '',
     quantity_kg: '',
     cost_per_bag: '',
+    cost_per_kg: '',
     purchase_date: '',
     expiry_date: '',
     notes: '',
+    status: 'active',
     deduct_from_balance: false,
+    balance_deducted: false,
     assigned_batches: []
   });
 
@@ -35,6 +39,7 @@ const FeedForm = ({
       if (editingFeed) {
         const isCustomBrand = !FEED_BRANDS.slice(0, -1).includes(editingFeed.brand);
         setFormData({
+          batch_number: editingFeed.batch_number || '',
           feed_type: editingFeed.feed_type || '',
           brand: isCustomBrand ? 'Others' : editingFeed.brand || '',
           custom_brand: isCustomBrand ? editingFeed.brand : '',
@@ -42,14 +47,20 @@ const FeedForm = ({
           number_of_bags: editingFeed.number_of_bags?.toString() || '',
           quantity_kg: editingFeed.quantity_kg?.toString() || '',
           cost_per_bag: editingFeed.cost_per_bag?.toString() || '',
+          cost_per_kg: editingFeed.cost_per_kg?.toString() || '',
           purchase_date: editingFeed.purchase_date || '',
           expiry_date: editingFeed.expiry_date || '',
           notes: editingFeed.notes || '',
+          status: editingFeed.status || 'active',
           deduct_from_balance: editingFeed.deduct_from_balance || false,
+          balance_deducted: editingFeed.balance_deducted || false,
           assigned_batches: editingFeed.assigned_batches || []
         });
       } else {
+        // Generate batch number for new feed
+        const batchNumber = `FEED-${Date.now()}`;
         setFormData({
+          batch_number: batchNumber,
           feed_type: '',
           brand: '',
           custom_brand: '',
@@ -57,10 +68,13 @@ const FeedForm = ({
           number_of_bags: '',
           quantity_kg: '',
           cost_per_bag: '',
+          cost_per_kg: '',
           purchase_date: new Date().toISOString().split('T')[0],
           expiry_date: '',
           notes: '',
+          status: 'active',
           deduct_from_balance: false,
+          balance_deducted: false,
           assigned_batches: []
         });
       }
@@ -95,6 +109,24 @@ const FeedForm = ({
       }
     }
   }, [formData.quantity_kg, formData.number_of_bags]);
+
+  // Auto-calculate cost_per_kg when cost_per_bag or quantity changes
+  useEffect(() => {
+    if (formData.cost_per_bag && formData.number_of_bags && formData.quantity_kg) {
+      const costPerBag = parseFloat(formData.cost_per_bag);
+      const bags = parseFloat(formData.number_of_bags);
+      const kg = parseFloat(formData.quantity_kg);
+
+      if (costPerBag > 0 && bags > 0 && kg > 0) {
+        const totalCost = costPerBag * bags;
+        const costPerKg = totalCost / kg;
+        setFormData(prev => ({
+          ...prev,
+          cost_per_kg: costPerKg.toFixed(2)
+        }));
+      }
+    }
+  }, [formData.cost_per_bag, formData.number_of_bags, formData.quantity_kg]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -147,6 +179,10 @@ const FeedForm = ({
   const validateForm = () => {
     const newErrors = {};
 
+    if (!formData.batch_number.trim()) {
+      newErrors.batch_number = 'Batch number is required';
+    }
+
     if (!formData.feed_type.trim()) {
       newErrors.feed_type = 'Feed type is required';
     }
@@ -179,7 +215,7 @@ const FeedForm = ({
     const invalidAssignments = formData.assigned_batches.filter(
       ab => ab.assigned && (!ab.assigned_quantity_kg || parseFloat(ab.assigned_quantity_kg) <= 0)
     );
-    
+
     if (invalidAssignments.length > 0) {
       newErrors.assigned_batches = 'All assigned batches must have a quantity greater than 0';
     }
@@ -188,7 +224,7 @@ const FeedForm = ({
     const totalAssigned = formData.assigned_batches.reduce(
       (sum, ab) => sum + (ab.assigned ? parseFloat(ab.assigned_quantity_kg || 0) : 0), 0
     );
-    
+
     if (totalAssigned > parseFloat(formData.quantity_kg || 0)) {
       newErrors.assigned_batches = 'Total assigned quantity cannot exceed available quantity';
     }
@@ -199,22 +235,26 @@ const FeedForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     const feedData = {
+      batch_number: formData.batch_number.trim(),
       feed_type: formData.feed_type.trim(),
       brand: formData.brand === 'Others' ? formData.custom_brand.trim() : formData.brand,
       supplier: formData.supplier.trim(),
       number_of_bags: parseInt(formData.number_of_bags),
       quantity_kg: parseFloat(formData.quantity_kg),
       cost_per_bag: parseFloat(formData.cost_per_bag),
+      cost_per_kg: parseFloat(formData.cost_per_kg),
       purchase_date: formData.purchase_date,
       expiry_date: formData.expiry_date || null,
       notes: formData.notes.trim(),
+      status: formData.status,
       deduct_from_balance: formData.deduct_from_balance,
+      balance_deducted: formData.balance_deducted,
       assigned_batches: formData.assigned_batches.filter(ab => ab.assigned)
     };
 
@@ -258,21 +298,45 @@ const FeedForm = ({
           <h4>Feed Information</h4>
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="feed_type">
-                Feed Type <span className="required">*</span>
+              <label htmlFor="batch_number">
+                Batch Number <span className="required">*</span>
               </label>
               <input
                 type="text"
+                id="batch_number"
+                name="batch_number"
+                value={formData.batch_number}
+                onChange={handleInputChange}
+                placeholder="Auto-generated batch number"
+                className={errors.batch_number ? 'error' : ''}
+                readOnly={!editingFeed}
+              />
+              {errors.batch_number && <span className="error-message">{errors.batch_number}</span>}
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="feed_type">
+                Feed Type <span className="required">*</span>
+              </label>
+              <select
                 id="feed_type"
                 name="feed_type"
                 value={formData.feed_type}
                 onChange={handleInputChange}
-                placeholder="e.g., Starter, Grower, Finisher"
                 className={errors.feed_type ? 'error' : ''}
-              />
+              >
+                <option value="">Select Feed Type</option>
+                {FEED_TYPES.map(type => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
               {errors.feed_type && <span className="error-message">{errors.feed_type}</span>}
             </div>
+          </div>
 
+          <div className="form-row">
             <div className="form-group">
               <label htmlFor="brand">
                 Brand <span className="required">*</span>
@@ -293,6 +357,18 @@ const FeedForm = ({
               </select>
               {errors.brand && <span className="error-message">{errors.brand}</span>}
             </div>
+
+            <div className="form-group">
+              <label htmlFor="supplier">Supplier</label>
+              <input
+                type="text"
+                id="supplier"
+                name="supplier"
+                value={formData.supplier}
+                onChange={handleInputChange}
+                placeholder="Enter supplier name"
+              />
+            </div>
           </div>
 
           {formData.brand === 'Others' && (
@@ -312,18 +388,6 @@ const FeedForm = ({
               {errors.custom_brand && <span className="error-message">{errors.custom_brand}</span>}
             </div>
           )}
-
-          <div className="form-group">
-            <label htmlFor="supplier">Supplier</label>
-            <input
-              type="text"
-              id="supplier"
-              name="supplier"
-              value={formData.supplier}
-              onChange={handleInputChange}
-              placeholder="Enter supplier name"
-            />
-          </div>
         </div>
 
         {/* Quantity and Cost */}
@@ -386,6 +450,16 @@ const FeedForm = ({
               {errors.cost_per_bag && <span className="error-message">{errors.cost_per_bag}</span>}
             </div>
 
+            <div className="form-group">
+              <label>Cost per Kg (₦)</label>
+              <div className="calculated-value">
+                ₦{formatNumber(parseFloat(formData.cost_per_kg) || 0, 2)}
+              </div>
+              <small className="form-help">Auto-calculated from total cost</small>
+            </div>
+          </div>
+
+          <div className="form-row">
             <div className="form-group">
               <label>Total Cost</label>
               <div className="calculated-value">

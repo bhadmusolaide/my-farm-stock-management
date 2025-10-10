@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
-import { AppProvider } from './context/AppContext'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { ContextProvider, useAppContext } from './context'
+import { useAuth } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { SiteSettingsProvider } from './context/SiteSettingsContext'
@@ -9,24 +9,24 @@ import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary'
 import Layout from './components/Layout/Layout'
 import MigrationPrompt from './components/UI/MigrationPrompt'
 import LoadingSpinner from './components/LoadingSpinner/LoadingSpinner'
-import { useAppContext } from './context/AppContext'
 
 // Lazy load page components for better code splitting
 const Dashboard = lazy(() => import('./pages/Dashboard'))
-const ChickenOrders = lazy(() => import('./pages/ChickenOrders'))
+const ChickenOrders = lazy(() => import('./pages/ChickenOrdersRefactored'))
 const StockInventory = lazy(() => import('./pages/StockInventory'))
-const LiveChickenStock = lazy(() => import('./pages/LiveChickenStock'))
-const FeedManagement = lazy(() => import('./pages/FeedManagement'))
+const LiveChickenStock = lazy(() => import('./pages/LiveChickenStockRefactored'))
+const FeedManagement = lazy(() => import('./pages/FeedManagementRefactored'))
 const Transactions = lazy(() => import('./pages/Transactions'))
-const Reports = lazy(() => import('./pages/Reports'))
+const Reports = lazy(() => import('./pages/ReportsRefactored'))
 const Login = lazy(() => import('./pages/Login'))
 const UserManagement = lazy(() => import('./pages/UserManagement'))
 const AuditTrail = lazy(() => import('./pages/AuditTrail'))
 const SiteSettings = lazy(() => import('./pages/SiteSettings'))
 const ChickenLifecycle = lazy(() => import('./pages/ChickenLifecycle'))
 // Replace deprecated pages with consolidated DressedChickenStock
-const DressedChickenStock = lazy(() => import('./pages/DressedChickenStock'))
+const DressedChickenStock = lazy(() => import('./pages/DressedChickenStockRefactored'))
 const ProcessingConfiguration = lazy(() => import('./pages/ProcessingConfiguration'))
+const ProcessingManagement = lazy(() => import('./pages/ProcessingManagement'))
 
 // Import theme styles
 import './styles/theme.css'
@@ -131,6 +131,13 @@ function AppContent() {
             </Layout>
           </ProtectedRoute>
         } />
+        <Route path="/processing" element={
+          <ProtectedRoute>
+            <Layout>
+              <ProcessingManagement />
+            </Layout>
+          </ProtectedRoute>
+        } />
         <Route path="/processing-config" element={
           <ProtectedRoute>
             <Layout>
@@ -188,11 +195,15 @@ function App() {
   return (
     <ErrorBoundary>
       <Router>
-        <AuthProvider>
-          <AppProvider>
-            <AppContent />
-          </AppProvider>
-        </AuthProvider>
+        <NotificationProvider>
+          <ThemeProvider>
+            <SiteSettingsProvider>
+              <ContextProvider>
+                <AppContent />
+              </ContextProvider>
+            </SiteSettingsProvider>
+          </ThemeProvider>
+        </NotificationProvider>
       </Router>
     </ErrorBoundary>
   )

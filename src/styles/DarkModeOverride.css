@@ -1,5 +1,212 @@
 /* Dark Mode Override for Dashboard, Cards, and Tables */
 
+/* ============================================
+   PHASE 7: GLOBAL COMPONENTS DARK MODE FIXES
+   ============================================ */
+
+/* Global Form Elements - All Pages */
+[data-theme="dark"] .form-group label,
+[data-theme="dark"] label {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .form-group input,
+[data-theme="dark"] .form-group select,
+[data-theme="dark"] .form-group textarea,
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="email"],
+[data-theme="dark"] input[type="password"],
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] input[type="date"],
+[data-theme="dark"] input[type="datetime-local"],
+[data-theme="dark"] input[type="search"],
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--input-background) !important;
+  border-color: var(--input-border) !important;
+  color: var(--input-text) !important;
+}
+
+[data-theme="dark"] .form-group input::placeholder,
+[data-theme="dark"] .form-group textarea::placeholder,
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--input-placeholder) !important;
+}
+
+[data-theme="dark"] .form-group input:focus,
+[data-theme="dark"] .form-group select:focus,
+[data-theme="dark"] .form-group textarea:focus,
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+  border-color: var(--input-focus-border) !important;
+  box-shadow: 0 0 0 3px var(--input-focus-shadow) !important;
+}
+
+[data-theme="dark"] .form-group input:disabled,
+[data-theme="dark"] .form-group select:disabled,
+[data-theme="dark"] .form-group textarea:disabled,
+[data-theme="dark"] input:disabled,
+[data-theme="dark"] select:disabled,
+[data-theme="dark"] textarea:disabled {
+  background-color: rgba(55, 65, 81, 0.5) !important;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Global Table Elements - All Pages */
+[data-theme="dark"] table,
+[data-theme="dark"] .table {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] table thead th,
+[data-theme="dark"] .table thead th,
+[data-theme="dark"] th {
+  background-color: var(--table-header-bg) !important;
+  color: var(--table-header-text) !important;
+  border-color: var(--table-border) !important;
+}
+
+[data-theme="dark"] table tbody td,
+[data-theme="dark"] .table tbody td,
+[data-theme="dark"] td {
+  color: var(--text-color) !important;
+  border-color: var(--table-border) !important;
+}
+
+[data-theme="dark"] table tbody tr:hover,
+[data-theme="dark"] .table tbody tr:hover {
+  background-color: var(--table-row-hover) !important;
+}
+
+/* Global Card Elements - All Pages */
+[data-theme="dark"] .recommendation-item.warning {
+  background-color: var(--warning-color-dark-bg) !important;
+  border-color: var(--warning-color-dark-border) !important;
+}
+
+[data-theme="dark"] .recommendation-item.info {
+  background-color: var(--info-color-dark-bg) !important;
+  border-color: var(--info-color-dark-border) !important;
+}
+
+[data-theme="dark"] .card,
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .summary-card,
+[data-theme="dark"] .info-card,
+[data-theme="dark"] .ui-card,
+[data-theme="dark"] .metric-card,
+[data-theme="dark"] .alert-card,
+[data-theme="dark"] .health-status-card,
+[data-theme="dark"] .section,
+[data-theme="dark"] .dashboard-section {
+  background-color: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+[data-theme="dark"] .card h1,
+[data-theme="dark"] .card h2,
+[data-theme="dark"] .card h3,
+[data-theme="dark"] .card h4,
+[data-theme="dark"] .card h5,
+[data-theme="dark"] .card h6,
+[data-theme="dark"] .ui-card h1,
+[data-theme="dark"] .ui-card h2,
+[data-theme="dark"] .ui-card h3,
+[data-theme="dark"] .ui-card h4,
+[data-theme="dark"] .ui-card h5,
+[data-theme="dark"] .ui-card h6,
+[data-theme="dark"] .section-title {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .card p,
+[data-theme="dark"] .card span,
+[data-theme="dark"] .card div,
+[data-theme="dark"] .ui-card p,
+[data-theme="dark"] .ui-card span,
+[data-theme="dark"] .ui-card div {
+  color: var(--text-color) !important;
+}
+
+/* Global Table Elements - All Pages */
+[data-theme="dark"] .ui-table,
+[data-theme="dark"] .data-table,
+[data-theme="dark"] .ui-table-responsive,
+[data-theme="dark"] .performance-table-container,
+[data-theme="dark"] .status-table-container {
+  background-color: var(--card-background) !important;
+  border-color: var(--table-border) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .ui-table__header,
+[data-theme="dark"] .ui-table__header-cell {
+  background-color: var(--table-header-bg) !important;
+  color: var(--table-header-color) !important;
+  border-color: var(--table-border) !important;
+}
+
+[data-theme="dark"] .ui-table__cell,
+[data-theme="dark"] .ui-table__row {
+  color: var(--text-color) !important;
+  border-color: var(--table-border) !important;
+}
+
+[data-theme="dark"] .ui-table__row:hover {
+  background-color: var(--table-hover-bg) !important;
+}
+
+[data-theme="dark"] .ui-table--striped .ui-table__row:nth-child(even) {
+  background-color: var(--table-stripe-bg) !important;
+}
+
+[data-theme="dark"] .ui-table__header-cell--sortable:hover {
+  background-color: var(--table-header-hover-bg) !important;
+}
+
+[data-theme="dark"] .ui-table__header-cell--sorted {
+  background-color: var(--table-header-sorted-bg) !important;
+}
+
+/* Status Badges in Dark Mode - using CSS variables, no overrides needed */
+
+/* Performance Change Indicators */
+[data-theme="dark"] .performance-change.positive {
+  background: var(--success-color-light) !important;
+  color: var(--success-color) !important;
+}
+
+[data-theme="dark"] .performance-change.negative {
+  background: var(--danger-color-light) !important;
+  color: var(--danger-color) !important;
+}
+
+[data-theme="dark"] .performance-change.neutral {
+  background: var(--text-light-bg) !important;
+  color: var(--text-light) !important;
+}
+
+/* Global Filter/Search Elements - All Pages */
+[data-theme="dark"] .filters-container,
+[data-theme="dark"] .filter-card,
+[data-theme="dark"] .search-container {
+  background-color: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+[data-theme="dark"] .search-input,
+[data-theme="dark"] .filter-input {
+  background-color: var(--input-background) !important;
+  border-color: var(--input-border) !important;
+  color: var(--input-text) !important;
+}
+
 /* Dashboard text color */
 [data-theme="dark"] .dashboard-container h1,
 [data-theme="dark"] .chicken-orders-container h1,
@@ -1109,4 +1316,1299 @@
   border-color: rgba(220, 53, 69, 0.8) !important;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3) !important;
+}
+
+/* Comprehensive Chicken Orders Dark Mode Styles */
+
+/* Order Analytics Section */
+[data-theme="dark"] .order-analytics {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .order-analytics h3 {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .order-analytics h4 {
+  color: var(--text-color) !important;
+}
+
+/* Customer Management Section */
+[data-theme="dark"] .customer-management {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .customer-management h4 {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .customer-table-section h4 {
+  color: var(--text-color) !important;
+}
+
+/* Tab Content */
+[data-theme="dark"] .tab-content {
+  background-color: transparent !important;
+}
+
+/* Order List Section */
+[data-theme="dark"] .order-list {
+  color: var(--text-color) !important;
+}
+
+/* Stat Cards in Analytics */
+[data-theme="dark"] .stat-card {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .stat-card h4 {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .stat-card .stat-value {
+  color: var(--text-color) !important;
+}
+
+/* Status Analysis Section */
+[data-theme="dark"] .status-analysis {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .status-analysis h3 {
+  color: var(--text-color) !important;
+}
+
+/* Inventory Analysis Section */
+[data-theme="dark"] .inventory-analysis {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .inventory-analysis h3 {
+  color: var(--text-color) !important;
+}
+
+/* Monthly Trends Section */
+[data-theme="dark"] .monthly-trends {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .monthly-trends h3 {
+  color: var(--text-color) !important;
+}
+
+/* Top Customers Analytics Section */
+[data-theme="dark"] .top-customers-analytics {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .top-customers-analytics h3 {
+  color: var(--text-color) !important;
+}
+
+/* Summary Cards */
+[data-theme="dark"] .summary-card {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .summary-card h4 {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .summary-card .summary-value {
+  color: var(--text-color) !important;
+}
+
+/* Top Customers List */
+[data-theme="dark"] .top-customers {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .top-customers h4 {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .top-customer-item {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .customer-name {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .customer-stats {
+  color: var(--text-light) !important;
+}
+
+/* Customer Detail Modal */
+[data-theme="dark"] .customer-detail-modal {
+  background-color: var(--card-background) !important;
+}
+
+[data-theme="dark"] .customer-detail-modal h2 {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .customer-info-section {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .info-item {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .info-item label {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .info-item span {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .customer-orders-section h4 {
+  color: var(--text-color) !important;
+}
+
+/* Inventory Cards */
+[data-theme="dark"] .inventory-card {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .inventory-card label {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .inventory-card span {
+  color: var(--text-color) !important;
+}
+
+/* Status Cards */
+[data-theme="dark"] .status-card {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .status-card .status-count {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .status-card .status-percentage {
+  color: var(--text-light) !important;
+}
+
+/* Batch Update Modal */
+[data-theme="dark"] .batch-update-content {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .selection-summary {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .selection-summary h4 {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .affected-orders {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .affected-orders h4 {
+  color: var(--text-color) !important;
+}
+
+/* Order Form Modal */
+[data-theme="dark"] .order-form .form-section {
+  background-color: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .order-form .form-section h4 {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .order-form label {
+  color: var(--text-color) !important;
+}
+
+/* Ensure all headings in chicken orders are visible */
+[data-theme="dark"] .chicken-orders-container h1,
+[data-theme="dark"] .chicken-orders-container h2,
+[data-theme="dark"] .chicken-orders-container h3,
+[data-theme="dark"] .chicken-orders-container h4,
+[data-theme="dark"] .chicken-orders-container h5 {
+  color: var(--text-color) !important;
+}
+
+/* Ensure all labels are visible */
+[data-theme="dark"] .chicken-orders-container label {
+  color: var(--text-color) !important;
+}
+
+/* Ensure all paragraphs are visible */
+[data-theme="dark"] .chicken-orders-container p {
+  color: var(--text-color) !important;
+}
+
+/* Small text elements */
+[data-theme="dark"] .chicken-orders-container small {
+  color: var(--text-light) !important;
+}
+
+/* ============================================
+   PHASE 8: CRITICAL CARD AND TABLE FIXES
+   ============================================ */
+
+/* Force dark backgrounds on all card components */
+[data-theme="dark"] .ui-card,
+[data-theme="dark"] .summary-card,
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .metric-card,
+[data-theme="dark"] .alert-card,
+[data-theme="dark"] .health-status-card,
+[data-theme="dark"] .config-card,
+[data-theme="dark"] .card {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Force dark backgrounds on card content areas */
+[data-theme="dark"] .ui-card__content,
+[data-theme="dark"] .summary-card__content,
+[data-theme="dark"] .card-content,
+[data-theme="dark"] .card-body,
+[data-theme="dark"] .card .card-body {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* Force dark backgrounds on table components */
+[data-theme="dark"] .ui-table,
+[data-theme="dark"] .data-table,
+[data-theme="dark"] .performance-table,
+[data-theme="dark"] .status-table,
+[data-theme="dark"] table {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* Table headers - critical fix */
+[data-theme="dark"] .ui-table__header,
+[data-theme="dark"] .ui-table thead,
+[data-theme="dark"] .data-table thead,
+[data-theme="dark"] .performance-table thead,
+[data-theme="dark"] .status-table thead,
+[data-theme="dark"] table thead {
+  background-color: var(--table-header-bg) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .ui-table__header-cell,
+[data-theme="dark"] .ui-table th,
+[data-theme="dark"] .data-table th,
+[data-theme="dark"] .performance-table th,
+[data-theme="dark"] .status-table th,
+[data-theme="dark"] table th {
+  background-color: var(--table-header-bg) !important;
+  color: var(--text-color) !important;
+  border-color: var(--table-border) !important;
+}
+
+/* Table body and rows */
+[data-theme="dark"] .ui-table__body,
+[data-theme="dark"] .ui-table tbody,
+[data-theme="dark"] .data-table tbody,
+[data-theme="dark"] .performance-table tbody,
+[data-theme="dark"] .status-table tbody,
+[data-theme="dark"] table tbody {
+  background-color: var(--card-background) !important;
+}
+
+[data-theme="dark"] .ui-table__row,
+[data-theme="dark"] .ui-table tr,
+[data-theme="dark"] .data-table tr,
+[data-theme="dark"] .performance-table tr,
+[data-theme="dark"] .status-table tr,
+[data-theme="dark"] table tr {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--table-border) !important;
+}
+
+[data-theme="dark"] .ui-table__cell,
+[data-theme="dark"] .ui-table td,
+[data-theme="dark"] .data-table td,
+[data-theme="dark"] .performance-table td,
+[data-theme="dark"] .status-table td,
+[data-theme="dark"] table td {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--table-border) !important;
+}
+
+/* Transaction items and list items */
+[data-theme="dark"] .transaction-item,
+[data-theme="dark"] .list-item,
+[data-theme="dark"] .recent-transaction,
+[data-theme="dark"] .transaction-row {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Analytics cards specific fixes */
+[data-theme="dark"] .analytics-card,
+[data-theme="dark"] .chart-card,
+[data-theme="dark"] .revenue-card {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* Status cards in analytics */
+[data-theme="dark"] .status-card,
+[data-theme="dark"] .order-status-card {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* Metric display cards */
+[data-theme="dark"] .metric-display,
+[data-theme="dark"] .stat-display,
+[data-theme="dark"] .summary-display {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* Force white text on all card titles and content */
+[data-theme="dark"] .card-title,
+[data-theme="dark"] .card-header,
+[data-theme="dark"] .card-text,
+[data-theme="dark"] .card p,
+[data-theme="dark"] .card span,
+[data-theme="dark"] .card div {
+  color: var(--text-color) !important;
+}
+
+/* Ensure all generic divs in dark mode have proper text color */
+[data-theme="dark"] div {
+  color: var(--text-color);
+}
+
+/* Override any remaining white backgrounds */
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] .bg-light {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* ============================================
+   PHASE 9: SPECIFIC COMPONENT FIXES
+   ============================================ */
+
+/* Stock Alerts and Analysis Sections */
+[data-theme="dark"] .stock-alerts,
+[data-theme="dark"] .analysis-section,
+[data-theme="dark"] .analytics-section,
+[data-theme="dark"] .overview-section,
+[data-theme="dark"] .summary-section {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Parts Inventory and Storage Analysis */
+[data-theme="dark"] .parts-inventory-summary,
+[data-theme="dark"] .storage-location-analysis,
+[data-theme="dark"] .size-distribution-analysis,
+[data-theme="dark"] .inventory-summary {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Overall Statistics and Expiry Status */
+[data-theme="dark"] .overall-statistics,
+[data-theme="dark"] .expiry-status-overview,
+[data-theme="dark"] .statistics-overview,
+[data-theme="dark"] .status-overview {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Order Status Analytics Cards */
+[data-theme="dark"] .order-status-analytics,
+[data-theme="dark"] .order-status-card,
+[data-theme="dark"] .status-analytics-card,
+[data-theme="dark"] .analytics-status-card {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Revenue Analytics and Charts */
+[data-theme="dark"] .revenue-analytics,
+[data-theme="dark"] .chart-analytics,
+[data-theme="dark"] .analytics-chart,
+[data-theme="dark"] .revenue-chart {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Specific card types that might be missed */
+[data-theme="dark"] .inventory-card,
+[data-theme="dark"] .parts-card,
+[data-theme="dark"] .storage-card,
+[data-theme="dark"] .distribution-card,
+[data-theme="dark"] .expiry-card {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Analysis grid items */
+[data-theme="dark"] .analysis-grid,
+[data-theme="dark"] .analysis-grid-item,
+[data-theme="dark"] .analytics-grid,
+[data-theme="dark"] .analytics-grid-item {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Summary cards in various sections */
+[data-theme="dark"] .summary-cards,
+[data-theme="dark"] .summary-cards .card,
+[data-theme="dark"] .summary-grid,
+[data-theme="dark"] .summary-grid .card {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Feed Management specific cards */
+[data-theme="dark"] .feed-inventory-card,
+[data-theme="dark"] .feed-analytics-card,
+[data-theme="dark"] .consumption-card {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Dressed Chicken specific cards */
+[data-theme="dark"] .dressed-chicken-card,
+[data-theme="dark"] .chicken-analytics-card,
+[data-theme="dark"] .batch-card {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Bootstrap and framework overrides */
+[data-theme="dark"] .table-light,
+[data-theme="dark"] .table-light > th,
+[data-theme="dark"] .table-light > td {
+  background-color: var(--table-header-bg) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .table-secondary,
+[data-theme="dark"] .table-secondary > th,
+[data-theme="dark"] .table-secondary > td {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* Ensure all table headers are dark */
+[data-theme="dark"] thead,
+[data-theme="dark"] thead th,
+[data-theme="dark"] thead td,
+[data-theme="dark"] .table thead th,
+[data-theme="dark"] .table thead td {
+  background-color: var(--table-header-bg) !important;
+  color: var(--text-color) !important;
+  border-color: var(--table-border) !important;
+}
+
+/* Ensure all table bodies are dark */
+[data-theme="dark"] tbody,
+[data-theme="dark"] tbody tr,
+[data-theme="dark"] tbody td,
+[data-theme="dark"] .table tbody tr,
+[data-theme="dark"] .table tbody td {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--table-border) !important;
+}
+
+/* Force all card-like elements to be dark */
+[data-theme="dark"] .card-header,
+[data-theme="dark"] .card-footer,
+[data-theme="dark"] .list-group-item,
+[data-theme="dark"] .nav-tabs .nav-link,
+[data-theme="dark"] .nav-pills .nav-link {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Specific fixes for analytics components */
+[data-theme="dark"] .analytics-overview .stat-card,
+[data-theme="dark"] .status-analysis .stat-card,
+[data-theme="dark"] .inventory-analysis .stat-card,
+[data-theme="dark"] .monthly-trends .stat-card,
+[data-theme="dark"] .top-customers-analytics .stat-card {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Transaction list items */
+[data-theme="dark"] .recent-transactions .transaction-item,
+[data-theme="dark"] .transaction-list .transaction-item,
+[data-theme="dark"] .transactions-container .transaction-item {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Ensure all text in cards is visible - but preserve intentional colors */
+[data-theme="dark"] .card h1,
+[data-theme="dark"] .card h2,
+[data-theme="dark"] .card h3,
+[data-theme="dark"] .card h4,
+[data-theme="dark"] .card h5,
+[data-theme="dark"] .card h6,
+[data-theme="dark"] .card p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .stat-card h1,
+[data-theme="dark"] .stat-card h2,
+[data-theme="dark"] .stat-card h3,
+[data-theme="dark"] .stat-card h4,
+[data-theme="dark"] .stat-card h5,
+[data-theme="dark"] .stat-card h6,
+[data-theme="dark"] .stat-card p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .summary-card h1,
+[data-theme="dark"] .summary-card h2,
+[data-theme="dark"] .summary-card h3,
+[data-theme="dark"] .summary-card h4,
+[data-theme="dark"] .summary-card h5,
+[data-theme="dark"] .summary-card h6,
+[data-theme="dark"] .summary-card p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .metric-card h1,
+[data-theme="dark"] .metric-card h2,
+[data-theme="dark"] .metric-card h3,
+[data-theme="dark"] .metric-card h4,
+[data-theme="dark"] .metric-card h5,
+[data-theme="dark"] .metric-card h6,
+[data-theme="dark"] .metric-card p:not(.balance-due):not(.balance-paid):not(.status-revenue) {
+  color: var(--text-color) !important;
+}
+
+/* Override any inline styles or specific background colors */
+[data-theme="dark"] [style*="background-color: white"],
+[data-theme="dark"] [style*="background-color: #fff"],
+[data-theme="dark"] [style*="background-color: #ffffff"],
+[data-theme="dark"] [style*="background: white"],
+[data-theme="dark"] [style*="background: #fff"],
+[data-theme="dark"] [style*="background: #ffffff"] {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* ============================================
+   PHASE 10: AGGRESSIVE WHITE BACKGROUND FIXES
+   ============================================ */
+
+/* Force all section containers to be dark */
+[data-theme="dark"] section,
+[data-theme="dark"] .section,
+[data-theme="dark"] .container-section,
+[data-theme="dark"] .content-section {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* Force all white containers to be dark */
+[data-theme="dark"] .white-container,
+[data-theme="dark"] .light-container,
+[data-theme="dark"] .bg-container {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* Force all panel and widget backgrounds */
+[data-theme="dark"] .panel,
+[data-theme="dark"] .widget,
+[data-theme="dark"] .component,
+[data-theme="dark"] .module {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Force all content areas */
+[data-theme="dark"] .content,
+[data-theme="dark"] .content-area,
+[data-theme="dark"] .main-content,
+[data-theme="dark"] .page-content {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* Force all wrapper divs that might have white backgrounds */
+[data-theme="dark"] .wrapper,
+[data-theme="dark"] .container-wrapper,
+[data-theme="dark"] .section-wrapper,
+[data-theme="dark"] .content-wrapper {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* Force all box and block elements */
+[data-theme="dark"] .box,
+[data-theme="dark"] .block,
+[data-theme="dark"] .item-box,
+[data-theme="dark"] .content-box {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Nuclear option - force any div with white-ish background */
+[data-theme="dark"] div[style*="background"],
+[data-theme="dark"] div[class*="white"],
+[data-theme="dark"] div[class*="light"],
+[data-theme="dark"] div[class*="bg-"] {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* Ensure all text in forced dark containers is visible - but preserve intentional colors */
+[data-theme="dark"] .white-container h1,
+[data-theme="dark"] .white-container h2,
+[data-theme="dark"] .white-container h3,
+[data-theme="dark"] .white-container h4,
+[data-theme="dark"] .white-container h5,
+[data-theme="dark"] .white-container h6,
+[data-theme="dark"] .white-container p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .light-container h1,
+[data-theme="dark"] .light-container h2,
+[data-theme="dark"] .light-container h3,
+[data-theme="dark"] .light-container h4,
+[data-theme="dark"] .light-container h5,
+[data-theme="dark"] .light-container h6,
+[data-theme="dark"] .light-container p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .bg-container h1,
+[data-theme="dark"] .bg-container h2,
+[data-theme="dark"] .bg-container h3,
+[data-theme="dark"] .bg-container h4,
+[data-theme="dark"] .bg-container h5,
+[data-theme="dark"] .bg-container h6,
+[data-theme="dark"] .bg-container p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] section h1,
+[data-theme="dark"] section h2,
+[data-theme="dark"] section h3,
+[data-theme="dark"] section h4,
+[data-theme="dark"] section h5,
+[data-theme="dark"] section h6,
+[data-theme="dark"] section p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .section h1,
+[data-theme="dark"] .section h2,
+[data-theme="dark"] .section h3,
+[data-theme="dark"] .section h4,
+[data-theme="dark"] .section h5,
+[data-theme="dark"] .section h6,
+[data-theme="dark"] .section p:not(.balance-due):not(.balance-paid):not(.status-revenue) {
+  color: var(--text-color) !important;
+}
+
+/* Override any CSS framework defaults */
+[data-theme="dark"] .card-white,
+[data-theme="dark"] .bg-card,
+[data-theme="dark"] .surface,
+[data-theme="dark"] .paper {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* ============================================
+   PHASE 11: SPECIFIC COMPONENT CLASS FIXES
+   ============================================ */
+
+/* Expiry Overview and Cards */
+[data-theme="dark"] .expiry-overview,
+[data-theme="dark"] .expiry-status-overview,
+[data-theme="dark"] .expiry-cards,
+[data-theme="dark"] .expiry-card {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Size Distribution Analysis */
+[data-theme="dark"] .size-distribution,
+[data-theme="dark"] .size-distribution-analysis,
+[data-theme="dark"] .distribution-analysis {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Storage Location Analysis */
+[data-theme="dark"] .storage-location,
+[data-theme="dark"] .storage-analysis,
+[data-theme="dark"] .location-analysis {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Parts Inventory Summary */
+[data-theme="dark"] .parts-inventory,
+[data-theme="dark"] .inventory-parts,
+[data-theme="dark"] .parts-summary {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Overall Statistics */
+[data-theme="dark"] .overall-stats,
+[data-theme="dark"] .stats-overview,
+[data-theme="dark"] .statistics-section {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Order Status Analytics specific classes */
+[data-theme="dark"] .order-analytics,
+[data-theme="dark"] .status-analytics,
+[data-theme="dark"] .analytics-cards {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Revenue Analytics specific classes */
+[data-theme="dark"] .revenue-section,
+[data-theme="dark"] .revenue-overview,
+[data-theme="dark"] .analytics-revenue {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Feed Management specific sections */
+[data-theme="dark"] .feed-alerts,
+[data-theme="dark"] .feed-overview,
+[data-theme="dark"] .consumption-overview {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Any remaining overview sections */
+[data-theme="dark"] .overview,
+[data-theme="dark"] .summary,
+[data-theme="dark"] .analysis,
+[data-theme="dark"] .statistics {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Force all h3 and h4 headings in these sections to be visible */
+[data-theme="dark"] .expiry-overview h3,
+[data-theme="dark"] .size-distribution h3,
+[data-theme="dark"] .storage-location h3,
+[data-theme="dark"] .parts-inventory h3,
+[data-theme="dark"] .overall-stats h3,
+[data-theme="dark"] .order-analytics h3,
+[data-theme="dark"] .revenue-section h3,
+[data-theme="dark"] .feed-alerts h3 {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .expiry-card h4,
+[data-theme="dark"] .stat-card h4,
+[data-theme="dark"] .analytics-card h4 {
+  color: var(--text-color) !important;
+}
+
+/* ============================================
+   PHASE 12: ULTRA-AGGRESSIVE COMPONENT FIXES
+   ============================================ */
+
+/* ChickenOrders Analytics Components - Force Override */
+[data-theme="dark"] .order-analytics .analytics-overview,
+[data-theme="dark"] .order-analytics .status-analysis,
+[data-theme="dark"] .order-analytics .inventory-analysis,
+[data-theme="dark"] .order-analytics .monthly-trends,
+[data-theme="dark"] .order-analytics .top-customers-analytics {
+  background: var(--card-background) !important;
+  background-color: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+/* Force all stat cards to be dark */
+[data-theme="dark"] .stats-grid .stat-card,
+[data-theme="dark"] .status-cards .status-card,
+[data-theme="dark"] .inventory-cards .inventory-card {
+  background: var(--card-background) !important;
+  background-color: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+/* Force all content within these cards to be visible - but preserve intentional colors */
+[data-theme="dark"] .stat-card h1,
+[data-theme="dark"] .stat-card h2,
+[data-theme="dark"] .stat-card h3,
+[data-theme="dark"] .stat-card h4,
+[data-theme="dark"] .stat-card h5,
+[data-theme="dark"] .stat-card h6,
+[data-theme="dark"] .stat-card p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .status-card h1,
+[data-theme="dark"] .status-card h2,
+[data-theme="dark"] .status-card h3,
+[data-theme="dark"] .status-card h4,
+[data-theme="dark"] .status-card h5,
+[data-theme="dark"] .status-card h6,
+[data-theme="dark"] .status-card p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .inventory-card h1,
+[data-theme="dark"] .inventory-card h2,
+[data-theme="dark"] .inventory-card h3,
+[data-theme="dark"] .inventory-card h4,
+[data-theme="dark"] .inventory-card h5,
+[data-theme="dark"] .inventory-card h6,
+[data-theme="dark"] .inventory-card p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .analytics-overview h1,
+[data-theme="dark"] .analytics-overview h2,
+[data-theme="dark"] .analytics-overview h3,
+[data-theme="dark"] .analytics-overview h4,
+[data-theme="dark"] .analytics-overview h5,
+[data-theme="dark"] .analytics-overview h6,
+[data-theme="dark"] .analytics-overview p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .status-analysis h1,
+[data-theme="dark"] .status-analysis h2,
+[data-theme="dark"] .status-analysis h3,
+[data-theme="dark"] .status-analysis h4,
+[data-theme="dark"] .status-analysis h5,
+[data-theme="dark"] .status-analysis h6,
+[data-theme="dark"] .status-analysis p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .inventory-analysis h1,
+[data-theme="dark"] .inventory-analysis h2,
+[data-theme="dark"] .inventory-analysis h3,
+[data-theme="dark"] .inventory-analysis h4,
+[data-theme="dark"] .inventory-analysis h5,
+[data-theme="dark"] .inventory-analysis h6,
+[data-theme="dark"] .inventory-analysis p:not(.balance-due):not(.balance-paid):not(.status-revenue) {
+  color: var(--text-color) !important;
+}
+
+/* Override any CSS variables that might be causing white backgrounds */
+[data-theme="dark"] {
+  --card-bg: var(--card-background) !important;
+  --card-background-color: var(--card-background) !important;
+  --section-bg: var(--card-background) !important;
+  --panel-bg: var(--card-background) !important;
+  --container-bg: var(--card-background) !important;
+}
+
+/* Nuclear option for any remaining white sections */
+[data-theme="dark"] [style*="background: #fff"],
+[data-theme="dark"] [style*="background: white"],
+[data-theme="dark"] [style*="background-color: #fff"],
+[data-theme="dark"] [style*="background-color: white"],
+[data-theme="dark"] [style*="background-color: #ffffff"] {
+  background: var(--card-background) !important;
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* Force any div with white-ish class names to be dark */
+[data-theme="dark"] .white,
+[data-theme="dark"] .light,
+[data-theme="dark"] .bright,
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] .bg-light,
+[data-theme="dark"] .background-white,
+[data-theme="dark"] .background-light {
+  background: var(--card-background) !important;
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+/* Ensure all text in forced dark elements is visible - but preserve intentional colors */
+[data-theme="dark"] .white h1,
+[data-theme="dark"] .white h2,
+[data-theme="dark"] .white h3,
+[data-theme="dark"] .white h4,
+[data-theme="dark"] .white h5,
+[data-theme="dark"] .white h6,
+[data-theme="dark"] .white p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .light h1,
+[data-theme="dark"] .light h2,
+[data-theme="dark"] .light h3,
+[data-theme="dark"] .light h4,
+[data-theme="dark"] .light h5,
+[data-theme="dark"] .light h6,
+[data-theme="dark"] .light p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .bright h1,
+[data-theme="dark"] .bright h2,
+[data-theme="dark"] .bright h3,
+[data-theme="dark"] .bright h4,
+[data-theme="dark"] .bright h5,
+[data-theme="dark"] .bright h6,
+[data-theme="dark"] .bright p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .bg-white h1,
+[data-theme="dark"] .bg-white h2,
+[data-theme="dark"] .bg-white h3,
+[data-theme="dark"] .bg-white h4,
+[data-theme="dark"] .bg-white h5,
+[data-theme="dark"] .bg-white h6,
+[data-theme="dark"] .bg-white p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .bg-light h1,
+[data-theme="dark"] .bg-light h2,
+[data-theme="dark"] .bg-light h3,
+[data-theme="dark"] .bg-light h4,
+[data-theme="dark"] .bg-light h5,
+[data-theme="dark"] .bg-light h6,
+[data-theme="dark"] .bg-light p:not(.balance-due):not(.balance-paid):not(.status-revenue) {
+  color: var(--text-color) !important;
+}
+
+/* ============================================
+   PHASE 13: REMOVED - CONFLICTED WITH EXISTING STYLING
+   ============================================ */
+
+/* Note: Removed overly aggressive status card overrides that were
+   conflicting with the proper colored status cards in ChickenOrders.css.
+   The existing dark mode styling in component files is sufficient. */
+
+/* ============================================
+   DASHBOARD STATUS ITEMS DARK MODE
+   ============================================ */
+
+/* Dashboard status items (Paid, Partial, Pending) */
+[data-theme="dark"] .status-item {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .status-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .status-name {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .status-count {
+  color: var(--text-light) !important;
+}
+
+/* Preserve the green color for revenue amounts */
+[data-theme="dark"] .status-revenue {
+  color: #4caf50 !important; /* Keep the green color for revenue */
+}
+
+/* More selective status card fixes - preserve colored status cards */
+[data-theme="dark"] .status-cards .status-card:not(.status-pending):not(.status-confirmed):not(.status-completed):not(.status-cancelled),
+[data-theme="dark"] .analytics-overview .status-card:not(.status-pending):not(.status-confirmed):not(.status-completed):not(.status-cancelled),
+[data-theme="dark"] .status-analysis .status-card:not(.status-pending):not(.status-confirmed):not(.status-completed):not(.status-cancelled),
+[data-theme="dark"] .order-analytics .status-card:not(.status-pending):not(.status-confirmed):not(.status-completed):not(.status-cancelled) {
+  background: var(--card-background) !important;
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* ============================================
+   PHASE 14: DASHBOARD STATUS BREAKDOWN FIXES
+   ============================================ */
+
+/* Fix the specific white cards in Dashboard Analytics section */
+[data-theme="dark"] .status-breakdown {
+  background: transparent !important;
+}
+
+[data-theme="dark"] .status-item {
+  background: var(--card-background) !important;
+  background-color: var(--card-background) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .status-item:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme="dark"] .status-details {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .status-name {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .status-count {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .status-revenue {
+  color: var(--text-light) !important;
+}
+
+/* Force all content within status breakdown to be visible - but preserve intentional colors */
+[data-theme="dark"] .status-breakdown h1,
+[data-theme="dark"] .status-breakdown h2,
+[data-theme="dark"] .status-breakdown h3,
+[data-theme="dark"] .status-breakdown h4,
+[data-theme="dark"] .status-breakdown h5,
+[data-theme="dark"] .status-breakdown h6,
+[data-theme="dark"] .status-breakdown p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .status-item h1,
+[data-theme="dark"] .status-item h2,
+[data-theme="dark"] .status-item h3,
+[data-theme="dark"] .status-item h4,
+[data-theme="dark"] .status-item h5,
+[data-theme="dark"] .status-item h6,
+[data-theme="dark"] .status-item p:not(.balance-due):not(.balance-paid):not(.status-revenue),
+[data-theme="dark"] .status-details h1,
+[data-theme="dark"] .status-details h2,
+[data-theme="dark"] .status-details h3,
+[data-theme="dark"] .status-details h4,
+[data-theme="dark"] .status-details h5,
+[data-theme="dark"] .status-details h6,
+[data-theme="dark"] .status-details p:not(.balance-due):not(.balance-paid):not(.status-revenue) {
+  color: var(--text-color) !important;
+}
+
+/* Ensure status indicators remain visible */
+[data-theme="dark"] .status-indicator {
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+/* ============================================
+   PHASE 15: COMPREHENSIVE DASHBOARD FIXES
+   ============================================ */
+
+/* Fix all hardcoded light backgrounds in Dashboard */
+[data-theme="dark"] .orders-carousel {
+  background-color: var(--card-background) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .carousel-count {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: #60a5fa !important;
+}
+
+[data-theme="dark"] .order-card {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .order-status.pending {
+  background-color: rgba(255, 193, 7, 0.2) !important;
+  color: #fbbf24 !important;
+  border-color: #fbbf24 !important;
+}
+
+[data-theme="dark"] .order-size {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .carousel-indicator {
+  background-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+[data-theme="dark"] .carousel-nav-btn {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .carousel-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .carousel-nav-btn:disabled:hover {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .progress-track {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="dark"] .chart-container {
+  background-color: var(--card-background) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .filter-select {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .toggle-btn {
+  background: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="dark"] .recent-transactions {
+  background-color: var(--card-background) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .transaction-item {
+  background-color: var(--card-background) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .transaction-item:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme="dark"] .revenue-summary {
+  background: var(--card-background) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .modal-content {
+  background-color: var(--card-background) !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .btn-secondary {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: var(--text-color) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* ============================================
+   PHASE 16: SUMMARY VALUE BACKGROUND FIXES
+   ============================================ */
+
+/* Fix white/light backgrounds on summary values across all components */
+[data-theme="dark"] .summary-value {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .summary-card .summary-value {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .summary-content .summary-value {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--text-color) !important;
+}
+
+/* Fix any p tags with summary-value class */
+[data-theme="dark"] p.summary-value {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--text-color) !important;
+}
+
+/* Fix summary values in global SummaryCard component */
+[data-theme="dark"] .summary-card__value {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--text-color) !important;
+}
+
+/* Fix any nested summary value elements */
+[data-theme="dark"] .summary-card .summary-content p,
+[data-theme="dark"] .summary-card .summary-content .summary-value,
+[data-theme="dark"] .summary-card__info .summary-card__value {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--text-color) !important;
+}
+
+/* Ensure balance-due values are also fixed - but preserve original color */
+[data-theme="dark"] .balance-due {
+  background: transparent !important;
+  background-color: transparent !important;
+  /* Remove color override to preserve original warning color */
+}
+
+/* Fix any other value display elements that might have backgrounds */
+[data-theme="dark"] .metric-card__value,
+[data-theme="dark"] .stat-card__value,
+[data-theme="dark"] .card-value,
+[data-theme="dark"] .value-display {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--text-color) !important;
+}
+
+/* Fix health status card count values */
+[data-theme="dark"] .health-status-card__count,
+[data-theme="dark"] .health-status-card__percentage {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--text-color) !important;
+}
+
+/* Fix any numeric display elements */
+[data-theme="dark"] .number-display,
+[data-theme="dark"] .amount-display,
+[data-theme="dark"] .count-display,
+[data-theme="dark"] .total-display {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: var(--text-color) !important;
+}
+
+/* More selective text element background fixes - avoid status elements */
+[data-theme="dark"] .ui-card p:not(.status-count):not(.status-percentage),
+[data-theme="dark"] .ui-card span:not(.status-badge):not(.balance-due):not(.balance-paid),
+[data-theme="dark"] .summary-card p:not(.summary-value),
+[data-theme="dark"] .summary-card span:not(.balance-due),
+[data-theme="dark"] .stat-card p,
+[data-theme="dark"] .stat-card span,
+[data-theme="dark"] .metric-card p,
+[data-theme="dark"] .metric-card span {
+  background: transparent !important;
+  background-color: transparent !important;
 }

@@ -29,9 +29,8 @@ const CustomerManagement = ({
           lastOrderDate: null,
           statusCounts: {
             pending: 0,
-            confirmed: 0,
-            completed: 0,
-            cancelled: 0
+            partial: 0,
+            paid: 0
           }
         });
       }
@@ -47,7 +46,7 @@ const CustomerManagement = ({
       } else if (order.calculation_mode === 'size_cost') {
         orderTotal = order.size * order.price;
       } else {
-        orderTotal = order.size * order.price;
+        orderTotal = order.count * order.size * order.price;
       }
 
       customer.totalValue += orderTotal;
@@ -315,7 +314,7 @@ export const CustomerDetailModal = ({
         } else if (order.calculation_mode === 'size_cost') {
           total = order.size * order.price;
         } else {
-          total = order.size * order.price;
+          total = order.count * order.size * order.price;
         }
         return `₦${formatNumber(total, 2)}`;
       }

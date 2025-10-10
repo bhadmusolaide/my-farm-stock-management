@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context';
 import { useNotification } from '../context/NotificationContext';
 import { TabNavigation } from '../components/UI';
 import {
@@ -23,7 +23,9 @@ const FeedManagement = () => {
     liveChickens,
     feedBatchAssignments,
     deleteFeedBatchAssignment,
-    loadFeedInventory
+    loadFeedInventory,
+    balance,
+    addExpense
   } = useAppContext();
 
   const { showError, showSuccess, showWarning } = useNotification();
@@ -126,8 +128,32 @@ const FeedManagement = () => {
         await updateFeedInventory(feedData.id, feedData);
         showSuccess('Feed stock updated successfully!');
       } else {
-        await addFeedInventory(feedData);
-        showSuccess('Feed stock added successfully!');
+        // Add feed inventory
+        const newFeed = await addFeedInventory(feedData);
+
+        // Handle balance deduction if requested
+        if (feedData.deduct_from_balance && !feedData.balance_deducted) {
+          const totalCost = feedData.number_of_bags * feedData.cost_per_bag;
+          try {
+            await addExpense(
+              totalCost,
+              `Feed purchase: ${feedData.feed_type} - ${feedData.brand} (${feedData.number_of_bags} bags)`
+            );
+
+            // Mark as deducted
+            await updateFeedInventory(newFeed.id, {
+              ...newFeed,
+              balance_deducted: true
+            });
+
+            showSuccess('Feed stock added and cost deducted from balance!');
+          } catch (balanceError) {
+            console.error('Failed to deduct from balance:', balanceError);
+            showWarning('Feed added but failed to deduct from balance. Please check your balance.');
+          }
+        } else {
+          showSuccess('Feed stock added successfully!');
+        }
       }
 
       // Refresh feed inventory

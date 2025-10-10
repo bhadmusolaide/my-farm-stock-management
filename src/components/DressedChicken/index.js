@@ -4,3 +4,5 @@ export { default as InventoryView } from './InventoryView';
 export { default as ProcessingHistory } from './ProcessingHistory';
 export { default as DressedAnalyticsView } from './DressedAnalyticsView';
 export { default as TraceabilityModal } from './TraceabilityModal';
+export { default as EditForm } from './EditForm';
+export { default as ProcessingDetailsModal } from './ProcessingDetailsModal';

@@ -1,5 +1,5 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { AppContext } from '../context/AppContext';
+import React, { useState, useEffect } from 'react';
+import { useAppContext } from '../context';
 import { useNotification } from '../context/NotificationContext';
 import { TabNavigation } from '../components/UI';
 import {
@@ -7,7 +7,8 @@ import {
   InventoryView,
   ProcessingHistory,
   DressedAnalyticsView,
-  TraceabilityModal
+  TraceabilityModal,
+  EditForm
 } from '../components/DressedChicken';
 import './DressedChickenStock.css';
 
@@ -26,13 +27,14 @@ const DressedChickenStock = () => {
     loadBatchRelationships,
     chickenSizeCategories,
     loadChickenSizeCategories
-  } = useContext(AppContext);
+  } = useAppContext();
 
   const { showSuccess, showError } = useNotification();
 
   // State management
   const [activeTab, setActiveTab] = useState('inventory');
   const [showProcessingModal, setShowProcessingModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editingChicken, setEditingChicken] = useState(null);
   const [viewingTraceability, setViewingTraceability] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -202,8 +204,24 @@ const DressedChickenStock = () => {
 
   const handleEditChicken = (chicken) => {
     setEditingChicken(chicken);
-    // TODO: Implement edit modal
-    alert(`Edit functionality for ${chicken.batch_id} - Feature coming soon!`);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateChicken = async (id, updatedData) => {
+    try {
+      setLoading(true);
+      await updateDressedChicken(id, updatedData);
+      await loadDressedChickens();
+      showSuccess('Dressed chicken record updated successfully');
+      setShowEditModal(false);
+      setEditingChicken(null);
+    } catch (error) {
+      console.error('Error updating dressed chicken:', error);
+      showError(`Failed to update record: ${error.message}`);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDeleteChicken = async (chickenId) => {
@@ -295,6 +313,19 @@ const DressedChickenStock = () => {
         onClose={() => setShowProcessingModal(false)}
         onSubmit={handleProcessingSubmit}
         liveChickens={liveChickens}
+        chickenSizeCategories={chickenSizeCategories}
+        loading={loading}
+      />
+
+      {/* Edit Form Modal */}
+      <EditForm
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingChicken(null);
+        }}
+        onSubmit={handleUpdateChicken}
+        editingChicken={editingChicken}
         chickenSizeCategories={chickenSizeCategories}
         loading={loading}
       />

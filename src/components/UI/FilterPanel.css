@@ -285,25 +285,55 @@
   }
 }
 
-/* Dark Mode Support */
-@media (prefers-color-scheme: dark) {
-  .filter-panel {
-    --filter-panel-bg: #2d3748;
-    --filter-panel-border: #4a5568;
-    --filter-panel-header-bg: #4a5568;
-    --filter-panel-title-color: #e2e8f0;
-    --filter-panel-label-color: #e2e8f0;
-    --filter-panel-description-color: #a0aec0;
-    --filter-panel-active-color: #63b3ed;
-    --filter-panel-toggle-color: #a0aec0;
-    --filter-panel-toggle-hover-bg: #718096;
-    --filter-panel-toggle-hover-color: #e2e8f0;
-    --input-bg: #2d3748;
-    --input-color: #e2e8f0;
-    --input-border: #4a5568;
-    --input-focus-border: #63b3ed;
-    --input-focus-shadow: rgba(99, 179, 237, 0.25);
-  }
+/* Dark Mode Support - Using data-theme attribute */
+[data-theme="dark"] .filter-panel {
+  --filter-panel-bg: var(--card-background);
+  --filter-panel-border: var(--border-color);
+  --filter-panel-header-bg: rgba(255, 255, 255, 0.05);
+  --filter-panel-title-color: var(--text-color);
+  --filter-panel-label-color: var(--text-color);
+  --filter-panel-description-color: var(--text-light);
+  --filter-panel-active-color: var(--primary-color);
+  --filter-panel-toggle-color: var(--text-light);
+  --filter-panel-toggle-hover-bg: rgba(255, 255, 255, 0.1);
+  --filter-panel-toggle-hover-color: var(--text-color);
+  --input-bg: var(--input-background);
+  --input-color: var(--input-text);
+  --input-border: var(--input-border);
+  --input-focus-border: var(--input-focus-border);
+  --input-focus-shadow: var(--input-focus-shadow);
+  background-color: var(--card-background) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .filter-panel__header {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .filter-panel__title {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .filter-panel__label,
+[data-theme="dark"] .filter-checkbox-label,
+[data-theme="dark"] .filter-radio-label {
+  color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .filter-panel__description {
+  color: var(--text-light) !important;
+}
+
+[data-theme="dark"] .filter-input,
+[data-theme="dark"] .filter-select {
+  background-color: var(--input-background) !important;
+  border-color: var(--input-border) !important;
+  color: var(--input-text) !important;
+}
+
+[data-theme="dark"] .filter-panel__actions {
+  border-color: var(--border-color) !important;
 }
 
 /* Mobile Responsive */

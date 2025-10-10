@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { DataTable } from '../UI';
+import { DataTable, MetricCard, PerformanceTable } from '../UI';
 import { formatNumber, formatDate } from '../../utils/formatters';
 import './LiveChicken.css';
 
@@ -224,41 +224,72 @@ const AnalyticsView = ({ batches = [], transactions = [] }) => {
       <h2>Analytics Dashboard</h2>
 
       {/* Performance Metrics */}
-      <div className="performance-metrics">
-        <h3>📊 Performance Overview</h3>
-        <div className="metrics-grid">
-          <div className="metric-card">
-            <h4>Total Batches</h4>
-            <p className="metric-value">{analyticsData.performanceMetrics.totalBatches}</p>
-          </div>
-          <div className="metric-card">
-            <h4>Total Birds</h4>
-            <p className="metric-value">{formatNumber(analyticsData.performanceMetrics.totalBirds)}</p>
-          </div>
-          <div className="metric-card">
-            <h4>Overall Mortality Rate</h4>
-            <p className={`metric-value ${parseFloat(analyticsData.performanceMetrics.overallMortalityRate) > 10 ? 'warning' : 'success'}`}>
-              {analyticsData.performanceMetrics.overallMortalityRate}%
-            </p>
-          </div>
-          <div className="metric-card">
-            <h4>Average Weight</h4>
-            <p className="metric-value">{analyticsData.performanceMetrics.averageWeight} kg</p>
-          </div>
-          <div className="metric-card">
-            <h4>Average Age</h4>
-            <p className="metric-value">{analyticsData.performanceMetrics.averageAge} weeks</p>
-          </div>
-          <div className="metric-card">
-            <h4>Production Efficiency</h4>
-            <p className="metric-value">{analyticsData.performanceMetrics.productionEfficiency} kg/week</p>
-          </div>
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h3 className="section-title">
+            <span className="section-title-icon">📊</span>
+            Performance Overview
+          </h3>
         </div>
-      </div>
+
+        <div className="stats-grid">
+          <MetricCard
+            title="Total Batches"
+            value={analyticsData.performanceMetrics.totalBatches}
+            icon="📦"
+            variant="primary"
+          />
+
+          <MetricCard
+            title="Total Birds"
+            value={formatNumber(analyticsData.performanceMetrics.totalBirds)}
+            icon="🐔"
+            variant="success"
+          />
+
+          <MetricCard
+            title="Overall Mortality Rate"
+            value={analyticsData.performanceMetrics.overallMortalityRate}
+            unit="%"
+            icon="⚠️"
+            variant={parseFloat(analyticsData.performanceMetrics.overallMortalityRate) > 10 ? "danger" : "success"}
+          />
+
+          <MetricCard
+            title="Average Weight"
+            value={analyticsData.performanceMetrics.averageWeight}
+            unit="kg"
+            icon="⚖️"
+            variant="info"
+          />
+
+          <MetricCard
+            title="Average Age"
+            value={analyticsData.performanceMetrics.averageAge}
+            unit="weeks"
+            icon="📅"
+            variant="info"
+          />
+
+          <MetricCard
+            title="Production Efficiency"
+            value={analyticsData.performanceMetrics.productionEfficiency}
+            unit="kg/week"
+            icon="📈"
+            variant="success"
+          />
+        </div>
+      </section>
 
       {/* Breed Analysis */}
-      <div className="breed-analysis">
-        <h3>🐔 Breed Performance Analysis</h3>
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h3 className="section-title">
+            <span className="section-title-icon">🐔</span>
+            Breed Performance Analysis
+          </h3>
+        </div>
+
         <DataTable
           data={analyticsData.breedAnalysis}
           columns={breedColumns}
@@ -267,11 +298,17 @@ const AnalyticsView = ({ batches = [], transactions = [] }) => {
           enablePagination={false}
           emptyMessage="No breed data available"
         />
-      </div>
+      </section>
 
       {/* Age Distribution */}
-      <div className="age-distribution">
-        <h3>📅 Age Distribution Analysis</h3>
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h3 className="section-title">
+            <span className="section-title-icon">📅</span>
+            Age Distribution Analysis
+          </h3>
+        </div>
+
         <DataTable
           data={analyticsData.ageDistribution}
           columns={ageColumns}
@@ -280,12 +317,18 @@ const AnalyticsView = ({ batches = [], transactions = [] }) => {
           enablePagination={false}
           emptyMessage="No age distribution data available"
         />
-      </div>
+      </section>
 
       {/* Mortality Trends */}
       {analyticsData.mortalityTrends.length > 0 && (
-        <div className="mortality-trends">
-          <h3>⚠️ Recent Mortality Trends</h3>
+        <section className="dashboard-section">
+          <div className="section-header">
+            <h3 className="section-title">
+              <span className="section-title-icon">⚠️</span>
+              Recent Mortality Trends
+            </h3>
+          </div>
+
           <DataTable
             data={analyticsData.mortalityTrends}
             columns={mortalityColumns}
@@ -294,7 +337,7 @@ const AnalyticsView = ({ batches = [], transactions = [] }) => {
             enablePagination={false}
             emptyMessage="No mortality data available"
           />
-        </div>
+        </section>
       )}
     </div>
   );

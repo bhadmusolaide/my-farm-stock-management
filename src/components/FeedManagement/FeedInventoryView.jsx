@@ -117,6 +117,16 @@ const FeedInventoryView = ({
   // Table columns configuration
   const columns = [
     {
+      key: 'batch_number',
+      label: 'Batch #',
+      sortable: true,
+      render: (item) => (
+        <div className="batch-number">
+          <strong>{item.batch_number || 'N/A'}</strong>
+        </div>
+      )
+    },
+    {
       key: 'purchase_date',
       label: 'Purchase Date',
       sortable: true,
@@ -161,16 +171,23 @@ const FeedInventoryView = ({
       key: 'cost',
       label: 'Cost',
       sortable: true,
-      render: (item) => (
-        <div className="cost-info">
-          <div className="cost-per-bag">
-            ₦{formatNumber(item.cost_per_bag, 2)}/bag
+      render: (item) => {
+        const costPerKg = item.cost_per_kg ||
+          (item.cost_per_bag * item.number_of_bags) / item.quantity_kg;
+        return (
+          <div className="cost-info">
+            <div className="cost-per-bag">
+              ₦{formatNumber(item.cost_per_bag, 2)}/bag
+            </div>
+            <div className="cost-per-kg">
+              ₦{formatNumber(costPerKg, 2)}/kg
+            </div>
+            <div className="total-cost">
+              Total: ₦{formatNumber((item.number_of_bags || 1) * item.cost_per_bag, 2)}
+            </div>
           </div>
-          <div className="total-cost">
-            Total: ₦{formatNumber((item.number_of_bags || 1) * item.cost_per_bag, 2)}
-          </div>
-        </div>
-      )
+        );
+      }
     },
     {
       key: 'supplier',
@@ -260,6 +277,8 @@ const FeedInventoryView = ({
       totalItems: filteredInventory.length,
       totalQuantity: 0,
       totalValue: 0,
+      totalAssigned: 0,
+      remainingFeed: 0,
       lowStockItems: 0,
       outOfStockItems: 0,
       expiringItems: 0
@@ -268,13 +287,21 @@ const FeedInventoryView = ({
     const today = new Date();
 
     filteredInventory.forEach(item => {
-      stats.totalQuantity += item.quantity_kg || 0;
+      const itemQuantity = item.quantity_kg || 0;
+      stats.totalQuantity += itemQuantity;
       stats.totalValue += (item.number_of_bags || 1) * item.cost_per_bag;
-      
+
+      // Calculate total assigned for this item
+      const itemAssigned = (item.assigned_batches || []).reduce(
+        (sum, assignment) => sum + (assignment.assigned_quantity_kg || 0),
+        0
+      );
+      stats.totalAssigned += itemAssigned;
+
       const status = getStockStatus(item.quantity_kg);
       if (status === 'low') stats.lowStockItems++;
       if (status === 'out') stats.outOfStockItems++;
-      
+
       if (item.expiry_date) {
         const expiryDate = new Date(item.expiry_date);
         const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
@@ -283,6 +310,9 @@ const FeedInventoryView = ({
         }
       }
     });
+
+    // Calculate remaining feed (total - assigned)
+    stats.remainingFeed = stats.totalQuantity - stats.totalAssigned;
 
     return stats;
   }, [filteredInventory]);
@@ -338,6 +368,22 @@ const FeedInventoryView = ({
           <div className="summary-content">
             <h4>Total Value</h4>
             <p className="summary-value">₦{formatNumber(summaryStats.totalValue, 2)}</p>
+          </div>
+        </div>
+
+        <div className="summary-card success">
+          <div className="summary-icon">📊</div>
+          <div className="summary-content">
+            <h4>Total Assigned</h4>
+            <p className="summary-value">{formatNumber(summaryStats.totalAssigned, 2)} kg</p>
+          </div>
+        </div>
+
+        <div className="summary-card primary">
+          <div className="summary-icon">🔄</div>
+          <div className="summary-content">
+            <h4>Remaining Feeds</h4>
+            <p className="summary-value">{formatNumber(summaryStats.remainingFeed, 2)} kg</p>
           </div>
         </div>
 

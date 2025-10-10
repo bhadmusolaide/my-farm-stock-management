@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { useAppContext } from '../../context/AppContext'
+import { useAppContext } from '../../context'
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner'
 import './VirtualizedTable.css'
 

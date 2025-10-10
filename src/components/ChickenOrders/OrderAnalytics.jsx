@@ -21,9 +21,8 @@ const OrderAnalytics = ({
     // Status counts
     const statusCounts = {
       pending: 0,
-      confirmed: 0,
-      completed: 0,
-      cancelled: 0
+      partial: 0,
+      paid: 0
     };
 
     // Inventory type analysis
@@ -53,7 +52,7 @@ const OrderAnalytics = ({
       } else if (order.calculation_mode === 'size_cost') {
         orderTotal = order.size * order.price;
       } else {
-        orderTotal = order.size * order.price;
+        orderTotal = order.count * order.size * order.price;
       }
 
       totalRevenue += orderTotal;

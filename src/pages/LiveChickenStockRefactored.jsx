@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context';
 import { TabNavigation } from '../components/UI';
 import {
   BatchForm,
@@ -28,6 +28,7 @@ const LiveChickenStock = () => {
   const [editingBatch, setEditingBatch] = useState(null);
   const [selectedBatchForTransactions, setSelectedBatchForTransactions] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [dismissedAlerts, setDismissedAlerts] = useState([]);
   
   // Filter states
   const [batchFilters, setBatchFilters] = useState({
@@ -44,10 +45,23 @@ const LiveChickenStock = () => {
     }
   }, [liveChickens, loadLiveChickens]);
 
-  // Get low feed alerts
+  // Get low feed alerts (filtered by dismissed alerts)
   const feedAlerts = React.useMemo(() => {
-    return getLowFeedAlerts();
-  }, [liveChickens, getLowFeedAlerts]);
+    const lowFeedItems = getLowFeedAlerts();
+    return lowFeedItems
+      .filter(feed => !dismissedAlerts.includes(feed.id))
+      .map(feed => {
+        const currentStock = feed.quantity_kg || 0;
+        const minThreshold = feed.min_threshold || 50;
+        const severity = currentStock < 20 ? 'critical' : 'warning';
+
+        return {
+          id: feed.id,
+          severity,
+          message: `Low feed stock: ${feed.feed_type || 'Unknown'} (${currentStock.toFixed(1)} kg remaining, threshold: ${minThreshold} kg)`
+        };
+      });
+  }, [liveChickens, getLowFeedAlerts, dismissedAlerts]);
 
   // Tab configuration
   const tabs = [
@@ -134,6 +148,10 @@ const LiveChickenStock = () => {
     setSelectedBatchForTransactions(batch);
   };
 
+  const handleDismissAlert = (alertId) => {
+    setDismissedAlerts(prev => [...prev, alertId]);
+  };
+
   return (
     <div className="live-chicken-container">
       {/* Page Header */}
@@ -158,6 +176,14 @@ const LiveChickenStock = () => {
             {feedAlerts.map(alert => (
               <div key={alert.id} className={`alert-card ${alert.severity}`}>
                 <p>{alert.message}</p>
+                <button
+                  className="alert-dismiss-btn"
+                  onClick={() => handleDismissAlert(alert.id)}
+                  aria-label="Dismiss alert"
+                  title="Dismiss this alert"
+                >
+                  ×
+                </button>
               </div>
             ))}
           </div>

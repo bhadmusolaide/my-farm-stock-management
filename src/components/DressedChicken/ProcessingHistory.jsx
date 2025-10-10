@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { DataTable, FilterPanel } from '../UI';
 import { formatDate, formatNumber } from '../../utils/formatters';
+import ProcessingDetailsModal from './ProcessingDetailsModal';
 import './DressedChicken.css';
 
 const ProcessingHistory = ({
@@ -11,6 +12,7 @@ const ProcessingHistory = ({
   onFiltersChange,
   loading = false
 }) => {
+  const [viewingDetails, setViewingDetails] = useState(null);
   // Helper functions
   const getLiveChickenById = (id) => {
     return liveChickens.find(lc => lc.id === id) || {};
@@ -22,9 +24,9 @@ const ProcessingHistory = ({
 
   // Process relationships data
   const processedRelationships = useMemo(() => {
-    // Filter for processing relationships only
+    // Filter for processing relationships only (both types)
     const processingRelationships = batchRelationships.filter(
-      br => br.relationship_type === 'partial_processed_from'
+      br => br.relationship_type === 'partial_processed_from' || br.relationship_type === 'processed_from'
     );
 
     return processingRelationships.map(relationship => {
@@ -131,14 +133,14 @@ const ProcessingHistory = ({
 
     if (filters?.yieldThreshold) {
       filtered = filtered.filter(rel => {
-        const yield = rel.yieldRate;
+        const yieldRate = rel.yieldRate;
         switch (filters.yieldThreshold) {
           case 'low':
-            return yield < 95;
+            return yieldRate < 95;
           case 'normal':
-            return yield >= 95 && yield <= 100;
+            return yieldRate >= 95 && yieldRate <= 100;
           case 'high':
-            return yield > 100;
+            return yieldRate > 100;
           default:
             return true;
         }
@@ -196,10 +198,7 @@ const ProcessingHistory = ({
     <div className="processing-actions">
       <button
         className="btn btn-sm btn-info"
-        onClick={() => {
-          // TODO: Implement detailed view
-          alert(`Processing details for ${row.dressedBatchId} - Feature coming soon!`);
-        }}
+        onClick={() => setViewingDetails(row)}
         title="View processing details"
       >
         Details
@@ -294,6 +293,15 @@ const ProcessingHistory = ({
         rowClassName={getRowClassName}
         emptyMessage="No processing history found"
         storageKey="processingHistory"
+      />
+
+      {/* Processing Details Modal */}
+      <ProcessingDetailsModal
+        isOpen={!!viewingDetails}
+        onClose={() => setViewingDetails(null)}
+        processingRecord={viewingDetails}
+        liveChicken={viewingDetails ? getLiveChickenById(viewingDetails.liveBatchId) : null}
+        dressedChicken={viewingDetails ? getDressedChickenById(viewingDetails.dressedBatchId) : null}
       />
     </div>
   );

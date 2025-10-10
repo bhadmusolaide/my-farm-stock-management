@@ -1,6 +1,11 @@
 import React, { useMemo } from 'react';
 import { DataTable, StatusBadge, FilterPanel } from '../UI';
 import { formatNumber, formatDate } from '../../utils/formatters';
+import {
+  useTableFilters,
+  useStatusFilter,
+  useDateRangeFilter
+} from '../../hooks';
 import './ChickenOrders.css';
 
 const OrderList = ({
@@ -8,32 +13,87 @@ const OrderList = ({
   onEdit,
   onDelete,
   onBatchUpdate,
-  filters,
-  onFiltersChange,
   selectedOrders = [],
   onOrderSelect,
   onSelectAll,
   loading = false
 }) => {
-  // Filter configuration
+  // Use custom hooks for filtering and table operations
+  const {
+    filteredData: filteredOrders,
+    filters,
+    searchTerm,
+    updateFilter,
+    removeFilter,
+    clearAllFilters,
+    setSearchTerm,
+    handleSort,
+    getFilterSummary
+  } = useTableFilters(orders, {
+    searchFields: ['customer', 'phone', 'address', 'notes'],
+    defaultFilters: {},
+    caseSensitive: false
+  });
+
+  const {
+    filteredData: statusFilteredOrders,
+    selectedStatuses,
+    availableStatuses,
+    toggleStatus,
+    clearStatusFilter,
+    getStatusSummary
+  } = useStatusFilter(filteredOrders, 'status', {
+    allowMultiple: true,
+    defaultStatuses: []
+  });
+
+  const {
+    filteredData: dateFilteredOrders,
+    dateRange,
+    selectedPreset,
+    presets,
+    applyPreset,
+    setCustomRange,
+    clearDateFilter
+  } = useDateRangeFilter(statusFilteredOrders, 'date');
+
+  // Selection is managed by parent component via props
+
+  // Final filtered data
+  const finalFilteredOrders = dateFilteredOrders;
+
+  // Handler for filter changes
+  const onFiltersChange = (newFilters) => {
+    Object.entries(newFilters).forEach(([key, value]) => {
+      if (key === 'search') {
+        // Handle search separately using setSearchTerm
+        setSearchTerm(value || '');
+      } else if (value === null || value === undefined || value === '') {
+        removeFilter(key);
+      } else {
+        updateFilter(key, value);
+      }
+    });
+  };
+
+  // Order selection is handled by parent component via onOrderSelect prop
+
+  // Handler for select all - this is passed from parent
+  // const onSelectAll is already provided as a prop
+
+  // Enhanced filter configuration using custom hooks
+  // Combine search term and filters for FilterPanel
+  const combinedFilters = {
+    search: searchTerm,
+    ...filters
+  };
+
   const filterConfig = [
     {
-      key: 'customer',
-      type: 'text',
-      label: 'Customer',
-      placeholder: 'Search by customer name...'
-    },
-    {
-      key: 'status',
-      type: 'select',
-      label: 'Status',
-      options: [
-        { value: '', label: 'All Statuses' },
-        { value: 'pending', label: 'Pending' },
-        { value: 'confirmed', label: 'Confirmed' },
-        { value: 'completed', label: 'Completed' },
-        { value: 'cancelled', label: 'Cancelled' }
-      ]
+      key: 'search',
+      type: 'search',
+      label: 'Search Orders',
+      placeholder: 'Search by customer, phone, address...'
     },
     {
       key: 'inventoryType',
@@ -47,46 +107,40 @@ const OrderList = ({
       ]
     },
     {
-      key: 'dateRange',
-      type: 'dateRange',
-      label: 'Date Range',
-      startKey: 'startDate',
-      endKey: 'endDate'
+      key: 'paymentStatus',
+      type: 'select',
+      label: 'Payment Status',
+      options: [
+        { value: '', label: 'All Payment Status' },
+        { value: 'paid', label: 'Fully Paid' },
+        { value: 'partial', label: 'Partially Paid' },
+        { value: 'unpaid', label: 'Unpaid' }
+      ]
     }
   ];
 
-  // Apply filters to orders
-  const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
-      // Customer filter
-      if (filters.customer && !order.customer.toLowerCase().includes(filters.customer.toLowerCase())) {
-        return false;
-      }
+  // Status filter component data
+  const statusFilterData = {
+    selectedStatuses,
+    availableStatuses,
+    onToggleStatus: toggleStatus,
+    onClearFilter: clearStatusFilter,
+    summary: getStatusSummary()
+  };
 
-      // Status filter
-      if (filters.status && order.status !== filters.status) {
-        return false;
-      }
-
-      // Inventory type filter
-      if (filters.inventoryType && order.inventory_type !== filters.inventoryType) {
-        return false;
-      }
-
-      // Date range filter
-      if (filters.startDate || filters.endDate) {
-        const orderDate = new Date(order.date);
-        if (filters.startDate && orderDate < new Date(filters.startDate)) {
-          return false;
-        }
-        if (filters.endDate && orderDate > new Date(filters.endDate)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [orders, filters]);
+  // Date range filter data
+  const dateFilterData = {
+    dateRange,
+    selectedPreset,
+    presets,
+    onApplyPreset: applyPreset,
+    onSetCustomRange: setCustomRange,
+    onClearFilter: clearDateFilter,
+    type: 'dateRange',
+    label: 'Date Range',
+    startKey: 'startDate',
+    endKey: 'endDate'
+  };
 
   // Table columns configuration
   const columns = [
@@ -165,14 +219,23 @@ const OrderList = ({
       sortable: true,
       render: (order) => {
         let total = 0;
-        if (order.calculation_mode === 'count_cost') {
-          total = order.count * order.price;
-        } else if (order.calculation_mode === 'size_cost') {
-          total = order.size * order.price;
+        const calcMode = order.calculation_mode || 'count_size_cost';
+
+        // Convert to numbers explicitly - this is likely the issue!
+        const count = parseFloat(order.count) || 0;
+        const size = parseFloat(order.size) || 0;
+        const price = parseFloat(order.price) || 0;
+
+        if (calcMode === 'count_cost') {
+          total = count * price;
+        } else if (calcMode === 'size_cost') {
+          total = size * price;
         } else {
-          total = order.size * order.price; // count_size_cost
+          // Default: count_size_cost
+          total = count * size * price;
         }
-        return `₦${formatNumber(total, 2)}`;
+
+        return total > 0 ? `₦${formatNumber(total, 2)}` : '-';
       }
     },
     {
@@ -187,14 +250,24 @@ const OrderList = ({
       sortable: true,
       render: (order) => {
         let total = 0;
-        if (order.calculation_mode === 'count_cost') {
-          total = order.count * order.price;
-        } else if (order.calculation_mode === 'size_cost') {
-          total = order.size * order.price;
+        const calcMode = order.calculation_mode || 'count_size_cost';
+
+        // Convert to numbers explicitly
+        const count = parseFloat(order.count) || 0;
+        const size = parseFloat(order.size) || 0;
+        const price = parseFloat(order.price) || 0;
+        const amountPaid = parseFloat(order.amount_paid) || 0;
+
+        if (calcMode === 'count_cost') {
+          total = count * price;
+        } else if (calcMode === 'size_cost') {
+          total = size * price;
         } else {
-          total = order.size * order.price;
+          // Default: count_size_cost
+          total = count * size * price;
         }
-        const balance = total - (order.amount_paid || 0);
+
+        const balance = total - amountPaid;
         return (
           <span className={balance > 0 ? 'balance-due' : 'balance-paid'}>
             ₦{formatNumber(balance, 2)}
@@ -258,37 +331,45 @@ const OrderList = ({
   // Summary statistics
   const summaryStats = useMemo(() => {
     const stats = {
-      totalOrders: filteredOrders.length,
+      totalOrders: finalFilteredOrders.length,
       totalValue: 0,
       totalPaid: 0,
       totalBalance: 0,
       statusCounts: {
         pending: 0,
-        confirmed: 0,
-        completed: 0,
-        cancelled: 0
+        partial: 0,
+        paid: 0
       }
     };
 
-    filteredOrders.forEach(order => {
+    finalFilteredOrders.forEach(order => {
       // Calculate total value
       let total = 0;
-      if (order.calculation_mode === 'count_cost') {
-        total = order.count * order.price;
-      } else if (order.calculation_mode === 'size_cost') {
-        total = order.size * order.price;
+      const calcMode = order.calculation_mode || 'count_size_cost';
+
+      // Convert to numbers explicitly
+      const count = parseFloat(order.count) || 0;
+      const size = parseFloat(order.size) || 0;
+      const price = parseFloat(order.price) || 0;
+      const amountPaid = parseFloat(order.amount_paid) || 0;
+
+      if (calcMode === 'count_cost') {
+        total = count * price;
+      } else if (calcMode === 'size_cost') {
+        total = size * price;
       } else {
-        total = order.size * order.price;
+        // Default: count_size_cost
+        total = count * size * price;
       }
 
       stats.totalValue += total;
-      stats.totalPaid += order.amount_paid || 0;
-      stats.totalBalance += total - (order.amount_paid || 0);
+      stats.totalPaid += amountPaid;
+      stats.totalBalance += total - amountPaid;
       stats.statusCounts[order.status] = (stats.statusCounts[order.status] || 0) + 1;
     });
 
     return stats;
-  }, [filteredOrders]);
+  }, [finalFilteredOrders]);
 
   return (
     <div className="order-list">
@@ -342,7 +423,7 @@ const OrderList = ({
 
       {/* Filters */}
       <FilterPanel
-        filters={filters}
+        filters={combinedFilters}
         onFiltersChange={onFiltersChange}
         filterConfig={filterConfig}
         collapsible
@@ -351,13 +432,12 @@ const OrderList = ({
 
       {/* Data Table */}
       <DataTable
-        data={filteredOrders}
+        data={finalFilteredOrders}
         columns={columns}
         loading={loading}
         enableSorting
-        enablePagination
-        enableSearch
-        searchPlaceholder="Search orders..."
+        enablePagination={false}
+        enableSearch={false}
         renderActions={renderActions}
         headerActions={headerActions}
         emptyMessage="No orders found"
@@ -373,12 +453,12 @@ const OrderList = ({
         }}
         onSelectAll={(checked) => {
           if (checked) {
-            onSelectAll(filteredOrders.map(order => order.id));
+            onSelectAll(finalFilteredOrders.map(order => order.id));
           } else {
             onSelectAll([]);
           }
         }}
-        selectAllChecked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+        selectAllChecked={selectedOrders.length === finalFilteredOrders.length && finalFilteredOrders.length > 0}
         storageKey="orderList"
       />
     </div>

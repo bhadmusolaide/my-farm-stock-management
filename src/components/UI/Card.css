@@ -1,0 +1,442 @@
+/* ============================================
+   GLOBAL CARD COMPONENTS STYLES
+   ============================================ */
+
+/* Base Card Styles */
+.ui-card {
+  background: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Card Variants */
+.ui-card--default {
+  border-color: var(--border-color);
+}
+
+.ui-card--primary {
+  border-left: 4px solid var(--primary-color);
+}
+
+.ui-card--secondary {
+  border-left: 4px solid var(--secondary-color);
+}
+
+.ui-card--success {
+  border-left: 4px solid var(--success-color, #28a745);
+}
+
+.ui-card--warning {
+  border-left: 4px solid var(--warning-color);
+}
+
+.ui-card--danger {
+  border-left: 4px solid var(--danger-color);
+}
+
+.ui-card--info {
+  border-left: 4px solid var(--info-color, #17a2b8);
+}
+
+/* Card Padding Variants */
+.ui-card--padding-none {
+  padding: 0;
+}
+
+.ui-card--padding-small {
+  padding: 0.75rem;
+}
+
+.ui-card--padding-default {
+  padding: 1.5rem;
+}
+
+.ui-card--padding-large {
+  padding: 2rem;
+}
+
+/* Card Shadow Variants */
+.ui-card--shadow-none {
+  box-shadow: none;
+}
+
+.ui-card--shadow-default {
+  box-shadow: var(--shadow);
+}
+
+.ui-card--shadow-medium {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.ui-card--shadow-large {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Hover Effect */
+.ui-card--hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Summary Card Styles */
+.summary-card {
+  padding: 1.5rem;
+}
+
+.summary-card__content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.summary-card__icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: var(--primary-color-light, rgba(76, 175, 80, 0.1));
+  color: var(--primary-color);
+}
+
+.summary-card__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.summary-card__title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-light);
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.summary-card__value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-color);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.summary-card__subtitle {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin: 0.25rem 0 0 0;
+}
+
+.summary-card__trend {
+  font-size: 0.75rem;
+  margin: 0.25rem 0 0 0;
+  font-weight: 500;
+}
+
+/* Summary Card Variants */
+.summary-card--success .summary-card__icon {
+  background: var(--success-color-light, rgba(40, 167, 69, 0.1));
+  color: var(--success-color, #28a745);
+}
+
+.summary-card--warning .summary-card__icon {
+  background: var(--warning-color-light, rgba(255, 152, 0, 0.1));
+  color: var(--warning-color);
+}
+
+.summary-card--danger .summary-card__icon {
+  background: var(--danger-color-light, rgba(244, 67, 54, 0.1));
+  color: var(--danger-color);
+}
+
+.summary-card--info .summary-card__icon {
+  background: var(--info-color-light, rgba(23, 162, 184, 0.1));
+  color: var(--info-color, #17a2b8);
+}
+
+/* Stat Card Styles */
+.stat-card {
+  padding: 1rem;
+  text-align: center;
+}
+
+.stat-card__icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--primary-color);
+}
+
+.stat-card__label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-light);
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-card__value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-color);
+  margin: 0;
+}
+
+/* Stat Card Sizes */
+.stat-card--small {
+  padding: 0.75rem;
+}
+
+.stat-card--small .stat-card__value {
+  font-size: 1.25rem;
+}
+
+.stat-card--large {
+  padding: 2rem;
+}
+
+.stat-card--large .stat-card__value {
+  font-size: 2rem;
+}
+
+/* Metric Card Styles */
+.metric-card {
+  padding: 1.5rem;
+}
+
+.metric-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.metric-card__icon {
+  font-size: 1.25rem;
+  color: var(--primary-color);
+}
+
+.metric-card__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin: 0;
+}
+
+.metric-card__body {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.metric-card__value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-color);
+  line-height: 1;
+}
+
+.metric-card__unit {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--text-light);
+  margin-left: 0.25rem;
+}
+
+.metric-card__change {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.metric-card__change--positive {
+  background: var(--success-color-light, rgba(40, 167, 69, 0.1));
+  color: var(--success-color, #28a745);
+}
+
+.metric-card__change--negative {
+  background: var(--danger-color-light, rgba(244, 67, 54, 0.1));
+  color: var(--danger-color);
+}
+
+.metric-card__change--neutral {
+  background: var(--text-light-bg, rgba(108, 117, 125, 0.1));
+  color: var(--text-light);
+}
+
+/* Alert Card Styles */
+.alert-card {
+  padding: 1rem;
+}
+
+.alert-card__content {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.alert-card__icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.alert-card__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.alert-card__title {
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+  color: var(--text-color);
+}
+
+.alert-card__message {
+  margin: 0;
+  color: var(--text-color);
+  line-height: 1.4;
+}
+
+.alert-card__dismiss {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--text-light);
+  padding: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.alert-card__dismiss:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--text-color);
+}
+
+/* Alert Card Variants */
+.alert-card--success {
+  background: var(--success-color-light, rgba(40, 167, 69, 0.1));
+  border-color: var(--success-color, #28a745);
+}
+
+.alert-card--success .alert-card__icon {
+  color: var(--success-color, #28a745);
+}
+
+.alert-card--warning {
+  background: var(--warning-color-light, rgba(255, 152, 0, 0.1));
+  border-color: var(--warning-color);
+}
+
+.alert-card--warning .alert-card__icon {
+  color: var(--warning-color);
+}
+
+.alert-card--danger {
+  background: var(--danger-color-light, rgba(244, 67, 54, 0.1));
+  border-color: var(--danger-color);
+}
+
+.alert-card--danger .alert-card__icon {
+  color: var(--danger-color);
+}
+
+.alert-card--info {
+  background: var(--info-color-light, rgba(23, 162, 184, 0.1));
+  border-color: var(--info-color, #17a2b8);
+}
+
+.alert-card--info .alert-card__icon {
+  color: var(--info-color, #17a2b8);
+}
+
+/* Health Status Card Styles */
+.health-status-card {
+  padding: 1.5rem;
+}
+
+.health-status-card__content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.health-status-card__icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.health-status-card__info {
+  flex: 1;
+}
+
+.health-status-card__status {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin: 0 0 0.25rem 0;
+  text-transform: capitalize;
+}
+
+.health-status-card__count {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-color);
+  margin: 0;
+}
+
+.health-status-card__percentage {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  margin: 0.25rem 0 0 0;
+}
+
+/* Health Status Card Variants */
+.health-status-card--healthy .health-status-card__icon {
+  color: var(--success-color, #28a745);
+}
+
+.health-status-card--sick .health-status-card__icon {
+  color: var(--warning-color);
+}
+
+.health-status-card--critical .health-status-card__icon,
+.health-status-card--dead .health-status-card__icon {
+  color: var(--danger-color);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .summary-card__content {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.75rem;
+  }
+  
+  .summary-card__icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1.5rem;
+  }
+  
+  .metric-card__body {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+}

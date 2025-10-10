@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { DataTable, StatusBadge } from '../UI';
+import { DataTable, StatusBadge, HealthStatusCard, AlertCard } from '../UI';
 import { formatDate } from '../../utils/formatters';
 import './LiveChicken.css';
 
@@ -174,43 +174,71 @@ const HealthTracking = ({ batches = [] }) => {
       
       {/* Health Alerts */}
       {healthData.healthAlerts.length > 0 && (
-        <div className="health-alerts">
+        <section className="alert-section">
           <h3>🚨 Health Alerts</h3>
-          <div className="alerts-container">
-            {healthData.healthAlerts.map((alert, index) => (
-              <div key={index} className={`alert alert-${alert.type}`}>
-                <span className="alert-icon">
-                  {alert.type === 'critical' ? '🔴' : '⚠️'}
-                </span>
-                <span className="alert-message">{alert.message}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+          {healthData.healthAlerts.map((alert, index) => (
+            <AlertCard
+              key={index}
+              type={alert.type === 'critical' ? 'danger' : 'warning'}
+              title={`Batch ${alert.batchId} Alert`}
+              message={alert.message}
+              icon={alert.type === 'critical' ? '🔴' : '⚠️'}
+              dismissible={true}
+            />
+          ))}
+        </section>
       )}
 
       {/* Health Status Overview */}
-      <div className="health-status-overview">
-        <h3>📊 Health Status Overview</h3>
-        <div className="health-status-cards">
-          {healthStatusCards.map(card => (
-            <div key={card.status} className={`health-status-card ${card.color}`}>
-              <div className="health-status-card__icon">{card.icon}</div>
-              <div className="health-status-card__content">
-                <h4>{card.label}</h4>
-                <p className="health-status-card__count">
-                  {healthData.healthStatus[card.status] || 0}
-                </p>
-              </div>
-            </div>
-          ))}
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h3 className="section-title">
+            <span className="section-title-icon">📊</span>
+            Health Status Overview
+          </h3>
         </div>
-      </div>
+
+        <div className="health-status-cards">
+          <HealthStatusCard
+            status="healthy"
+            count={healthData.healthStatus.healthy || 0}
+            percentage={batches.length > 0 ? Math.round((healthData.healthStatus.healthy / batches.length) * 100) : 0}
+            icon="✅"
+          />
+
+          <HealthStatusCard
+            status="sick"
+            count={healthData.healthStatus.sick || 0}
+            percentage={batches.length > 0 ? Math.round((healthData.healthStatus.sick / batches.length) * 100) : 0}
+            icon="🤒"
+          />
+
+          <HealthStatusCard
+            status="critical"
+            count={healthData.healthStatus.quarantine || 0}
+            percentage={batches.length > 0 ? Math.round((healthData.healthStatus.quarantine / batches.length) * 100) : 0}
+            icon="🚫"
+          />
+
+          <HealthStatusCard
+            status="processing"
+            count={healthData.healthStatus.processing || 0}
+            percentage={batches.length > 0 ? Math.round((healthData.healthStatus.processing / batches.length) * 100) : 0}
+            icon="⚙️"
+          />
+        </div>
+      </section>
 
       {/* Vaccination Schedule */}
       {healthData.vaccinationDue.length > 0 && (
-        <div className="vaccination-section">
-          <h3>💉 Vaccination Schedule</h3>
+        <section className="dashboard-section">
+          <div className="section-header">
+            <h3 className="section-title">
+              <span className="section-title-icon">💉</span>
+              Vaccination Schedule
+            </h3>
+          </div>
+
           <DataTable
             data={healthData.vaccinationDue}
             columns={vaccinationColumns}
@@ -219,12 +247,18 @@ const HealthTracking = ({ batches = [] }) => {
             enablePagination={false}
             emptyMessage="No vaccinations due"
           />
-        </div>
+        </section>
       )}
 
       {/* Risk Batches */}
-      <div className="risk-batches-section">
-        <h3>⚠️ Risk Batches Monitoring</h3>
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h3 className="section-title">
+            <span className="section-title-icon">⚠️</span>
+            Risk Batches Monitoring
+          </h3>
+        </div>
+
         <DataTable
           data={healthData.riskBatches}
           columns={riskColumns}
@@ -239,7 +273,7 @@ const HealthTracking = ({ batches = [] }) => {
             return 'medium-risk';
           }}
         />
-      </div>
+      </section>
     </div>
   );
 };

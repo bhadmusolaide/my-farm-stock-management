@@ -128,7 +128,9 @@ const FeedConsumptionForm = ({
   // Calculate cost
   let costAnalysis = null;
   if (selectedFeed && quantityConsumed > 0) {
-    const costPerKg = selectedFeed.cost_per_bag / (selectedFeed.quantity_kg / selectedFeed.number_of_bags);
+    // Use cost_per_kg if available, otherwise calculate it
+    const costPerKg = selectedFeed.cost_per_kg ||
+      (selectedFeed.cost_per_bag * selectedFeed.number_of_bags) / selectedFeed.quantity_kg;
     const totalCost = costPerKg * quantityConsumed;
     costAnalysis = { costPerKg, totalCost };
   }
@@ -176,6 +178,10 @@ const FeedConsumptionForm = ({
               <h5>Selected Feed Details</h5>
               <div className="feed-info-grid">
                 <div className="info-item">
+                  <label>Batch:</label>
+                  <span>{selectedFeed.batch_number || 'N/A'}</span>
+                </div>
+                <div className="info-item">
                   <label>Type:</label>
                   <span>{selectedFeed.feed_type}</span>
                 </div>
@@ -189,7 +195,11 @@ const FeedConsumptionForm = ({
                 </div>
                 <div className="info-item">
                   <label>Cost/kg:</label>
-                  <span>₦{formatNumber(selectedFeed.cost_per_bag / (selectedFeed.quantity_kg / selectedFeed.number_of_bags), 2)}</span>
+                  <span>₦{formatNumber(
+                    selectedFeed.cost_per_kg ||
+                    (selectedFeed.cost_per_bag * selectedFeed.number_of_bags) / selectedFeed.quantity_kg,
+                    2
+                  )}</span>
                 </div>
               </div>
             </div>

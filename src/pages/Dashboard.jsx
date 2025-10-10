@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useAppContext } from '../context/AppContext'
+import { useAppContext } from '../context'
 import { formatNumber, formatDate, formatDateWithTime } from '../utils/formatters'
-import { 
+import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, Area, AreaChart, ComposedChart
 } from 'recharts'
+import { SummaryCard, AlertCard } from '../components/UI'
 
 import './Dashboard.css'
 
@@ -78,7 +79,7 @@ const Dashboard = () => {
   const recentTransactions = useMemo(() => {
     // Create a copy of transactions and sort by date descending
     const sortedTransactions = [...transactions].sort((a, b) => 
-      new Date(b.date) - new Date(a.date)
+      new Date(b.created_at || b.date) - new Date(a.created_at || a.date)
     )
     return sortedTransactions.slice(0, 5)
   }, [transactions])
@@ -216,10 +217,54 @@ const Dashboard = () => {
   
 
   
+  // Health alerts logic
+  const healthAlerts = useMemo(() => {
+    const alerts = []
+
+    // Check for high outstanding balance
+    if (stats.outstandingBalance > 50000) {
+      alerts.push({
+        type: 'warning',
+        title: 'High Outstanding Balance',
+        message: `Outstanding balance of ₦${formatNumber(stats.outstandingBalance, 2)} requires attention`,
+        icon: '⚠️'
+      })
+    }
+
+    // Check for low total chickens (example threshold)
+    if (stats.totalChickens < 100) {
+      alerts.push({
+        type: 'info',
+        title: 'Low Livestock Count',
+        message: `Current livestock count is ${stats.totalChickens}. Consider restocking.`,
+        icon: 'ℹ️'
+      })
+    }
+
+    return alerts
+  }, [stats.outstandingBalance, stats.totalChickens])
+
   return (
     <div className="dashboard-container">
       <h1>Dashboard</h1>
-      
+
+      {/* Health Alerts Section */}
+      {healthAlerts.length > 0 && (
+        <section className="alert-section">
+          <h3>🚨 System Alerts</h3>
+          {healthAlerts.map((alert, index) => (
+            <AlertCard
+              key={index}
+              type={alert.type}
+              title={alert.title}
+              message={alert.message}
+              icon={alert.icon}
+              dismissible={true}
+            />
+          ))}
+        </section>
+      )}
+
       {pendingPartialOrders.length > 0 && (
         <div className="orders-carousel">
           <div className="carousel-header">
@@ -313,34 +358,58 @@ const Dashboard = () => {
         </div>
       )}
       
-      <div className="stats-grid">
-        <div className="stat-card">
-          <h3>Current Balance</h3>
-          <p className="stat-value">₦{formatNumber(stats.balance, 2)}</p>
-        </div>
-        
-        <div className="stat-card">
-          <h3>Total Weight</h3>
-          <p className="stat-value">{formatNumber(totalWeight, 2)} kg</p>
-        </div>
-        
-        <div className="stat-card">
-          <h3>Total Chickens</h3>
-          <p className="stat-value">{formatNumber(stats.totalChickens)}</p>
-        </div>
-        
-        <div className="stat-card">
-          <h3>Total Revenue</h3>
-          <p className="stat-value">₦{formatNumber(stats.totalRevenue, 2)}</p>
-        </div>
-        
-        <div className="stat-card">
-          <h3>Outstanding Balance</h3>
-          <p className="stat-value">₦{formatNumber(stats.outstandingBalance, 2)}</p>
-        </div>
+      <div className="summary-cards">
+        <SummaryCard
+          title="Current Balance"
+          value={`₦${formatNumber(stats.balance, 2)}`}
+          icon="💰"
+          variant="success"
+          subtitle="Available funds"
+        />
+
+        <SummaryCard
+          title="Total Weight"
+          value={`${formatNumber(totalWeight, 2)} kg`}
+          icon="⚖️"
+          variant="info"
+          subtitle="Livestock weight"
+        />
+
+        <SummaryCard
+          title="Total Chickens"
+          value={formatNumber(stats.totalChickens)}
+          icon="🐔"
+          variant="primary"
+          subtitle="Active livestock"
+        />
+
+        <SummaryCard
+          title="Total Revenue"
+          value={`₦${formatNumber(stats.totalRevenue, 2)}`}
+          icon="📈"
+          variant="success"
+          subtitle="All time earnings"
+        />
+
+        <SummaryCard
+          title="Outstanding Balance"
+          value={`₦${formatNumber(stats.outstandingBalance, 2)}`}
+          icon="⏳"
+          variant={stats.outstandingBalance > 0 ? "warning" : "success"}
+          subtitle="Pending payments"
+        />
       </div>
-      
-      <div className="dashboard-charts">
+
+      {/* Analytics Section */}
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h2 className="section-title">
+            <span className="section-title-icon">📊</span>
+            Analytics & Charts
+          </h2>
+        </div>
+
+        <div className="dashboard-charts">
         {/* Enhanced Order Status Chart */}
         <div className="chart-container status-chart enhanced">
           <div className="chart-header">
@@ -499,10 +568,18 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-      </div>
-      
-      <div className="recent-transactions">
-        <h3>Recent Transactions</h3>
+        </div>
+      </section>
+
+      {/* Recent Transactions Section */}
+      <section className="dashboard-section">
+        <div className="section-header">
+          <h2 className="section-title">
+            <span className="section-title-icon">💳</span>
+            Recent Transactions
+          </h2>
+        </div>
+
         {recentTransactions.length > 0 ? (
           <div className="transactions-list">
             {recentTransactions.map(transaction => (
@@ -520,8 +597,7 @@ const Dashboard = () => {
         ) : (
           <p className="no-data">No recent transactions</p>
         )}
-      </div>
-      
+      </section>
 
     </div>
   )

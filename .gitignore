@@ -106,3 +106,6 @@ temp/
 # Test Files
 .test-lifecycle-connection.js
 .test-persistence-fix.js
+
+# Documentation files
+*.md

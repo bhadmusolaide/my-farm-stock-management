@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context';
 import { useNotification } from '../context/NotificationContext';
 import { TabNavigation } from '../components/UI';
 import {
@@ -26,7 +26,8 @@ const ChickenOrders = () => {
     loadPaginatedData,
     loadLiveChickensData,
     loadDressedChickensData,
-    pagination
+    pagination,
+    refreshData
   } = useAppContext();
 
   const { showError, showSuccess, showWarning } = useNotification();
@@ -44,6 +45,7 @@ const ChickenOrders = () => {
   // Paginated orders data
   const [paginatedOrders, setPaginatedOrders] = useState({ data: [], count: 0 });
   const [currentPage, setCurrentPage] = useState(1);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Add refresh trigger
 
   // Filter states
   const [orderFilters, setOrderFilters] = useState({
@@ -59,7 +61,7 @@ const ChickenOrders = () => {
     const loadOrdersData = async () => {
       try {
         setLoading(true);
-        const result = await loadPaginatedData('chicken_orders', currentPage, 20, orderFilters);
+        const result = await loadPaginatedData('chickens', currentPage, 20, orderFilters);
         setPaginatedOrders(result);
       } catch (error) {
         console.error('Failed to load orders:', error);
@@ -70,7 +72,7 @@ const ChickenOrders = () => {
     };
 
     loadOrdersData();
-  }, [currentPage, orderFilters, loadPaginatedData, showError]);
+  }, [currentPage, orderFilters, loadPaginatedData, showError, refreshTrigger]);
 
   // Load supporting data
   useEffect(() => {
@@ -197,10 +199,10 @@ const ChickenOrders = () => {
           count: orderData.count,
           size: orderData.size,
           price: orderData.price,
-          amount_paid: orderData.amountPaid,
+          amountPaid: orderData.amount_paid, // Convert from snake_case to camelCase
           status: orderData.status,
-          calculation_mode: orderData.calculationMode,
-          inventory_type: orderData.inventoryType,
+          calculationMode: orderData.calculation_mode, // Convert from snake_case to camelCase
+          inventoryType: orderData.inventory_type, // Convert from snake_case to camelCase
           batch_id: orderData.batch_id || null,
           part_type: orderData.part_type || null
         });
@@ -213,23 +215,35 @@ const ChickenOrders = () => {
           count: orderData.count,
           size: orderData.size,
           price: orderData.price,
-          amount_paid: orderData.amountPaid,
+          amountPaid: orderData.amount_paid, // Convert from snake_case to camelCase
           status: orderData.status,
-          calculation_mode: orderData.calculationMode,
-          inventory_type: orderData.inventoryType,
+          calculationMode: orderData.calculation_mode, // Convert from snake_case to camelCase
+          inventoryType: orderData.inventory_type, // Convert from snake_case to camelCase
           batch_id: orderData.batch_id || null,
           part_type: orderData.part_type || null
         });
         showSuccess('Order added successfully!');
       }
 
-      // Refresh orders data
-      const result = await loadPaginatedData('chicken_orders', currentPage, 20, orderFilters);
-      setPaginatedOrders(result);
+      // Trigger data refresh
+      setRefreshTrigger(prev => prev + 1);
 
     } catch (error) {
       console.error('Failed to save order:', error);
-      showError(`Failed to save order: ${error.message}`);
+
+      // If it's a "not found" error, try refreshing the context data
+      if (error.message.includes('not found')) {
+        console.log('Attempting to refresh context data due to "not found" error...');
+        try {
+          await refreshData();
+          showError('Order data was out of sync. Please try again.');
+        } catch (refreshError) {
+          console.error('Failed to refresh data:', refreshError);
+          showError(`Failed to save order: ${error.message}`);
+        }
+      } else {
+        showError(`Failed to save order: ${error.message}`);
+      }
       throw error;
     } finally {
       setLoading(false);
@@ -248,7 +262,7 @@ const ChickenOrders = () => {
         await deleteChicken(orderId);
         
         // Refresh orders data
-        const result = await loadPaginatedData('chicken_orders', currentPage, 20, orderFilters);
+        const result = await loadPaginatedData('chickens', currentPage, 20, orderFilters);
         setPaginatedOrders(result);
         
         showSuccess('Order deleted successfully');
@@ -264,25 +278,25 @@ const ChickenOrders = () => {
   const handleBatchUpdate = async (batchData) => {
     try {
       setLoading(true);
-      
+
       const updatePromises = batchData.orderIds.map(orderId => {
         const updateData = {};
-        
+
         if (batchData.status) {
           updateData.status = batchData.status;
         }
-        
-        if (batchData.amountPaid !== undefined) {
-          updateData.amount_paid = batchData.amountPaid;
+
+        if (batchData.amount_paid !== undefined) {
+          updateData.amountPaid = batchData.amount_paid;
         }
-        
+
         return updateChicken(orderId, updateData);
       });
 
       await Promise.all(updatePromises);
       
       // Refresh orders data
-      const result = await loadPaginatedData('chicken_orders', currentPage, 20, orderFilters);
+      const result = await loadPaginatedData('chickens', currentPage, 20, orderFilters);
       setPaginatedOrders(result);
       
       setSelectedOrders([]);
@@ -388,6 +402,34 @@ const ChickenOrders = () => {
           />
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {activeTab === 'orders' && paginatedOrders.count > 20 && (
+        <div className="pagination-container">
+          <div className="pagination-info">
+            Showing {((currentPage - 1) * 20) + 1} to {Math.min(currentPage * 20, paginatedOrders.count)} of {paginatedOrders.count} orders
+          </div>
+          <div className="pagination-controls">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1 || loading}
+              className="btn btn-outline-secondary"
+            >
+              Previous
+            </button>
+            <span className="page-info">
+              Page {currentPage} of {Math.ceil(paginatedOrders.count / 20)}
+            </span>
+            <button
+              onClick={() => setCurrentPage(prev => prev + 1)}
+              disabled={currentPage >= Math.ceil(paginatedOrders.count / 20) || loading}
+              className="btn btn-outline-secondary"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Order Form Modal */}
       <OrderForm

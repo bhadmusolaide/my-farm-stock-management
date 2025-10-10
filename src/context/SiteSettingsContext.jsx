@@ -12,7 +12,9 @@ const defaultNavItems = [
     { id: 'live-chickens', label: 'Live Chicken Stock', path: '/live-chickens', enabled: true },
     { id: 'lifecycle', label: 'Lifecycle Tracking', path: '/lifecycle', enabled: true },
     { id: 'feed', label: 'Feed Management', path: '/feed', enabled: true },
-    { id: 'dressed-chicken', label: 'Dressed Chicken Stock', path: '/dressed-chicken', enabled: true }
+    { id: 'dressed-chicken', label: 'Dressed Chicken Stock', path: '/dressed-chicken', enabled: true },
+    { id: 'processing', label: 'Processing Management', path: '/processing', enabled: true },
+    { id: 'processing-config', label: 'Processing Configuration', path: '/processing-config', enabled: true }
   ]},
   { id: 'transactions', label: 'Transactions', path: '/transactions', enabled: true, order: 4 },
   { id: 'reports', label: 'Reports', path: '/reports', enabled: true, order: 5 }

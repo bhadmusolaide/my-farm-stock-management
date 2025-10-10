@@ -205,7 +205,7 @@ const EnhancedModal = ({
             
             {error && (
               <div className="enhanced-modal__error">
-                <p>{error}</p>
+                <p>{typeof error === 'string' ? error : error?.message || 'An error occurred'}</p>
               </div>
             )}
             

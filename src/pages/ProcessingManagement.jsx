@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context';
 import { formatNumber, formatDate } from '../utils/formatters';
-import ColumnFilter from '../components/UI/ColumnFilter';
-import SortableTableHeader from '../components/UI/SortableTableHeader';
-import SortControls from '../components/UI/SortControls';
-import useColumnConfig from '../hooks/useColumnConfig';
-import useTableSort from '../hooks/useTableSort';
-import Pagination from '../components/UI/Pagination';
-import usePagination from '../hooks/usePagination';
+import { DataTable, StatusBadge, TabNavigation } from '../components/UI';
 import './ProcessingManagement.css';
 
 const ProcessingManagement = () => {
@@ -70,49 +64,123 @@ const ProcessingManagement = () => {
     { key: 'actions', label: 'Actions' }
   ];
 
-  // Column visibility hook
-  const columnConfig = useColumnConfig('processingManagement', processingColumns);
-  
   // Get filtered dressed chickens
   const getFilteredDressedChickens = () => {
     let filtered = [...(dressedChickens || [])];
-    
+
     if (filters.batch_id) {
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         item.batch_id.toLowerCase().includes(filters.batch_id.toLowerCase())
       );
     }
-    
+
     if (filters.size_category) {
       filtered = filtered.filter(item => item.size_category === filters.size_category);
     }
-    
+
     if (filters.status) {
       filtered = filtered.filter(item => item.status === filters.status);
     }
-    
+
     if (filters.startDate) {
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         new Date(item.processing_date) >= new Date(filters.startDate)
       );
     }
-    
+
     if (filters.endDate) {
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         new Date(item.processing_date) <= new Date(filters.endDate)
       );
     }
-    
+
     return filtered;
   };
-  
+
   const filteredDressedChickens = getFilteredDressedChickens();
-  
-  // Sorting hook
-  const { sortedData, sortConfig, requestSort, resetSort, getSortIcon } = useTableSort(filteredDressedChickens);
-  
-  // Pagination
-  const pagination = usePagination(sortedData, 10);
+
+  // Custom cell renderer for processing table
+  const renderProcessingCell = (value, row, column) => {
+    switch (column.key) {
+      case 'processing_date':
+        return formatDate(row.processing_date);
+      case 'initial_count':
+      case 'current_count':
+        return formatNumber(row[column.key]);
+      case 'average_weight':
+        return `${formatNumber(row.average_weight, 2)} kg`;
+      case 'size_category':
+        return row.size_category || 'N/A';
+      case 'status':
+        return (
+          <StatusBadge
+            status={row.status}
+            type={getStatusVariant(row.status)}
+          >
+            {row.status}
+          </StatusBadge>
+        );
+      case 'expiry_date':
+        return row.expiry_date ? formatDate(row.expiry_date) : 'N/A';
+      case 'actions':
+        return (
+          <div className="action-buttons">
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => handleEdit(row)}
+            >
+              Edit
+            </button>
+            <button
+              className="btn btn-danger btn-sm"
+              onClick={() => handleDelete(row.id)}
+            >
+              Delete
+            </button>
+          </div>
+        );
+      default:
+        return value;
+    }
+  };
+
+  // Helper function for status variants
+  const getStatusVariant = (status) => {
+    switch (status) {
+      case 'fresh': return 'success';
+      case 'expiring_soon': return 'warning';
+      case 'expired': return 'danger';
+      default: return 'default';
+    }
+  };
+
+  // Handler functions for DataTable actions
+  const handleEdit = (row) => {
+    setEditingDressedChicken(row);
+    setEditFormData({
+      batch_id: row.batch_id,
+      processing_date: row.processing_date,
+      initial_count: row.initial_count,
+      current_count: row.current_count,
+      average_weight: row.average_weight,
+      size_category: row.size_category,
+      storage_location: row.storage_location,
+      expiry_date: row.expiry_date,
+      notes: row.notes || ''
+    });
+    setShowEditModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this processed chicken record?')) {
+      try {
+        await deleteDressedChicken(id);
+      } catch (error) {
+        console.error('Error deleting processed chicken:', error);
+        alert('Failed to delete processed chicken record');
+      }
+    }
+  };
   
   // Handle filter changes
   const handleFilterChange = (e) => {
@@ -230,17 +298,6 @@ const ProcessingManagement = () => {
       closeEditModal();
     } catch (error) {
       alert(`Error: ${error.message}`);
-    }
-  };
-  
-  // Handle delete
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this dressed chicken record?')) {
-      try {
-        await deleteDressedChicken(id);
-      } catch (error) {
-        alert(`Error: ${error.message}`);
-      }
     }
   };
   
@@ -389,150 +446,39 @@ const ProcessingManagement = () => {
             </button>
           </div>
           
-          {/* Table Header Controls */}
-          <div className="table-header-controls">
-            <h3>Dressed Chicken Inventory</h3>
-            <ColumnFilter 
-              columns={processingColumns}
-              visibleColumns={columnConfig.visibleColumns}
-              onColumnToggle={columnConfig.toggleColumn}
-            />
-          </div>
-          
-          {/* Sort Controls */}
-          <SortControls 
-            sortConfig={sortConfig}
-            onReset={resetSort}
-          />
-          
           {/* Processing Table */}
-          <div className="table-container">
-            <table className="processing-table">
-              <thead>
-                <tr>
-                  {columnConfig.isColumnVisible('processing_date') && (
-                    <SortableTableHeader sortKey="processing_date" onSort={requestSort} getSortIcon={getSortIcon}>
-                      Processing Date
-                    </SortableTableHeader>
-                  )}
-                  {columnConfig.isColumnVisible('batch_id') && (
-                    <SortableTableHeader sortKey="batch_id" onSort={requestSort} getSortIcon={getSortIcon}>
-                      Batch ID
-                    </SortableTableHeader>
-                  )}
-                  {columnConfig.isColumnVisible('initial_count') && (
-                    <SortableTableHeader sortKey="initial_count" onSort={requestSort} getSortIcon={getSortIcon}>
-                      Initial Count
-                    </SortableTableHeader>
-                  )}
-                  {columnConfig.isColumnVisible('current_count') && (
-                    <SortableTableHeader sortKey="current_count" onSort={requestSort} getSortIcon={getSortIcon}>
-                      Current Count
-                    </SortableTableHeader>
-                  )}
-                  {columnConfig.isColumnVisible('average_weight') && (
-                    <SortableTableHeader sortKey="average_weight" onSort={requestSort} getSortIcon={getSortIcon}>
-                      Avg Weight (kg)
-                    </SortableTableHeader>
-                  )}
-                  {columnConfig.isColumnVisible('size_category') && (
-                    <SortableTableHeader sortKey="size_category" onSort={requestSort} getSortIcon={getSortIcon}>
-                      Size Category
-                    </SortableTableHeader>
-                  )}
-                  {columnConfig.isColumnVisible('status') && (
-                    <SortableTableHeader sortKey="status" onSort={requestSort} getSortIcon={getSortIcon}>
-                      Status
-                    </SortableTableHeader>
-                  )}
-                  {columnConfig.isColumnVisible('storage_location') && (
-                    <SortableTableHeader sortKey="storage_location" onSort={requestSort} getSortIcon={getSortIcon}>
-                      Storage Location
-                    </SortableTableHeader>
-                  )}
-                  {columnConfig.isColumnVisible('expiry_date') && (
-                    <SortableTableHeader sortKey="expiry_date" onSort={requestSort} getSortIcon={getSortIcon}>
-                      Expiry Date
-                    </SortableTableHeader>
-                  )}
-                  {columnConfig.isColumnVisible('actions') && (
-                    <SortableTableHeader sortable={false}>
-                      Actions
-                    </SortableTableHeader>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {pagination.currentData.length > 0 ? (
-                  pagination.currentData.map(item => {
-                    const isExpiringSoon = item.expiry_date && new Date(item.expiry_date) <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3 days
-                    
-                    return (
-                      <tr key={item.id}>
-                        {columnConfig.isColumnVisible('processing_date') && <td>{formatDate(item.processing_date)}</td>}
-                        {columnConfig.isColumnVisible('batch_id') && <td>{item.batch_id}</td>}
-                        {columnConfig.isColumnVisible('initial_count') && <td>{formatNumber(item.initial_count)}</td>}
-                        {columnConfig.isColumnVisible('current_count') && <td>{formatNumber(item.current_count)}</td>}
-                        {columnConfig.isColumnVisible('average_weight') && <td>{formatNumber(item.average_weight, 2)}</td>}
-                        {columnConfig.isColumnVisible('size_category') && <td>{item.size_category}</td>}
-                        {columnConfig.isColumnVisible('status') && (
-                          <td>
-                            <span className={`status-badge ${item.status}`}>
-                              {item.status.replace('-', ' ')}
-                            </span>
-                          </td>
-                        )}
-                        {columnConfig.isColumnVisible('storage_location') && <td>{item.storage_location || '-'}</td>}
-                        {columnConfig.isColumnVisible('expiry_date') && (
-                          <td className={isExpiringSoon ? 'expiring-soon' : ''}>
-                            {item.expiry_date ? formatDate(item.expiry_date) : '-'}
-                          </td>
-                        )}
-                        {columnConfig.isColumnVisible('actions') && (
-                          <td>
-                            <div className="action-buttons">
-                              <button
-                                className="edit-btn-icon"
-                                onClick={() => openEditModal(item)}
-                                title="Edit record"
-                                aria-label="Edit record"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                className="delete-btn-icon"
-                                onClick={() => handleDelete(item.id)}
-                                title="Delete record"
-                                aria-label="Delete record"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={columnConfig.visibleColumns.length} className="no-data">
-                      No dressed chicken records found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          
-          {/* Pagination */}
-          <Pagination
-            currentPage={pagination.currentPage}
-            totalPages={pagination.totalPages}
-            onPageChange={pagination.handlePageChange}
-            pageSize={pagination.pageSize}
-            onPageSizeChange={pagination.handlePageSizeChange}
-            totalItems={pagination.totalItems}
-          />
+          <section className="dashboard-section">
+            <div className="section-header">
+              <h3 className="section-title">
+                <span className="section-title-icon">🍗</span>
+                Dressed Chicken Inventory
+              </h3>
+              <div className="section-actions">
+                <button className="btn btn-primary" onClick={() => setShowProcessingModal(true)}>
+                  Process Chicken
+                </button>
+              </div>
+            </div>
+
+            <DataTable
+              data={filteredDressedChickens}
+              columns={processingColumns}
+              renderCell={renderProcessingCell}
+              enableSorting
+              enablePagination
+              pageSize={10}
+              emptyMessage="No dressed chicken records found"
+              rowKey="id"
+              rowClassName={(row) => {
+                const isExpiringSoon = row.expiry_date &&
+                  new Date(row.expiry_date) <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+                const isExpired = row.expiry_date &&
+                  new Date(row.expiry_date) < new Date();
+                return isExpired ? 'expired-row' : isExpiringSoon ? 'expiring-row' : '';
+              }}
+            />
+          </section>
+
         </>
       )}
       
