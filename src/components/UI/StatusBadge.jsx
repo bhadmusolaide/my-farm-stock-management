@@ -44,7 +44,11 @@ const StatusBadge = ({
     // Completed States
     completed: { label: 'Completed', type: 'success', icon: '✓' },
     done: { label: 'Done', type: 'success', icon: '✓' },
-    delivered: { label: 'Delivered', type: 'success', icon: '✓' },
+    delivered: { label: 'Delivered', type: '✓' },
+
+    // Specific Dressed Chicken Statuses
+    sold: { label: 'Sold', type: 'success', icon: '💰' },
+    damaged: { label: 'Damaged', type: 'danger', icon: '💔' },
 
     // Payment Status
     paid: { label: 'Paid', type: 'success', icon: '💰' },
