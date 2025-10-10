@@ -45,6 +45,53 @@
   gap: 0.75rem;
 }
 
+/* Pagination Styles */
+.pagination-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+  background-color: var(--card-background, #fff);
+}
+
+.pagination-info {
+  color: var(--text-secondary, #666);
+  font-size: 0.875rem;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pagination-controls .btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+}
+
+.page-info {
+  color: var(--text-color, #333);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+/* Dark mode pagination */
+[data-theme="dark"] .pagination-container {
+  background-color: var(--card-background);
+  border-top-color: var(--border-color);
+}
+
+[data-theme="dark"] .pagination-info {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .page-info {
+  color: var(--text-color);
+}
+
 .btn-primary {
   background-color: #4caf50;
   color: white;

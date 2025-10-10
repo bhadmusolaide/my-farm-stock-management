@@ -24,8 +24,10 @@ const StatusBadge = ({
     // Warning States
     sick: { label: 'Sick', type: 'warning', icon: '⚠' },
     warning: { label: 'Warning', type: 'warning', icon: '⚠' },
-    pending: { label: 'Pending', type: 'warning', icon: '⏳' },
     'expiring-soon': { label: 'Expiring Soon', type: 'warning', icon: '⚠' },
+
+    // Pending State (Red/Orange to differentiate from Partial)
+    pending: { label: 'Pending', type: 'danger', icon: '⏳' },
     
     // Critical/Error States
     quarantine: { label: 'Quarantine', type: 'danger', icon: '🚫' },
@@ -43,6 +45,10 @@ const StatusBadge = ({
     completed: { label: 'Completed', type: 'success', icon: '✓' },
     done: { label: 'Done', type: 'success', icon: '✓' },
     delivered: { label: 'Delivered', type: 'success', icon: '✓' },
+
+    // Payment Status
+    paid: { label: 'Paid', type: 'success', icon: '💰' },
+    partial: { label: 'Partial', type: 'warning', icon: '💳' },
     
     // Neutral States
     inactive: { label: 'Inactive', type: 'secondary', icon: '○' },

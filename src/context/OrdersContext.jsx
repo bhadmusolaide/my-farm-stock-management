@@ -110,17 +110,29 @@ export function OrdersProvider({ children }) {
   // CRUD operations for chicken orders
   const addChicken = async (chickenData) => {
     try {
-      // Convert amountPaid to amount_paid to match database schema
-      const { amountPaid, calculationMode, batch_id, ...otherData } = chickenData;
-      
+      // Convert camelCase to snake_case to match database schema
+      const { amountPaid, calculationMode, inventoryType, batch_id, ...otherData } = chickenData;
+
+      // Calculate total cost based on calculation mode
+      let totalCost = 0;
+      const calcMode = calculationMode || 'count_size_cost';
+      if (calcMode === 'count_cost') {
+        totalCost = chickenData.count * chickenData.price;
+      } else if (calcMode === 'size_cost') {
+        totalCost = chickenData.size * chickenData.price;
+      } else {
+        totalCost = chickenData.count * chickenData.size * chickenData.price;
+      }
+
       const chicken = {
         id: Date.now().toString(),
         date: new Date().toISOString().split('T')[0],
         ...otherData,
         amount_paid: amountPaid || 0,
-        calculation_mode: calculationMode || 'count_size_cost',
+        calculation_mode: calcMode,
+        inventory_type: inventoryType || 'live',
         batch_id: batch_id || null,
-        balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0),
+        balance: totalCost - (amountPaid || 0),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -142,19 +154,49 @@ export function OrdersProvider({ children }) {
 
   const updateChicken = async (id, chickenData) => {
     try {
-      const oldChicken = chickens.find(chicken => chicken.id === id);
-      if (!oldChicken) throw new Error('Chicken order not found');
+      // First, try to get the order from local state
+      let oldChicken = chickens.find(chicken => chicken.id === id);
 
-      // Convert amountPaid to amount_paid to match database schema
-      const { amountPaid, calculationMode, batch_id, ...otherData } = chickenData;
-      
+      // If not found in local state, fetch from database
+      if (!oldChicken) {
+        console.warn(`Order ${id} not found in local state (${chickens.length} orders loaded), fetching from database...`);
+        const { data: dbChicken, error: fetchError } = await supabase
+          .from('chickens')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (fetchError || !dbChicken) {
+          console.error('Database fetch error:', fetchError);
+          throw new Error(`Chicken order not found in database: ${id}`);
+        }
+
+        oldChicken = dbChicken;
+        console.log('Successfully fetched order from database');
+      }
+
+      // Convert camelCase to snake_case to match database schema
+      const { amountPaid, calculationMode, inventoryType, batch_id, ...otherData } = chickenData;
+
+      // Calculate total cost based on calculation mode
+      let totalCost = 0;
+      const calcMode = calculationMode || oldChicken.calculation_mode || 'count_size_cost';
+      if (calcMode === 'count_cost') {
+        totalCost = chickenData.count * chickenData.price;
+      } else if (calcMode === 'size_cost') {
+        totalCost = chickenData.size * chickenData.price;
+      } else {
+        totalCost = chickenData.count * chickenData.size * chickenData.price;
+      }
+
       const updatedChicken = {
         ...oldChicken,
         ...otherData,
         amount_paid: amountPaid || 0,
-        calculation_mode: calculationMode || 'count_size_cost',
+        calculation_mode: calcMode,
+        inventory_type: inventoryType || oldChicken.inventory_type || 'live',
         batch_id: batch_id || null,
-        balance: (chickenData.count * chickenData.size * chickenData.price) - (amountPaid || 0),
+        balance: totalCost - (amountPaid || 0),
         updated_at: new Date().toISOString()
       };
 
@@ -165,9 +207,20 @@ export function OrdersProvider({ children }) {
 
       if (error) throw error;
 
-      setChickens(prev => prev.map(chicken =>
-        chicken.id === id ? updatedChicken : chicken
-      ));
+      // Update local state - handle case where order wasn't in local state
+      setChickens(prev => {
+        const existingIndex = prev.findIndex(chicken => chicken.id === id);
+        if (existingIndex >= 0) {
+          // Update existing order
+          return prev.map(chicken =>
+            chicken.id === id ? updatedChicken : chicken
+          );
+        } else {
+          // Add the order to local state if it wasn't there
+          console.log(`Adding order ${id} to local state after update`);
+          return [updatedChicken, ...prev]; // Add to beginning for consistency with order
+        }
+      });
 
       // Log audit action
       await logAuditAction('UPDATE', 'chickens', id, oldChicken, updatedChicken);
@@ -330,6 +383,29 @@ export function OrdersProvider({ children }) {
     };
   }, [chickens]);
 
+  // Refresh function to reload data
+  const refreshData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Load chickens (orders)
+      const { data: chickensData, error: chickensError } = await supabase
+        .from('chickens')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (chickensError) throw chickensError;
+      setChickens(chickensData || []);
+      console.log(`Refreshed OrdersContext data: ${chickensData?.length || 0} orders loaded`);
+    } catch (err) {
+      console.error('Error refreshing orders data:', err);
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value = {
     // State
     chickens,
@@ -349,6 +425,7 @@ export function OrdersProvider({ children }) {
     getOrdersByCustomer,
     getOrdersByStatus,
     getOrdersByDateRange,
+    refreshData,
 
     // Analytics
     customerStats,

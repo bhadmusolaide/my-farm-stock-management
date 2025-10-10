@@ -43,6 +43,97 @@
   color: var(--danger-color, #dc3545);
 }
 
+/* Total Cost Section */
+.total-cost-section {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  border: 2px solid var(--primary-color, #007bff);
+  border-radius: 8px;
+  background-color: var(--primary-bg, #f8f9ff);
+  text-align: center;
+}
+
+.total-cost-display h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-color, #374151);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.total-amount {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--success-color, #28a745);
+  margin: 0;
+}
+
+/* Status Display */
+.status-display {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.status-display .status-badge {
+  align-self: flex-start;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+}
+
+.status-display .status-badge.status-pending {
+  background-color: var(--warning-bg, #fff3cd);
+  color: var(--warning-color, #856404);
+  border: 1px solid var(--warning-border, #ffeaa7);
+}
+
+.status-display .status-badge.status-partial {
+  background-color: var(--info-bg, #d1ecf1);
+  color: var(--info-color, #0c5460);
+  border: 1px solid var(--info-border, #bee5eb);
+}
+
+.status-display .status-badge.status-paid {
+  background-color: var(--success-bg, #d4edda);
+  color: var(--success-color, #155724);
+  border: 1px solid var(--success-border, #c3e6cb);
+}
+
+/* Dark mode optimization for Total Cost section */
+[data-theme="dark"] .total-cost-section {
+  border-color: var(--primary-color, #4dabf7);
+  background-color: var(--card-background, #2d3748);
+}
+
+[data-theme="dark"] .total-cost-display h4 {
+  color: var(--text-color, #e2e8f0);
+}
+
+[data-theme="dark"] .total-amount {
+  color: var(--success-color, #68d391);
+}
+
+/* Dark mode optimization for status badges */
+[data-theme="dark"] .status-display .status-badge.status-pending {
+  background-color: rgba(255, 193, 7, 0.2);
+  color: #ffd93d;
+  border-color: rgba(255, 193, 7, 0.3);
+}
+
+[data-theme="dark"] .status-display .status-badge.status-partial {
+  background-color: rgba(52, 144, 220, 0.2);
+  color: #63b3ed;
+  border-color: rgba(52, 144, 220, 0.3);
+}
+
+[data-theme="dark"] .status-display .status-badge.status-paid {
+  background-color: rgba(72, 187, 120, 0.2);
+  color: #68d391;
+  border-color: rgba(72, 187, 120, 0.3);
+}
+
 .order-form input,
 .order-form select,
 .order-form textarea {

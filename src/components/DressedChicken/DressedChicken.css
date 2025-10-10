@@ -1,5 +1,107 @@
 /* DressedChicken Components Styles */
 
+/* Processing Details Modal Styles */
+.processing-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.details-section {
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 8px;
+  padding: 1rem;
+  background-color: var(--card-bg, #fff);
+}
+
+.details-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  color: var(--text-color, #333);
+  border-bottom: 2px solid var(--primary-color, #007bff);
+  padding-bottom: 0.5rem;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-item label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-muted, #666);
+}
+
+.detail-item span {
+  font-size: 1rem;
+  color: var(--text-color, #333);
+}
+
+.detail-item span.capitalize {
+  text-transform: capitalize;
+}
+
+.detail-item span.warning-text {
+  color: var(--warning-color, #ffc107);
+  font-weight: 600;
+}
+
+.detail-item span.success-text {
+  color: var(--success-color, #28a745);
+  font-weight: 600;
+}
+
+.parts-table {
+  overflow-x: auto;
+}
+
+.parts-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.parts-table th,
+.parts-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color, #ddd);
+}
+
+.parts-table th {
+  background-color: var(--table-header-bg, #f8f9fa);
+  font-weight: 600;
+  color: var(--text-color, #333);
+}
+
+.parts-table td.capitalize {
+  text-transform: capitalize;
+}
+
+.notes-text {
+  margin: 0;
+  padding: 0.75rem;
+  background-color: var(--bg-light, #f8f9fa);
+  border-radius: 4px;
+  color: var(--text-color, #333);
+  line-height: 1.6;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color, #ddd);
+}
+
 /* Processing Form Styles */
 .processing-form {
   display: flex;

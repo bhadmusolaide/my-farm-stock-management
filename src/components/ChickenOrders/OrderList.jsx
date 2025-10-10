@@ -4,8 +4,7 @@ import { formatNumber, formatDate } from '../../utils/formatters';
 import {
   useTableFilters,
   useStatusFilter,
-  useDateRangeFilter,
-  useTableOperations
+  useDateRangeFilter
 } from '../../hooks';
 import './ChickenOrders.css';
 
@@ -14,6 +13,9 @@ const OrderList = ({
   onEdit,
   onDelete,
   onBatchUpdate,
+  selectedOrders = [],
+  onOrderSelect,
+  onSelectAll,
   loading = false
 }) => {
   // Use custom hooks for filtering and table operations
@@ -55,23 +57,7 @@ const OrderList = ({
     clearDateFilter
   } = useDateRangeFilter(statusFilteredOrders, 'date');
 
-  const {
-    selectedItems: selectedOrders,
-    selectedCount,
-    isAllSelected,
-    isIndeterminate,
-    selectItem,
-    handleItemClick,
-    selectAll,
-    deselectAll,
-    toggleSelectAll,
-    isSelected,
-    getSelectedItems,
-    bulkAction
-  } = useTableOperations(dateFilteredOrders, {
-    idField: 'id',
-    allowMultiSelect: true
-  });
+  // Selection is managed by parent component via props
 
   // Final filtered data
   const finalFilteredOrders = dateFilteredOrders;
@@ -90,20 +76,10 @@ const OrderList = ({
     });
   };
 
-  // Handler for order selection
-  const onOrderSelect = (orderId) => {
-    selectItem(orderId);
-  };
+  // Order selection is handled by parent component via onOrderSelect prop
 
-  // Handler for select all
-  const onSelectAll = (orderIds) => {
-    if (orderIds.length === 0) {
-      deselectAll();
-    } else {
-      // Select all provided order IDs
-      orderIds.forEach(id => selectItem(id));
-    }
-  };
+  // Handler for select all - this is passed from parent
+  // const onSelectAll is already provided as a prop
 
   // Enhanced filter configuration using custom hooks
   // Combine search term and filters for FilterPanel
@@ -243,14 +219,23 @@ const OrderList = ({
       sortable: true,
       render: (order) => {
         let total = 0;
-        if (order.calculation_mode === 'count_cost') {
-          total = order.count * order.price;
-        } else if (order.calculation_mode === 'size_cost') {
-          total = order.size * order.price;
+        const calcMode = order.calculation_mode || 'count_size_cost';
+
+        // Convert to numbers explicitly - this is likely the issue!
+        const count = parseFloat(order.count) || 0;
+        const size = parseFloat(order.size) || 0;
+        const price = parseFloat(order.price) || 0;
+
+        if (calcMode === 'count_cost') {
+          total = count * price;
+        } else if (calcMode === 'size_cost') {
+          total = size * price;
         } else {
-          total = order.size * order.price; // count_size_cost
+          // Default: count_size_cost
+          total = count * size * price;
         }
-        return `₦${formatNumber(total, 2)}`;
+
+        return total > 0 ? `₦${formatNumber(total, 2)}` : '-';
       }
     },
     {
@@ -265,14 +250,24 @@ const OrderList = ({
       sortable: true,
       render: (order) => {
         let total = 0;
-        if (order.calculation_mode === 'count_cost') {
-          total = order.count * order.price;
-        } else if (order.calculation_mode === 'size_cost') {
-          total = order.size * order.price;
+        const calcMode = order.calculation_mode || 'count_size_cost';
+
+        // Convert to numbers explicitly
+        const count = parseFloat(order.count) || 0;
+        const size = parseFloat(order.size) || 0;
+        const price = parseFloat(order.price) || 0;
+        const amountPaid = parseFloat(order.amount_paid) || 0;
+
+        if (calcMode === 'count_cost') {
+          total = count * price;
+        } else if (calcMode === 'size_cost') {
+          total = size * price;
         } else {
-          total = order.size * order.price;
+          // Default: count_size_cost
+          total = count * size * price;
         }
-        const balance = total - (order.amount_paid || 0);
+
+        const balance = total - amountPaid;
         return (
           <span className={balance > 0 ? 'balance-due' : 'balance-paid'}>
             ₦{formatNumber(balance, 2)}
@@ -342,26 +337,34 @@ const OrderList = ({
       totalBalance: 0,
       statusCounts: {
         pending: 0,
-        confirmed: 0,
-        completed: 0,
-        cancelled: 0
+        partial: 0,
+        paid: 0
       }
     };
 
     finalFilteredOrders.forEach(order => {
       // Calculate total value
       let total = 0;
-      if (order.calculation_mode === 'count_cost') {
-        total = order.count * order.price;
-      } else if (order.calculation_mode === 'size_cost') {
-        total = order.size * order.price;
+      const calcMode = order.calculation_mode || 'count_size_cost';
+
+      // Convert to numbers explicitly
+      const count = parseFloat(order.count) || 0;
+      const size = parseFloat(order.size) || 0;
+      const price = parseFloat(order.price) || 0;
+      const amountPaid = parseFloat(order.amount_paid) || 0;
+
+      if (calcMode === 'count_cost') {
+        total = count * price;
+      } else if (calcMode === 'size_cost') {
+        total = size * price;
       } else {
-        total = order.size * order.price;
+        // Default: count_size_cost
+        total = count * size * price;
       }
 
       stats.totalValue += total;
-      stats.totalPaid += order.amount_paid || 0;
-      stats.totalBalance += total - (order.amount_paid || 0);
+      stats.totalPaid += amountPaid;
+      stats.totalBalance += total - amountPaid;
       stats.statusCounts[order.status] = (stats.statusCounts[order.status] || 0) + 1;
     });
 
@@ -433,7 +436,7 @@ const OrderList = ({
         columns={columns}
         loading={loading}
         enableSorting
-        enablePagination
+        enablePagination={false}
         enableSearch={false}
         renderActions={renderActions}
         headerActions={headerActions}

@@ -156,16 +156,45 @@ export function FeedProvider({ children }) {
   // CRUD operations for feed inventory
   const addFeedInventory = async (feedData) => {
     try {
+      // Extract assigned_batches before creating feed item
+      const { assigned_batches, ...feedItemData } = feedData;
+
       const feedItem = {
         id: Date.now().toString(),
-        ...feedData,
-        purchase_date: feedData.purchase_date || new Date().toISOString().split('T')[0],
+        ...feedItemData,
+        purchase_date: feedItemData.purchase_date || new Date().toISOString().split('T')[0],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
+      // Insert feed inventory
       const { error } = await supabase.from('feed_inventory').insert(feedItem);
       if (error) throw error;
+
+      // Handle batch assignments if any
+      if (assigned_batches && assigned_batches.length > 0) {
+        const assignments = assigned_batches.map(ab => ({
+          id: `${feedItem.id}-${ab.batch_id}-${Date.now()}`,
+          feed_id: feedItem.id,
+          chicken_batch_id: ab.batch_id,
+          assigned_quantity_kg: parseFloat(ab.assigned_quantity_kg),
+          assigned_date: new Date().toISOString().split('T')[0],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }));
+
+        const { error: assignmentError } = await supabase
+          .from('feed_batch_assignments')
+          .insert(assignments);
+
+        if (assignmentError) {
+          console.error('Error creating batch assignments:', assignmentError);
+          // Don't throw - feed was created successfully
+        }
+
+        // Add assignments to feed item for local state
+        feedItem.assigned_batches = assigned_batches;
+      }
 
       setFeedInventory(prev => [feedItem, ...prev]);
 
@@ -184,18 +213,55 @@ export function FeedProvider({ children }) {
       const oldFeedItem = feedInventory.find(item => item.id === id);
       if (!oldFeedItem) throw new Error('Feed item not found');
 
+      // Extract assigned_batches before updating feed item
+      const { assigned_batches, ...feedItemData } = feedData;
+
       const updatedFeedItem = {
         ...oldFeedItem,
-        ...feedData,
+        ...feedItemData,
         updated_at: new Date().toISOString()
       };
 
+      // Update feed inventory
       const { error } = await supabase
         .from('feed_inventory')
         .update(updatedFeedItem)
         .eq('id', id);
 
       if (error) throw error;
+
+      // Handle batch assignments if provided
+      if (assigned_batches !== undefined) {
+        // Delete existing assignments
+        await supabase
+          .from('feed_batch_assignments')
+          .delete()
+          .eq('feed_id', id);
+
+        // Insert new assignments if any
+        if (assigned_batches.length > 0) {
+          const assignments = assigned_batches.map(ab => ({
+            id: `${id}-${ab.batch_id}-${Date.now()}`,
+            feed_id: id,
+            chicken_batch_id: ab.batch_id,
+            assigned_quantity_kg: parseFloat(ab.assigned_quantity_kg),
+            assigned_date: new Date().toISOString().split('T')[0],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }));
+
+          const { error: assignmentError } = await supabase
+            .from('feed_batch_assignments')
+            .insert(assignments);
+
+          if (assignmentError) {
+            console.error('Error updating batch assignments:', assignmentError);
+          }
+        }
+
+        // Add assignments to updated item for local state
+        updatedFeedItem.assigned_batches = assigned_batches;
+      }
 
       setFeedInventory(prev => prev.map(item =>
         item.id === id ? updatedFeedItem : item

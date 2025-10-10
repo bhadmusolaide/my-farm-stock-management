@@ -13,14 +13,14 @@ const BatchUpdateModal = ({
 }) => {
   const [updateData, setUpdateData] = useState({
     status: '',
-    amountPaid: '',
+    amount_paid: '',
     updateType: 'status' // 'status', 'payment', 'both'
   });
 
   const [errors, setErrors] = useState({});
 
   // Get selected order details
-  const selectedOrderDetails = orders.filter(order => 
+  const selectedOrderDetails = orders.filter(order =>
     selectedOrders.includes(order.id)
   );
 
@@ -32,7 +32,8 @@ const BatchUpdateModal = ({
     } else if (order.calculation_mode === 'size_cost') {
       orderTotal = order.size * order.price;
     } else {
-      orderTotal = order.size * order.price;
+      // Default: count_size_cost
+      orderTotal = order.count * order.size * order.price;
     }
 
     acc.totalValue += orderTotal;
@@ -46,7 +47,7 @@ const BatchUpdateModal = ({
     if (isOpen) {
       setUpdateData({
         status: '',
-        amountPaid: '',
+        amount_paid: '',
         updateType: 'status'
       });
       setErrors({});
@@ -79,8 +80,8 @@ const BatchUpdateModal = ({
     }
 
     if (updateData.updateType === 'payment' || updateData.updateType === 'both') {
-      if (!updateData.amountPaid || parseFloat(updateData.amountPaid) < 0) {
-        newErrors.amountPaid = 'Amount paid must be 0 or greater';
+      if (!updateData.amount_paid || parseFloat(updateData.amount_paid) < 0) {
+        newErrors.amount_paid = 'Amount paid must be 0 or greater';
       }
     }
 
@@ -90,20 +91,48 @@ const BatchUpdateModal = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
+    // Prepare batch update data with balance recalculation
+    const updatedOrders = selectedOrderDetails.map(order => {
+      let orderTotal = 0;
+      if (order.calculation_mode === 'count_cost') {
+        orderTotal = order.count * order.price;
+      } else if (order.calculation_mode === 'size_cost') {
+        orderTotal = order.size * order.price;
+      } else {
+        orderTotal = order.count * order.size * order.price;
+      }
+
+      const newAmountPaid = updateData.updateType === 'payment' || updateData.updateType === 'both'
+        ? parseFloat(updateData.amount_paid)
+        : order.amount_paid;
+
+      const newBalance = Math.max(0, orderTotal - newAmountPaid);
+
+      return {
+        id: order.id,
+        status: updateData.updateType === 'status' || updateData.updateType === 'both'
+          ? updateData.status
+          : order.status,
+        amount_paid: newAmountPaid,
+        balance: newBalance
+      };
+    });
+
     const batchData = {
       orderIds: selectedOrders,
       updateType: updateData.updateType,
-      status: updateData.updateType === 'status' || updateData.updateType === 'both' 
-        ? updateData.status 
+      status: updateData.updateType === 'status' || updateData.updateType === 'both'
+        ? updateData.status
         : undefined,
-      amountPaid: updateData.updateType === 'payment' || updateData.updateType === 'both' 
-        ? parseFloat(updateData.amountPaid) 
-        : undefined
+      amount_paid: updateData.updateType === 'payment' || updateData.updateType === 'both'
+        ? parseFloat(updateData.amount_paid)
+        : undefined,
+      updatedOrders: updatedOrders // Include recalculated balances
     };
 
     try {
@@ -206,23 +235,23 @@ const BatchUpdateModal = ({
 
           {(updateData.updateType === 'payment' || updateData.updateType === 'both') && (
             <div className="form-group">
-              <label htmlFor="amountPaid">
+              <label htmlFor="amount_paid">
                 Amount Paid <span className="required">*</span>
               </label>
               <input
                 type="number"
-                id="amountPaid"
-                name="amountPaid"
-                value={updateData.amountPaid}
+                id="amount_paid"
+                name="amount_paid"
+                value={updateData.amount_paid}
                 onChange={handleInputChange}
                 min="0"
                 step="0.01"
                 placeholder="Enter amount paid"
-                className={errors.amountPaid ? 'error' : ''}
+                className={errors.amount_paid ? 'error' : ''}
               />
-              {errors.amountPaid && <span className="error-message">{errors.amountPaid}</span>}
+              {errors.amount_paid && <span className="error-message">{errors.amount_paid}</span>}
               <small className="form-help">
-                This amount will be set for each selected order
+                This amount will be set for each selected order. Balance will be auto-recalculated.
               </small>
             </div>
           )}

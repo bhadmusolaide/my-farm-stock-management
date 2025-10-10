@@ -88,7 +88,14 @@ const DataTable = ({
     return String(value);
   };
 
-  const cellRenderer = renderCell || defaultRenderCell;
+  const cellRenderer = (value, row, column) => {
+    // CRITICAL FIX: Check if column has its own render function first
+    if (column.render && typeof column.render === 'function') {
+      return column.render(row);
+    }
+    // Otherwise use custom or default renderer
+    return renderCell ? renderCell(value, row, column) : defaultRenderCell(value, row, column);
+  };
 
   // Handle row click
   const handleRowClick = (row, index) => {
@@ -221,9 +228,9 @@ const DataTable = ({
         <Pagination
           currentPage={pagination.currentPage}
           totalPages={totalPages}
-          onPageChange={pagination.goToPage}
+          onPageChange={pagination.handlePageChange}
           pageSize={pagination.pageSize}
-          onPageSizeChange={pagination.setPageSize}
+          onPageSizeChange={pagination.handlePageSizeChange}
           totalItems={searchedData.length}
           pageSizeOptions={pageSizeOptions}
         />

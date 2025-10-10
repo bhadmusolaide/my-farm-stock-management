@@ -289,6 +289,7 @@ function CombinedContextProvider({ children }) {
     getOrdersByCustomer: orders.getOrdersByCustomer,
     getOrdersByStatus: orders.getOrdersByStatus,
     getOrdersByDateRange: orders.getOrdersByDateRange,
+    refreshData: orders.refreshData,
     customerStats: orders.customerStats,
     orderStats: orders.orderStats,
 

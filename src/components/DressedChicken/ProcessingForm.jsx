@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { EnhancedModal } from '../UI';
 import { formatWeight } from '../../utils/formatters';
+import { useAuth } from '../../context/AuthContext';
 import './DressedChicken.css';
 
 const ProcessingForm = ({
@@ -11,18 +12,25 @@ const ProcessingForm = ({
   chickenSizeCategories = [],
   loading = false
 }) => {
+  const { user } = useAuth();
+
   const [formData, setFormData] = useState({
+    batch_id: '',
     selectedBatch: '',
-    processingDate: new Date().toISOString().split('T')[0],
-    sizeCategoryId: '',
-    sizeCategoryCustom: '',
-    processingQuantity: '',
-    storageLocation: '',
-    expiryDate: '',
+    processing_date: new Date().toISOString().split('T')[0],
+    initial_count: '',
+    current_count: '',
+    average_weight: '',
+    size_category_id: '',
+    size_category_custom: '',
+    processing_quantity: '',
+    storage_location: '',
+    expiry_date: '',
+    status: 'in-storage',
     notes: '',
-    createNewBatchForRemaining: false,
-    remainingBatchId: '',
-    // Parts data
+    create_new_batch_for_remaining: false,
+    remaining_batch_id: '',
+    // Parts data (will be transformed to JSONB)
     neckCount: '',
     neckWeight: '',
     feetCount: '',
@@ -39,16 +47,21 @@ const ProcessingForm = ({
   useEffect(() => {
     if (isOpen) {
       setFormData({
+        batch_id: `DRESSED-${Date.now()}`,
         selectedBatch: '',
-        processingDate: new Date().toISOString().split('T')[0],
-        sizeCategoryId: '',
-        sizeCategoryCustom: '',
-        processingQuantity: '',
-        storageLocation: '',
-        expiryDate: '',
+        processing_date: new Date().toISOString().split('T')[0],
+        initial_count: '',
+        current_count: '',
+        average_weight: '',
+        size_category_id: '',
+        size_category_custom: '',
+        processing_quantity: '',
+        storage_location: '',
+        expiry_date: '',
+        status: 'in-storage',
         notes: '',
-        createNewBatchForRemaining: false,
-        remainingBatchId: '',
+        create_new_batch_for_remaining: false,
+        remaining_batch_id: '',
         neckCount: '',
         neckWeight: '',
         feetCount: '',
@@ -71,13 +84,31 @@ const ProcessingForm = ({
 
   // Update expiry date when processing date changes
   useEffect(() => {
-    if (formData.processingDate && !formData.expiryDate) {
+    if (formData.processing_date && !formData.expiry_date) {
       setFormData(prev => ({
         ...prev,
-        expiryDate: calculateDefaultExpiryDate(prev.processingDate)
+        expiry_date: calculateDefaultExpiryDate(prev.processing_date)
       }));
     }
-  }, [formData.processingDate]);
+  }, [formData.processing_date]);
+
+  // Auto-calculate initial_count, current_count, and average_weight when batch or quantity changes
+  useEffect(() => {
+    if (formData.selectedBatch && formData.processing_quantity) {
+      const selectedBatchData = liveChickens.find(batch => batch.id === formData.selectedBatch);
+      if (selectedBatchData) {
+        const processingQty = parseInt(formData.processing_quantity) || 0;
+        const avgWeight = selectedBatchData.current_weight || selectedBatchData.expected_weight || 2.5;
+
+        setFormData(prev => ({
+          ...prev,
+          initial_count: processingQty,
+          current_count: processingQty,
+          average_weight: avgWeight.toFixed(2)
+        }));
+      }
+    }
+  }, [formData.selectedBatch, formData.processing_quantity, liveChickens]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -85,7 +116,7 @@ const ProcessingForm = ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-    
+
     // Clear error for this field
     if (errors[name]) {
       setErrors(prev => ({
@@ -98,32 +129,40 @@ const ProcessingForm = ({
   const validateForm = () => {
     const newErrors = {};
 
+    if (!formData.batch_id?.trim()) {
+      newErrors.batch_id = 'Batch ID is required';
+    }
+
     if (!formData.selectedBatch) {
       newErrors.selectedBatch = 'Please select a live chicken batch';
     }
 
-    if (!formData.sizeCategoryId) {
-      newErrors.sizeCategoryId = 'Please select a size category';
+    if (!formData.size_category_id) {
+      newErrors.size_category_id = 'Please select a size category';
     }
 
-    if (formData.sizeCategoryId === 'custom' && !formData.sizeCategoryCustom.trim()) {
-      newErrors.sizeCategoryCustom = 'Please enter a custom size name';
+    if (formData.size_category_id === 'custom' && !formData.size_category_custom.trim()) {
+      newErrors.size_category_custom = 'Please enter a custom size name';
     }
 
     const selectedBatchData = liveChickens.find(batch => batch.id === formData.selectedBatch);
     const availableBirds = selectedBatchData?.current_count || 0;
-    const quantityToProcess = parseInt(formData.processingQuantity) || 0;
+    const quantityToProcess = parseInt(formData.processing_quantity) || 0;
 
     if (quantityToProcess <= 0) {
-      newErrors.processingQuantity = 'Please enter a valid quantity to process (must be greater than 0)';
+      newErrors.processing_quantity = 'Please enter a valid quantity to process (must be greater than 0)';
     }
 
     if (quantityToProcess > availableBirds) {
-      newErrors.processingQuantity = `Cannot process more than ${availableBirds} birds (available in selected batch)`;
+      newErrors.processing_quantity = `Cannot process more than ${availableBirds} birds (available in selected batch)`;
     }
 
-    if (!formData.processingDate) {
-      newErrors.processingDate = 'Processing date is required';
+    if (!formData.processing_date) {
+      newErrors.processing_date = 'Processing date is required';
+    }
+
+    if (!formData.storage_location?.trim()) {
+      newErrors.storage_location = 'Storage location is required';
     }
 
     // Validate parts data if provided
@@ -150,41 +189,52 @@ const ProcessingForm = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     const selectedBatchData = liveChickens.find(batch => batch.id === formData.selectedBatch);
-    const quantityToProcess = parseInt(formData.processingQuantity);
+    const quantityToProcess = parseInt(formData.processing_quantity);
     const remainingBirds = selectedBatchData.current_count - quantityToProcess;
 
-    // Calculate average weight (placeholder - would need actual weight data)
-    const averageWeight = selectedBatchData.current_weight || 2.5;
-
-    // Prepare parts data
-    const partsCount = {
+    // Prepare parts data as JSONB
+    const parts_count = {
       neck: parseInt(formData.neckCount) || 0,
       feet: parseInt(formData.feetCount) || 0,
       gizzard: parseInt(formData.gizzardCount) || 0,
       dog_food: parseInt(formData.dogFoodCount) || 0
     };
 
-    const partsWeight = {
+    const parts_weight = {
       neck: parseFloat(formData.neckWeight) || 0,
       feet: parseFloat(formData.feetWeight) || 0,
       gizzard: parseFloat(formData.gizzardWeight) || 0,
       dog_food: parseFloat(formData.dogFoodWeight) || 0
     };
 
+    // Prepare data matching database schema
     const processingData = {
-      ...formData,
-      quantityToProcess,
-      remainingBirds,
-      averageWeight,
-      partsCount,
-      partsWeight,
-      selectedBatchData
+      batch_id: formData.batch_id,
+      processing_date: formData.processing_date,
+      initial_count: parseInt(formData.initial_count),
+      current_count: parseInt(formData.current_count),
+      average_weight: parseFloat(formData.average_weight),
+      size_category_id: formData.size_category_id === 'custom' ? null : formData.size_category_id,
+      size_category_custom: formData.size_category_id === 'custom' ? formData.size_category_custom : null,
+      status: formData.status,
+      storage_location: formData.storage_location,
+      expiry_date: formData.expiry_date || null,
+      notes: formData.notes || null,
+      parts_count: parts_count,
+      parts_weight: parts_weight,
+      processing_quantity: quantityToProcess,
+      remaining_birds: remainingBirds,
+      create_new_batch_for_remaining: formData.create_new_batch_for_remaining,
+      remaining_batch_id: formData.remaining_batch_id || null,
+      created_by: user?.id || null,
+      // Additional data for context processing
+      selectedBatchData: selectedBatchData
     };
 
     try {
@@ -213,61 +263,80 @@ const ProcessingForm = ({
       error={errors.submit}
     >
       <form onSubmit={handleSubmit} className="processing-form">
-        {/* Batch Selection */}
-        <div className="form-group">
-          <label htmlFor="selectedBatch">
-            Live Chicken Batch <span className="required">*</span>
-          </label>
-          <select
-            id="selectedBatch"
-            name="selectedBatch"
-            value={formData.selectedBatch}
-            onChange={handleInputChange}
-            className={errors.selectedBatch ? 'error' : ''}
-          >
-            <option value="">Select Live Chicken Batch</option>
-            {availableBatches.map((batch) => (
-              <option key={batch.id} value={batch.id}>
-                {batch.batch_id} ({batch.breed}) - {batch.current_count} birds available
-              </option>
-            ))}
-          </select>
-          {errors.selectedBatch && <span className="error-message">{errors.selectedBatch}</span>}
+        {/* Batch Information */}
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="batch_id">
+              Dressed Batch ID <span className="required">*</span>
+            </label>
+            <input
+              type="text"
+              id="batch_id"
+              name="batch_id"
+              value={formData.batch_id}
+              onChange={handleInputChange}
+              placeholder="Auto-generated"
+              className={errors.batch_id ? 'error' : ''}
+            />
+            {errors.batch_id && <span className="error-message">{errors.batch_id}</span>}
+            <small className="form-help">Unique identifier for this dressed chicken batch</small>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="selectedBatch">
+              Live Chicken Batch <span className="required">*</span>
+            </label>
+            <select
+              id="selectedBatch"
+              name="selectedBatch"
+              value={formData.selectedBatch}
+              onChange={handleInputChange}
+              className={errors.selectedBatch ? 'error' : ''}
+            >
+              <option value="">Select Live Chicken Batch</option>
+              {availableBatches.map((batch) => (
+                <option key={batch.id} value={batch.id}>
+                  {batch.batch_id} ({batch.breed}) - {batch.current_count} birds available
+                </option>
+              ))}
+            </select>
+            {errors.selectedBatch && <span className="error-message">{errors.selectedBatch}</span>}
+          </div>
         </div>
 
         {/* Processing Details */}
         <div className="form-row">
           <div className="form-group">
-            <label htmlFor="processingDate">
+            <label htmlFor="processing_date">
               Processing Date <span className="required">*</span>
             </label>
             <input
               type="date"
-              id="processingDate"
-              name="processingDate"
-              value={formData.processingDate}
+              id="processing_date"
+              name="processing_date"
+              value={formData.processing_date}
               onChange={handleInputChange}
-              className={errors.processingDate ? 'error' : ''}
+              className={errors.processing_date ? 'error' : ''}
             />
-            {errors.processingDate && <span className="error-message">{errors.processingDate}</span>}
+            {errors.processing_date && <span className="error-message">{errors.processing_date}</span>}
           </div>
 
           <div className="form-group">
-            <label htmlFor="processingQuantity">
+            <label htmlFor="processing_quantity">
               Quantity to Process <span className="required">*</span>
             </label>
             <input
               type="number"
-              id="processingQuantity"
-              name="processingQuantity"
-              value={formData.processingQuantity}
+              id="processing_quantity"
+              name="processing_quantity"
+              value={formData.processing_quantity}
               onChange={handleInputChange}
               min="1"
               max={selectedBatchData?.current_count || 999}
               placeholder="Number of birds"
-              className={errors.processingQuantity ? 'error' : ''}
+              className={errors.processing_quantity ? 'error' : ''}
             />
-            {errors.processingQuantity && <span className="error-message">{errors.processingQuantity}</span>}
+            {errors.processing_quantity && <span className="error-message">{errors.processing_quantity}</span>}
             {selectedBatchData && (
               <small className="form-help">
                 Available: {selectedBatchData.current_count} birds
@@ -276,18 +345,55 @@ const ProcessingForm = ({
           </div>
         </div>
 
+        {/* Auto-calculated fields display */}
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="average_weight">Average Weight (kg)</label>
+            <input
+              type="number"
+              id="average_weight"
+              name="average_weight"
+              value={formData.average_weight}
+              readOnly
+              className="readonly-field"
+              style={{
+                backgroundColor: '#f5f5f5',
+                cursor: 'not-allowed'
+              }}
+            />
+            <small className="form-help">Auto-calculated from selected batch</small>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="initial_count">Initial Count</label>
+            <input
+              type="number"
+              id="initial_count"
+              name="initial_count"
+              value={formData.initial_count}
+              readOnly
+              className="readonly-field"
+              style={{
+                backgroundColor: '#f5f5f5',
+                cursor: 'not-allowed'
+              }}
+            />
+            <small className="form-help">Auto-set from processing quantity</small>
+          </div>
+        </div>
+
         {/* Size Category */}
         <div className="form-row">
           <div className="form-group">
-            <label htmlFor="sizeCategoryId">
+            <label htmlFor="size_category_id">
               Size Category <span className="required">*</span>
             </label>
             <select
-              id="sizeCategoryId"
-              name="sizeCategoryId"
-              value={formData.sizeCategoryId}
+              id="size_category_id"
+              name="size_category_id"
+              value={formData.size_category_id}
               onChange={handleInputChange}
-              className={errors.sizeCategoryId ? 'error' : ''}
+              className={errors.size_category_id ? 'error' : ''}
             >
               <option value="">Select Size Category</option>
               {chickenSizeCategories.map((category) => (
@@ -297,24 +403,24 @@ const ProcessingForm = ({
               ))}
               <option value="custom">Custom Size</option>
             </select>
-            {errors.sizeCategoryId && <span className="error-message">{errors.sizeCategoryId}</span>}
+            {errors.size_category_id && <span className="error-message">{errors.size_category_id}</span>}
           </div>
 
-          {formData.sizeCategoryId === 'custom' && (
+          {formData.size_category_id === 'custom' && (
             <div className="form-group">
-              <label htmlFor="sizeCategoryCustom">
+              <label htmlFor="size_category_custom">
                 Custom Size Name <span className="required">*</span>
               </label>
               <input
                 type="text"
-                id="sizeCategoryCustom"
-                name="sizeCategoryCustom"
-                value={formData.sizeCategoryCustom}
+                id="size_category_custom"
+                name="size_category_custom"
+                value={formData.size_category_custom}
                 onChange={handleInputChange}
                 placeholder="Enter custom size name"
-                className={errors.sizeCategoryCustom ? 'error' : ''}
+                className={errors.size_category_custom ? 'error' : ''}
               />
-              {errors.sizeCategoryCustom && <span className="error-message">{errors.sizeCategoryCustom}</span>}
+              {errors.size_category_custom && <span className="error-message">{errors.size_category_custom}</span>}
             </div>
           )}
         </div>
@@ -322,24 +428,28 @@ const ProcessingForm = ({
         {/* Storage Details */}
         <div className="form-row">
           <div className="form-group">
-            <label htmlFor="storageLocation">Storage Location</label>
+            <label htmlFor="storage_location">
+              Storage Location <span className="required">*</span>
+            </label>
             <input
               type="text"
-              id="storageLocation"
-              name="storageLocation"
-              value={formData.storageLocation}
+              id="storage_location"
+              name="storage_location"
+              value={formData.storage_location}
               onChange={handleInputChange}
               placeholder="e.g., Freezer A, Cold Room 1"
+              className={errors.storage_location ? 'error' : ''}
             />
+            {errors.storage_location && <span className="error-message">{errors.storage_location}</span>}
           </div>
 
           <div className="form-group">
-            <label htmlFor="expiryDate">Expiry Date</label>
+            <label htmlFor="expiry_date">Expiry Date</label>
             <input
               type="date"
-              id="expiryDate"
-              name="expiryDate"
-              value={formData.expiryDate}
+              id="expiry_date"
+              name="expiry_date"
+              value={formData.expiry_date}
               onChange={handleInputChange}
             />
             <small className="form-help">
@@ -399,29 +509,29 @@ const ProcessingForm = ({
         </div>
 
         {/* Remaining Birds Handling */}
-        {selectedBatchData && parseInt(formData.processingQuantity) > 0 && 
-         parseInt(formData.processingQuantity) < selectedBatchData.current_count && (
+        {selectedBatchData && parseInt(formData.processing_quantity) > 0 &&
+         parseInt(formData.processing_quantity) < selectedBatchData.current_count && (
           <div className="remaining-birds-section">
             <div className="form-group">
               <label>
                 <input
                   type="checkbox"
-                  name="createNewBatchForRemaining"
-                  checked={formData.createNewBatchForRemaining}
+                  name="create_new_batch_for_remaining"
+                  checked={formData.create_new_batch_for_remaining}
                   onChange={handleInputChange}
                 />
-                Create new batch for remaining {selectedBatchData.current_count - parseInt(formData.processingQuantity)} birds
+                Create new batch for remaining {selectedBatchData.current_count - parseInt(formData.processing_quantity)} birds
               </label>
             </div>
-            
-            {formData.createNewBatchForRemaining && (
+
+            {formData.create_new_batch_for_remaining && (
               <div className="form-group">
-                <label htmlFor="remainingBatchId">New Batch ID for Remaining Birds</label>
+                <label htmlFor="remaining_batch_id">New Batch ID for Remaining Birds</label>
                 <input
                   type="text"
-                  id="remainingBatchId"
-                  name="remainingBatchId"
-                  value={formData.remainingBatchId}
+                  id="remaining_batch_id"
+                  name="remaining_batch_id"
+                  value={formData.remaining_batch_id}
                   onChange={handleInputChange}
                   placeholder="e.g., BCH-2024-001-R"
                 />

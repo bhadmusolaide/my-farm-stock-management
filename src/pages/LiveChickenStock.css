@@ -1499,6 +1499,11 @@
   padding: 12px 15px;
   margin-bottom: 10px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .alert-card.critical {
@@ -1516,6 +1521,29 @@
 .alert-card p {
   margin: 0;
   font-size: 14px;
+  flex: 1;
+}
+
+.alert-dismiss-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.alert-dismiss-btn:hover {
+  opacity: 1;
 }
 
 /* ============================================
@@ -1644,5 +1672,9 @@
 }
 
 [data-theme="dark"] .alert-card p {
+  color: inherit !important;
+}
+
+[data-theme="dark"] .alert-dismiss-btn {
   color: inherit !important;
 }

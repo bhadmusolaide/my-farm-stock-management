@@ -19,13 +19,14 @@ export default defineConfig({
           // App chunks by feature
           'dashboard': [
             './src/pages/Dashboard.jsx',
-            './src/pages/Reports.jsx'
+            './src/pages/ReportsRefactored.jsx'
           ],
           'management': [
-            './src/pages/ChickenOrders.jsx',
-            './src/pages/LiveChickenStock.jsx',
-            './src/pages/FeedManagement.jsx',
-            './src/pages/StockInventory.jsx'
+            './src/pages/ChickenOrdersRefactored.jsx',
+            './src/pages/LiveChickenStockRefactored.jsx',
+            './src/pages/FeedManagementRefactored.jsx',
+            './src/pages/StockInventory.jsx',
+            './src/pages/DressedChickenStockRefactored.jsx'
           ],
           'admin': [
             './src/pages/UserManagement.jsx',
