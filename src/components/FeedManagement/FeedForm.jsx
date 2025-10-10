@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { EnhancedModal } from '../UI';
-import { FEED_BRANDS, kgToBags, bagsToKg } from '../../utils/constants';
+import { FEED_BRANDS, FEED_TYPES, kgToBags, bagsToKg } from '../../utils/constants';
 import { formatNumber } from '../../utils/formatters';
 import './FeedManagement.css';
 
@@ -318,15 +318,20 @@ const FeedForm = ({
               <label htmlFor="feed_type">
                 Feed Type <span className="required">*</span>
               </label>
-              <input
-                type="text"
+              <select
                 id="feed_type"
                 name="feed_type"
                 value={formData.feed_type}
                 onChange={handleInputChange}
-                placeholder="e.g., Starter, Grower, Finisher"
                 className={errors.feed_type ? 'error' : ''}
-              />
+              >
+                <option value="">Select Feed Type</option>
+                {FEED_TYPES.map(type => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
               {errors.feed_type && <span className="error-message">{errors.feed_type}</span>}
             </div>
           </div>

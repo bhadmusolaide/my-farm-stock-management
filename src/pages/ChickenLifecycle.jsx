@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAppContext } from '../context'
+import { useLiveChickenContext } from '../context/LiveChickenContext'
 import { formatDate, formatNumber } from '../utils/formatters'
 import { supabase } from '../utils/supabaseClient'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -19,6 +20,7 @@ const ChickenLifecycle = () => {
     chickenPartStandards,
     chickenProcessingConfigs
   } = useAppContext()
+  const { addWeightHistory } = useLiveChickenContext()
   const [selectedBatch, setSelectedBatch] = useState(null)
   const [lifecycleData, setLifecycleData] = useState({})
   const [showModal, setShowModal] = useState(false)
@@ -264,6 +266,14 @@ const ChickenLifecycle = () => {
           weight_notes: formData.weight_notes || '' // Pass notes for weight history
         }
         await updateLiveChicken(selectedBatch.id, updatedBatch)
+
+        // Add to weight history
+        await addWeightHistory({
+          chicken_batch_id: selectedBatch.id,
+          weight: weight,
+          recorded_date: new Date().toISOString().split('T')[0],
+          notes: formData.weight_notes || ''
+        })
       }
       
       closeModal()

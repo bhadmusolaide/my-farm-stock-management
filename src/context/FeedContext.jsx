@@ -211,13 +211,22 @@ export function FeedProvider({ children }) {
   const updateFeedInventory = async (id, feedData) => {
     try {
       const oldFeedItem = feedInventory.find(item => item.id === id);
-      if (!oldFeedItem) throw new Error('Feed item not found');
+      if (!oldFeedItem) {
+        // If feed item not found in current state, check if it's the newly added item
+        // This handles the case where balance deduction happens immediately after adding
+        if (feedData && feedData.id === id) {
+          // Use the provided feed data as the old item for comparison
+          console.log('Feed item not in state yet, using provided data for update');
+        } else {
+          throw new Error('Feed item not found');
+        }
+      }
 
       // Extract assigned_batches before updating feed item
       const { assigned_batches, ...feedItemData } = feedData;
 
       const updatedFeedItem = {
-        ...oldFeedItem,
+        ...(oldFeedItem || feedData),
         ...feedItemData,
         updated_at: new Date().toISOString()
       };
@@ -263,12 +272,21 @@ export function FeedProvider({ children }) {
         updatedFeedItem.assigned_batches = assigned_batches;
       }
 
-      setFeedInventory(prev => prev.map(item =>
-        item.id === id ? updatedFeedItem : item
-      ));
+      setFeedInventory(prev => {
+        const existingIndex = prev.findIndex(item => item.id === id);
+        if (existingIndex >= 0) {
+          // Update existing item
+          return prev.map(item =>
+            item.id === id ? updatedFeedItem : item
+          );
+        } else {
+          // Add new item if it doesn't exist (for immediate balance deduction updates)
+          return [updatedFeedItem, ...prev];
+        }
+      });
 
       // Log audit action
-      await logAuditAction('UPDATE', 'feed_inventory', id, oldFeedItem, updatedFeedItem);
+      await logAuditAction('UPDATE', 'feed_inventory', id, oldFeedItem || feedData, updatedFeedItem);
 
       return updatedFeedItem;
     } catch (err) {
