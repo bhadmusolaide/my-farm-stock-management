@@ -14,6 +14,15 @@ const Dashboard = () => {
   const [currentCarouselIndex, setCurrentCarouselIndex] = useState(0)
   const [isAutoPlaying, setIsAutoPlaying] = useState(true)
   const [itemsPerView, setItemsPerView] = useState(1)
+  const [dismissedAlerts, setDismissedAlerts] = useState(() => {
+    try {
+      const stored = localStorage.getItem('dismissedAlerts-dashboard');
+      return new Set(stored ? JSON.parse(stored) : []);
+    } catch (e) {
+      console.warn('Failed to load dismissed alerts from localStorage:', e);
+      return new Set();
+    }
+  })
   
   // Enhanced dashboard state
   const [selectedTimeRange, setSelectedTimeRange] = useState('6months')
@@ -217,6 +226,31 @@ const Dashboard = () => {
   
 
   
+  // Handle alert dismissal
+  const handleDismissAlert = (alertId) => {
+    setDismissedAlerts(prev => {
+      const newSet = new Set([...prev, alertId]);
+      try {
+        localStorage.setItem('dismissedAlerts-dashboard', JSON.stringify([...newSet]));
+        console.log('Alert dismissed and saved:', alertId);
+      } catch (e) {
+        console.warn('Failed to save dismissed alerts to localStorage:', e);
+      }
+      return newSet;
+    })
+  }
+
+  // Optional: Function to clear all dismissed alerts (for testing)
+  const clearDismissedAlerts = () => {
+    setDismissedAlerts(new Set());
+    try {
+      localStorage.removeItem('dismissedAlerts-dashboard');
+      console.log('All dismissed alerts cleared');
+    } catch (e) {
+      console.warn('Failed to clear dismissed alerts from localStorage:', e);
+    }
+  }
+
   // Health alerts logic
   const healthAlerts = useMemo(() => {
     const alerts = []
@@ -224,6 +258,7 @@ const Dashboard = () => {
     // Check for high outstanding balance
     if (stats.outstandingBalance > 50000) {
       alerts.push({
+        id: 'high-balance',
         type: 'warning',
         title: 'High Outstanding Balance',
         message: `Outstanding balance of ₦${formatNumber(stats.outstandingBalance, 2)} requires attention`,
@@ -234,6 +269,7 @@ const Dashboard = () => {
     // Check for low total chickens (example threshold)
     if (stats.totalChickens < 100) {
       alerts.push({
+        id: 'low-livestock',
         type: 'info',
         title: 'Low Livestock Count',
         message: `Current livestock count is ${stats.totalChickens}. Consider restocking.`,
@@ -244,22 +280,26 @@ const Dashboard = () => {
     return alerts
   }, [stats.outstandingBalance, stats.totalChickens])
 
+  // Filter out dismissed alerts
+  const visibleAlerts = healthAlerts.filter(alert => !dismissedAlerts.has(alert.id))
+
   return (
     <div className="dashboard-container">
       <h1>Dashboard</h1>
 
       {/* Health Alerts Section */}
-      {healthAlerts.length > 0 && (
+      {visibleAlerts.length > 0 && (
         <section className="alert-section">
           <h3>🚨 System Alerts</h3>
-          {healthAlerts.map((alert, index) => (
+          {visibleAlerts.map((alert) => (
             <AlertCard
-              key={index}
+              key={alert.id}
               type={alert.type}
               title={alert.title}
               message={alert.message}
               icon={alert.icon}
               dismissible={true}
+              onDismiss={() => handleDismissAlert(alert.id)}
             />
           ))}
         </section>

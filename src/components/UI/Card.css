@@ -324,7 +324,17 @@
 }
 
 .alert-card__dismiss:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--text-light-bg, rgba(0, 0, 0, 0.1));
+  color: var(--text-color);
+}
+
+/* Dark mode enhancements for alert dismiss button */
+[data-theme="dark"] .alert-card__dismiss {
+  color: var(--text-light);
+}
+
+[data-theme="dark"] .alert-card__dismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
   color: var(--text-color);
 }
 
