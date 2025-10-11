@@ -14,8 +14,15 @@ import { useAppContext } from '../../context';
 import { MetricCard, PerformanceTable } from '../UI';
 import './Reports.css';
 
-const OverviewDashboard = ({ dateRange }) => {
+const OverviewDashboard = ({
+  dateRange,
+  keyMetrics,
+  revenueChartData,
+  expensesChartData,
+  liveChickensData
+}) => {
   const { transactions, chickens, liveChickens, weightHistory } = useAppContext();
+
 
   // Use custom hooks for calculations
   const financialMetrics = useFinancialCalculations(transactions, chickens, {
@@ -39,7 +46,7 @@ const OverviewDashboard = ({ dateRange }) => {
   });
 
   // Prepare chart data using custom hooks
-  const revenueChartData = useChartData(financialMetrics.monthlyBreakdown, {
+  const revenueChartDataLocal = useChartData(financialMetrics.monthlyBreakdown, {
     chartType: 'bar',
     xField: 'month',
     yField: 'income',
@@ -47,7 +54,7 @@ const OverviewDashboard = ({ dateRange }) => {
     sortOrder: 'asc'
   });
 
-  const expensesChartData = useChartData(financialMetrics.monthlyBreakdown, {
+  const expensesChartDataLocal = useChartData(financialMetrics.monthlyBreakdown, {
     chartType: 'bar',
     xField: 'month',
     yField: 'expenses',
@@ -55,16 +62,16 @@ const OverviewDashboard = ({ dateRange }) => {
     sortOrder: 'asc'
   });
 
-  const liveChickensChartData = useChartData(livestockMetrics.batchMetrics, {
+  const liveChickensChartDataLocal = useChartData(livestockMetrics.batchMetrics, {
     chartType: 'pie',
     xField: 'breed',
     yField: 'current_count'
   });
 
-  const COLORS = revenueChartData.colors;
+  const COLORS = revenueChartDataLocal.colors;
 
-  // Construct keyMetrics object from various metrics
-  const keyMetrics = {
+  // Use keyMetrics from props if available, otherwise construct from calculations
+  const finalKeyMetrics = keyMetrics || {
     financial: {
       revenue: financialMetrics.orderRevenue || 0,
       expenses: financialMetrics.totalExpenses || 0,
@@ -95,6 +102,7 @@ const OverviewDashboard = ({ dateRange }) => {
       mortalityRate: livestockMetrics.mortalityRate || 0
     }
   };
+
 
   // Prepare performance data for PerformanceTable
   const financialPerformanceData = [
@@ -156,15 +164,15 @@ const OverviewDashboard = ({ dateRange }) => {
             <div className="metric-content">
               <div className="metric-item">
                 <span className="metric-label">Funds Added</span>
-                <span className="metric-value positive">+{formatCurrency(keyMetrics.funds.added)}</span>
+                <span className="metric-value positive">+{formatCurrency(finalKeyMetrics.funds.added)}</span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Funds Withdrawn</span>
-                <span className="metric-value negative">-{formatCurrency(keyMetrics.funds.withdrawn)}</span>
+                <span className="metric-value negative">-{formatCurrency(finalKeyMetrics.funds.withdrawn)}</span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Current Balance</span>
-                <span className="metric-value">{formatCurrency(keyMetrics.funds.balance)}</span>
+                <span className="metric-value">{formatCurrency(finalKeyMetrics.funds.balance)}</span>
               </div>
             </div>
           </div>
@@ -177,15 +185,15 @@ const OverviewDashboard = ({ dateRange }) => {
             <div className="metric-content">
               <div className="metric-item">
                 <span className="metric-label">Items in Stock</span>
-                <span className="metric-value">{formatNumber(keyMetrics.stock.items)}</span>
+                <span className="metric-value">{formatNumber(finalKeyMetrics.stock.items)}</span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Stock Value</span>
-                <span className="metric-value">{formatCurrency(keyMetrics.stock.value)}</span>
+                <span className="metric-value">{formatCurrency(finalKeyMetrics.stock.value)}</span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Feed Stock</span>
-                <span className="metric-value">{formatNumber(keyMetrics.feed.stock, 1)} kg</span>
+                <span className="metric-value">{formatNumber(finalKeyMetrics.feed.stock, 1)} kg</span>
               </div>
             </div>
           </div>
@@ -198,19 +206,19 @@ const OverviewDashboard = ({ dateRange }) => {
             <div className="metric-content">
               <div className="metric-item">
                 <span className="metric-label">Total Customers</span>
-                <span className="metric-value">{formatNumber(keyMetrics.customers.total)}</span>
+                <span className="metric-value">{formatNumber(finalKeyMetrics.customers.total)}</span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Outstanding Balance</span>
-                <span className="metric-value">{formatCurrency(keyMetrics.customers.outstandingBalance)}</span>
+                <span className="metric-value">{formatCurrency(finalKeyMetrics.customers.outstandingBalance)}</span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Pending Orders</span>
-                <span className="metric-value">{formatNumber(keyMetrics.customers.pending)}</span>
+                <span className="metric-value">{formatNumber(finalKeyMetrics.customers.pending)}</span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Partially Paid</span>
-                <span className="metric-value">{formatNumber(keyMetrics.customers.partial)}</span>
+                <span className="metric-value">{formatNumber(finalKeyMetrics.customers.partial)}</span>
               </div>
             </div>
           </div>
@@ -223,15 +231,15 @@ const OverviewDashboard = ({ dateRange }) => {
             <div className="metric-content">
               <div className="metric-item">
                 <span className="metric-label">Total Chickens</span>
-                <span className="metric-value">{formatNumber(keyMetrics.liveChickens.total)}</span>
+                <span className="metric-value">{formatNumber(finalKeyMetrics.liveChickens.total)}</span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Mortality</span>
-                <span className="metric-value">{formatNumber(keyMetrics.liveChickens.mortality)}</span>
+                <span className="metric-value">{formatNumber(finalKeyMetrics.liveChickens.mortality)}</span>
               </div>
               <div className="metric-item">
                 <span className="metric-label">Mortality Rate</span>
-                <span className="metric-value">{keyMetrics.liveChickens.mortalityRate.toFixed(1)}%</span>
+                <span className="metric-value">{finalKeyMetrics.liveChickens.mortalityRate.toFixed(1)}%</span>
               </div>
             </div>
           </div>
@@ -241,9 +249,9 @@ const OverviewDashboard = ({ dateRange }) => {
       <div className="charts-section">
         <div className="chart-container">
           <h3>📈 Revenue Trend</h3>
-          {!revenueChartData.isEmpty ? (
+          {!revenueChartDataLocal.isEmpty ? (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={revenueChartData.data}>
+              <BarChart data={revenueChartDataLocal.data}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="x" />
                 <YAxis />
@@ -261,9 +269,9 @@ const OverviewDashboard = ({ dateRange }) => {
 
         <div className="chart-container">
           <h3>📉 Expenses Trend</h3>
-          {!expensesChartData.isEmpty ? (
+          {!expensesChartDataLocal.isEmpty ? (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={expensesChartData.data}>
+              <BarChart data={expensesChartDataLocal.data}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="x" />
                 <YAxis />
@@ -281,11 +289,11 @@ const OverviewDashboard = ({ dateRange }) => {
 
         <div className="chart-container">
           <h3>🐔 Live Chicken Stock Distribution</h3>
-          {!liveChickensChartData.isEmpty ? (
+          {!liveChickensChartDataLocal.isEmpty ? (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={liveChickensChartData.data}
+                  data={liveChickensChartDataLocal.data}
                   cx="50%"
                   cy="50%"
                   outerRadius={100}
@@ -294,7 +302,7 @@ const OverviewDashboard = ({ dateRange }) => {
                   nameKey="name"
                   label={({ name, percentage }) => `${name}: ${percentage.toFixed(0)}%`}
                 >
-                  {liveChickensChartData.data.map((entry, index) => (
+                  {liveChickensChartDataLocal.data.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -317,35 +325,35 @@ const OverviewDashboard = ({ dateRange }) => {
           <div className="summary-item">
             <span className="summary-icon">💹</span>
             <div className="summary-text">
-              <strong>Performance:</strong> {keyMetrics.financial.profit >= 0 ? 'Profitable' : 'Loss-making'} with a {keyMetrics.financial.profitMargin.toFixed(1)}% margin
+              <strong>Performance:</strong> {finalKeyMetrics.financial.profit >= 0 ? 'Profitable' : 'Loss-making'} with a {finalKeyMetrics.financial.profitMargin.toFixed(1)}% margin
             </div>
           </div>
-          
+
           <div className="summary-item">
             <span className="summary-icon">💰</span>
             <div className="summary-text">
-              <strong>Liquidity:</strong> Current balance of {formatCurrency(keyMetrics.funds.balance)} ({keyMetrics.funds.added > keyMetrics.funds.withdrawn ? 'positive' : 'negative'} cash flow)
+              <strong>Liquidity:</strong> Current balance of {formatCurrency(finalKeyMetrics.funds.balance)} ({finalKeyMetrics.funds.added > finalKeyMetrics.funds.withdrawn ? 'positive' : 'negative'} cash flow)
             </div>
           </div>
-          
+
           <div className="summary-item">
             <span className="summary-icon">📦</span>
             <div className="summary-text">
-              <strong>Inventory:</strong> {formatNumber(keyMetrics.stock.items)} stock items valued at {formatCurrency(keyMetrics.stock.value)}
+              <strong>Inventory:</strong> {formatNumber(finalKeyMetrics.stock.items)} stock items valued at {formatCurrency(finalKeyMetrics.stock.value)}
             </div>
           </div>
-          
+
           <div className="summary-item">
             <span className="summary-icon">👥</span>
             <div className="summary-text">
-              <strong>Customers:</strong> {formatNumber(keyMetrics.customers.total)} customers with {formatCurrency(keyMetrics.customers.outstandingBalance)} outstanding balance
+              <strong>Customers:</strong> {formatNumber(finalKeyMetrics.customers.total)} customers with {formatCurrency(finalKeyMetrics.customers.outstandingBalance)} outstanding balance
             </div>
           </div>
-          
+
           <div className="summary-item">
             <span className="summary-icon">🐔</span>
             <div className="summary-text">
-              <strong>Livestock:</strong> {formatNumber(keyMetrics.liveChickens.total)} chickens with {keyMetrics.liveChickens.mortalityRate.toFixed(1)}% mortality rate
+              <strong>Livestock:</strong> {formatNumber(finalKeyMetrics.liveChickens.total)} chickens with {finalKeyMetrics.liveChickens.mortalityRate.toFixed(1)}% mortality rate
             </div>
           </div>
         </div>
