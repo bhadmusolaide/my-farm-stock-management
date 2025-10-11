@@ -9,6 +9,9 @@ const FeedConsumptionForm = ({
   onSubmit,
   feedInventory = [],
   liveChickens = [],
+  feedConsumption = [], // Add this prop
+  getLastConsumptionForBatch, // Add this prop
+  get3DayAverageConsumption, // Add this prop
   loading = false
 }) => {
   const [formData, setFormData] = useState({
@@ -16,10 +19,16 @@ const FeedConsumptionForm = ({
     quantity_consumed: '',
     chicken_batch_id: '',
     consumption_date: '',
-    notes: ''
+    notes: '',
+    auto_logged: false
   });
 
   const [errors, setErrors] = useState({});
+  const [suggestions, setSuggestions] = useState({
+    lastQuantity: null,
+    avgQuantity: null,
+    lastFeedId: null
+  });
 
   // Reset form when modal opens/closes
   useEffect(() => {
@@ -29,11 +38,39 @@ const FeedConsumptionForm = ({
         quantity_consumed: '',
         chicken_batch_id: '',
         consumption_date: new Date().toISOString().split('T')[0],
-        notes: ''
+        notes: '',
+        auto_logged: false
       });
       setErrors({});
+      setSuggestions({
+        lastQuantity: null,
+        avgQuantity: null,
+        lastFeedId: null
+      });
     }
   }, [isOpen]);
+
+  // Update suggestions when batch is selected
+  useEffect(() => {
+    if (formData.chicken_batch_id && getLastConsumptionForBatch && get3DayAverageConsumption) {
+      const lastConsumption = getLastConsumptionForBatch(formData.chicken_batch_id);
+      const avgConsumption = get3DayAverageConsumption(formData.chicken_batch_id);
+
+      setSuggestions({
+        lastQuantity: lastConsumption?.quantity_consumed || null,
+        avgQuantity: avgConsumption || null,
+        lastFeedId: lastConsumption?.feed_id || null
+      });
+
+      // Auto-select last used feed if available
+      if (lastConsumption && !formData.feed_id) {
+        setFormData(prev => ({
+          ...prev,
+          feed_id: lastConsumption.feed_id
+        }));
+      }
+    }
+  }, [formData.chicken_batch_id, getLastConsumptionForBatch, get3DayAverageConsumption]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -41,12 +78,34 @@ const FeedConsumptionForm = ({
       ...prev,
       [name]: value
     }));
-    
+
     // Clear error for this field
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
         [name]: ''
+      }));
+    }
+  };
+
+  // Quick action: Use last quantity
+  const handleUseSameAsYesterday = () => {
+    if (suggestions.lastQuantity) {
+      setFormData(prev => ({
+        ...prev,
+        quantity_consumed: suggestions.lastQuantity.toString(),
+        auto_logged: true
+      }));
+    }
+  };
+
+  // Quick action: Use 3-day average
+  const handleUseAverage = () => {
+    if (suggestions.avgQuantity) {
+      setFormData(prev => ({
+        ...prev,
+        quantity_consumed: suggestions.avgQuantity.toFixed(2),
+        auto_logged: true
       }));
     }
   };
@@ -264,6 +323,34 @@ const FeedConsumptionForm = ({
         {/* Consumption Details */}
         <div className="form-section">
           <h4>Consumption Details</h4>
+
+          {/* Smart Suggestions */}
+          {formData.chicken_batch_id && (suggestions.lastQuantity || suggestions.avgQuantity) && (
+            <div className="suggestions-box">
+              <p className="suggestions-title">💡 Quick Fill Options:</p>
+              <div className="quick-actions">
+                {suggestions.lastQuantity && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleUseSameAsYesterday}
+                  >
+                    Same as Last ({formatNumber(suggestions.lastQuantity, 2)} kg)
+                  </button>
+                )}
+                {suggestions.avgQuantity && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleUseAverage}
+                  >
+                    Use 3-Day Avg ({formatNumber(suggestions.avgQuantity, 2)} kg)
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="form-row">
             <div className="form-group">
               <label htmlFor="quantity_consumed">
@@ -281,6 +368,9 @@ const FeedConsumptionForm = ({
                 className={errors.quantity_consumed ? 'error' : ''}
               />
               {errors.quantity_consumed && <span className="error-message">{errors.quantity_consumed}</span>}
+              {formData.auto_logged && (
+                <small className="form-help success">✓ Auto-filled from suggestion</small>
+              )}
             </div>
 
             <div className="form-group">

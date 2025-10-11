@@ -123,6 +123,12 @@ CREATE TABLE IF NOT EXISTS public.feed_inventory (
     expiry_date DATE,
     supplier TEXT,
     status TEXT DEFAULT 'active', -- 'active', 'expired', 'consumed'
+    deduct_from_balance BOOLEAN DEFAULT FALSE,
+    balance_deducted BOOLEAN DEFAULT FALSE,
+    auto_assigned BOOLEAN DEFAULT FALSE,
+    total_cost DECIMAL(10,2), -- Total purchase cost (number_of_bags * cost_per_bag)
+    remaining_kg DECIMAL(10,2), -- Remaining stock after consumption
+    notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -134,6 +140,52 @@ CREATE TABLE IF NOT EXISTS public.feed_consumption (
     chicken_batch_id TEXT REFERENCES public.live_chickens(id),
     quantity_consumed DECIMAL(10,2) NOT NULL,
     consumption_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    auto_logged BOOLEAN DEFAULT FALSE, -- Whether this was auto-logged
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create feed_batch_assignments table for tracking feed assigned to batches
+CREATE TABLE IF NOT EXISTS public.feed_batch_assignments (
+    id TEXT PRIMARY KEY,
+    feed_id TEXT REFERENCES public.feed_inventory(id) ON DELETE CASCADE,
+    chicken_batch_id TEXT REFERENCES public.live_chickens(id) ON DELETE CASCADE,
+    assigned_quantity_kg DECIMAL(10,2) NOT NULL,
+    assigned_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    auto_assigned BOOLEAN DEFAULT FALSE,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create feed_alerts table for tracking feed-related alerts
+CREATE TABLE IF NOT EXISTS public.feed_alerts (
+    id TEXT PRIMARY KEY,
+    alert_type TEXT NOT NULL, -- 'low_stock', 'no_consumption', 'fcr_deviation', 'expiry_warning'
+    severity TEXT NOT NULL DEFAULT 'warning', -- 'info', 'warning', 'critical'
+    feed_id TEXT REFERENCES public.feed_inventory(id) ON DELETE CASCADE,
+    chicken_batch_id TEXT REFERENCES public.live_chickens(id) ON DELETE CASCADE,
+    message TEXT NOT NULL,
+    action_link TEXT, -- Link to resolve the alert
+    acknowledged BOOLEAN DEFAULT FALSE,
+    acknowledged_at TIMESTAMP WITH TIME ZONE,
+    acknowledged_by UUID REFERENCES auth.users(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create batch_feed_summary table for end-of-batch feed summaries
+CREATE TABLE IF NOT EXISTS public.batch_feed_summary (
+    id TEXT PRIMARY KEY,
+    chicken_batch_id TEXT REFERENCES public.live_chickens(id) ON DELETE CASCADE,
+    total_feed_kg DECIMAL(10,2) NOT NULL DEFAULT 0,
+    total_feed_bags DECIMAL(10,2) NOT NULL DEFAULT 0,
+    total_feed_cost DECIMAL(10,2) NOT NULL DEFAULT 0,
+    average_fcr DECIMAL(10,4), -- Feed Conversion Ratio
+    total_weight_gain DECIMAL(10,2), -- Total weight gain of the batch
+    feed_efficiency_rating TEXT, -- 'excellent', 'good', 'average', 'poor'
+    summary_date DATE NOT NULL DEFAULT CURRENT_DATE,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -184,6 +236,9 @@ ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.live_chickens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feed_inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.feed_consumption ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.feed_batch_assignments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.feed_alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.batch_feed_summary ENABLE ROW LEVEL SECURITY;
 
 -- Create standard RLS policies for all tables
 -- This replaces the repetitive policy creation with a more maintainable approach
@@ -216,6 +271,9 @@ SELECT create_standard_rls_policies('audit_logs');
 SELECT create_standard_rls_policies('live_chickens');
 SELECT create_standard_rls_policies('feed_inventory');
 SELECT create_standard_rls_policies('feed_consumption');
+SELECT create_standard_rls_policies('feed_batch_assignments');
+SELECT create_standard_rls_policies('feed_alerts');
+SELECT create_standard_rls_policies('batch_feed_summary');
 
 -- Create chicken_inventory_transactions table for tracking inventory changes
 CREATE TABLE IF NOT EXISTS public.chicken_inventory_transactions (
@@ -556,6 +614,9 @@ DROP TRIGGER IF EXISTS handle_updated_at ON public.users;
 DROP TRIGGER IF EXISTS handle_updated_at ON public.live_chickens;
 DROP TRIGGER IF EXISTS handle_updated_at ON public.feed_inventory;
 DROP TRIGGER IF EXISTS handle_updated_at ON public.feed_consumption;
+DROP TRIGGER IF EXISTS handle_updated_at ON public.feed_batch_assignments;
+DROP TRIGGER IF EXISTS handle_updated_at ON public.feed_alerts;
+DROP TRIGGER IF EXISTS handle_updated_at ON public.batch_feed_summary;
 CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.chickens FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.stock FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.transactions FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
@@ -564,6 +625,9 @@ CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXEC
 CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.live_chickens FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.feed_inventory FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.feed_consumption FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.feed_batch_assignments FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.feed_alerts FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+CREATE TRIGGER handle_updated_at BEFORE UPDATE ON public.batch_feed_summary FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_chickens_date ON public.chickens(date DESC);
@@ -583,9 +647,21 @@ CREATE INDEX IF NOT EXISTS idx_live_chickens_hatch_date ON public.live_chickens(
 CREATE INDEX IF NOT EXISTS idx_feed_inventory_feed_type ON public.feed_inventory(feed_type);
 CREATE INDEX IF NOT EXISTS idx_feed_inventory_status ON public.feed_inventory(status);
 CREATE INDEX IF NOT EXISTS idx_feed_inventory_expiry_date ON public.feed_inventory(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_feed_inventory_supplier ON public.feed_inventory(supplier);
+CREATE INDEX IF NOT EXISTS idx_feed_inventory_purchase_date ON public.feed_inventory(purchase_date DESC);
 CREATE INDEX IF NOT EXISTS idx_feed_consumption_feed_id ON public.feed_consumption(feed_id);
 CREATE INDEX IF NOT EXISTS idx_feed_consumption_chicken_batch_id ON public.feed_consumption(chicken_batch_id);
 CREATE INDEX IF NOT EXISTS idx_feed_consumption_consumption_date ON public.feed_consumption(consumption_date DESC);
+CREATE INDEX IF NOT EXISTS idx_feed_batch_assignments_feed_id ON public.feed_batch_assignments(feed_id);
+CREATE INDEX IF NOT EXISTS idx_feed_batch_assignments_chicken_batch_id ON public.feed_batch_assignments(chicken_batch_id);
+CREATE INDEX IF NOT EXISTS idx_feed_batch_assignments_assigned_date ON public.feed_batch_assignments(assigned_date DESC);
+CREATE INDEX IF NOT EXISTS idx_feed_alerts_alert_type ON public.feed_alerts(alert_type);
+CREATE INDEX IF NOT EXISTS idx_feed_alerts_severity ON public.feed_alerts(severity);
+CREATE INDEX IF NOT EXISTS idx_feed_alerts_acknowledged ON public.feed_alerts(acknowledged);
+CREATE INDEX IF NOT EXISTS idx_feed_alerts_feed_id ON public.feed_alerts(feed_id);
+CREATE INDEX IF NOT EXISTS idx_feed_alerts_chicken_batch_id ON public.feed_alerts(chicken_batch_id);
+CREATE INDEX IF NOT EXISTS idx_batch_feed_summary_chicken_batch_id ON public.batch_feed_summary(chicken_batch_id);
+CREATE INDEX IF NOT EXISTS idx_batch_feed_summary_summary_date ON public.batch_feed_summary(summary_date DESC);
 
 -- Create weight_history table for tracking weight measurements over time
 CREATE TABLE IF NOT EXISTS public.weight_history (
@@ -731,8 +807,11 @@ COMMENT ON TABLE public.balance IS 'Current account balance';
 COMMENT ON TABLE public.users IS 'System users and authentication';
 COMMENT ON TABLE public.audit_logs IS 'Audit trail for all system actions';
 COMMENT ON TABLE public.live_chickens IS 'Live chicken batch tracking and management';
-COMMENT ON TABLE public.feed_inventory IS 'Feed inventory management';
+COMMENT ON TABLE public.feed_inventory IS 'Feed inventory management with purchase tracking';
 COMMENT ON TABLE public.feed_consumption IS 'Feed consumption tracking by chicken batches';
+COMMENT ON TABLE public.feed_batch_assignments IS 'Feed assignments to chicken batches for tracking allocation';
+COMMENT ON TABLE public.feed_alerts IS 'Feed-related alerts for low stock, consumption gaps, and FCR deviations';
+COMMENT ON TABLE public.batch_feed_summary IS 'End-of-batch feed summaries with FCR and cost analysis';
 COMMENT ON TABLE public.site_settings IS 'Global site settings and configuration';
 COMMENT ON TABLE public.chicken_inventory_transactions IS 'Audit trail for all changes to live chicken inventory (sales, mortality, transfers, etc.)';
 COMMENT ON TABLE public.dressed_chickens IS 'Processed/dressed chicken inventory tracking with support for partial batch processing';

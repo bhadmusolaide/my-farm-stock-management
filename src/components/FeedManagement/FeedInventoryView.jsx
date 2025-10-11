@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { DataTable, StatusBadge, FilterPanel } from '../UI';
 import { formatNumber, formatDate } from '../../utils/formatters';
-import { LOW_STOCK_THRESHOLD } from '../../utils/constants';
+import { LOW_STOCK_THRESHOLD, FEED_TYPES } from '../../utils/constants';
 import './FeedManagement.css';
 
 const FeedInventoryView = ({
@@ -12,6 +12,7 @@ const FeedInventoryView = ({
   onFiltersChange,
   loading = false
 }) => {
+  const [viewMode, setViewMode] = useState('aggregated'); // 'aggregated' or 'detailed'
   // Filter configuration
   const filterConfig = [
     {
@@ -156,16 +157,39 @@ const FeedInventoryView = ({
       key: 'quantity',
       label: 'Quantity',
       sortable: true,
-      render: (item) => (
-        <div className="quantity-info">
-          <div className="quantity-kg">
-            <strong>{formatNumber(item.quantity_kg, 2)} kg</strong>
+      render: (item) => {
+        const currentQty = item.quantity_kg || 0;
+        const initialQty = item.initial_quantity_kg || item.quantity_kg || 1;
+        const percentageRemaining = (currentQty / initialQty) * 100;
+        const status = getStockStatus(currentQty);
+
+        let progressColor = '#28a745'; // green
+        if (status === 'low') progressColor = '#ffc107'; // yellow
+        if (status === 'out') progressColor = '#dc3545'; // red
+
+        return (
+          <div className="quantity-info">
+            <div className="quantity-kg">
+              <strong>{formatNumber(currentQty, 2)} kg</strong>
+            </div>
+            <div className="quantity-bags">
+              {formatNumber(item.number_of_bags)} bags
+            </div>
+            <div className="stock-progress-bar">
+              <div
+                className="stock-progress-fill"
+                style={{
+                  width: `${Math.min(percentageRemaining, 100)}%`,
+                  backgroundColor: progressColor
+                }}
+              />
+            </div>
+            <div className="stock-percentage">
+              {formatNumber(percentageRemaining, 0)}% remaining
+            </div>
           </div>
-          <div className="quantity-bags">
-            {formatNumber(item.number_of_bags)} bags
-          </div>
-        </div>
-      )
+        );
+      }
     },
     {
       key: 'cost',
@@ -202,19 +226,15 @@ const FeedInventoryView = ({
       render: (item) => {
         const status = getStockStatus(item.quantity_kg);
         const statusConfig = {
-          out: { label: 'Out of Stock', variant: 'danger' },
-          low: { label: 'Low Stock', variant: 'warning' },
-          normal: { label: 'In Stock', variant: 'success' }
+          out: { label: '🚫 Out of Stock', icon: '🚫' },
+          low: { label: '⚠️ Low Stock', icon: '⚠️' },
+          normal: { label: '✓ In Stock', icon: '✓' }
         };
-        
+
         return (
-          <StatusBadge 
-            status={status}
-            variant="pill"
-            showIcon
-            customLabel={statusConfig[status].label}
-            customVariant={statusConfig[status].variant}
-          />
+          <span className={`stock-status-badge ${status}`}>
+            {statusConfig[status].icon} {statusConfig[status].label}
+          </span>
         );
       }
     },
@@ -271,37 +291,73 @@ const FeedInventoryView = ({
     </div>
   );
 
-  // Summary statistics
-  const summaryStats = useMemo(() => {
-    const stats = {
-      totalItems: filteredInventory.length,
-      totalQuantity: 0,
-      totalValue: 0,
-      totalAssigned: 0,
-      remainingFeed: 0,
-      lowStockItems: 0,
-      outOfStockItems: 0,
-      expiringItems: 0
-    };
+  // Aggregate feed by type
+  const aggregatedFeedByType = useMemo(() => {
+    const aggregated = {};
 
-    const today = new Date();
+    feedInventory.forEach(item => {
+      const feedType = item.feed_type;
+      if (!aggregated[feedType]) {
+        aggregated[feedType] = {
+          feedType,
+          totalQuantity: 0,
+          totalValue: 0,
+          totalAssigned: 0,
+          purchases: [],
+          lowStock: false,
+          outOfStock: false
+        };
+      }
 
-    filteredInventory.forEach(item => {
       const itemQuantity = item.quantity_kg || 0;
-      stats.totalQuantity += itemQuantity;
-      stats.totalValue += (item.number_of_bags || 1) * item.cost_per_bag;
+      aggregated[feedType].totalQuantity += itemQuantity;
+      aggregated[feedType].totalValue += (item.number_of_bags || 1) * item.cost_per_bag;
 
       // Calculate total assigned for this item
       const itemAssigned = (item.assigned_batches || []).reduce(
         (sum, assignment) => sum + (assignment.assigned_quantity_kg || 0),
         0
       );
-      stats.totalAssigned += itemAssigned;
+      aggregated[feedType].totalAssigned += itemAssigned;
+      aggregated[feedType].purchases.push(item);
+    });
 
-      const status = getStockStatus(item.quantity_kg);
-      if (status === 'low') stats.lowStockItems++;
-      if (status === 'out') stats.outOfStockItems++;
+    // Determine stock status for each feed type
+    Object.values(aggregated).forEach(feedType => {
+      feedType.remainingQuantity = feedType.totalQuantity - feedType.totalAssigned;
+      feedType.outOfStock = feedType.remainingQuantity === 0;
+      feedType.lowStock = feedType.remainingQuantity > 0 && feedType.remainingQuantity <= LOW_STOCK_THRESHOLD;
+    });
 
+    return aggregated;
+  }, [feedInventory]);
+
+  // Summary statistics
+  const summaryStats = useMemo(() => {
+    const stats = {
+      totalQuantity: 0,
+      totalValue: 0,
+      totalAssigned: 0,
+      remainingFeed: 0,
+      lowStockTypes: 0,
+      outOfStockTypes: 0,
+      expiringItems: 0
+    };
+
+    const today = new Date();
+
+    // Aggregate stats from feed types
+    Object.values(aggregatedFeedByType).forEach(feedType => {
+      stats.totalQuantity += feedType.totalQuantity;
+      stats.totalValue += feedType.totalValue;
+      stats.totalAssigned += feedType.totalAssigned;
+
+      if (feedType.lowStock) stats.lowStockTypes++;
+      if (feedType.outOfStock) stats.outOfStockTypes++;
+    });
+
+    // Check for expiring items
+    filteredInventory.forEach(item => {
       if (item.expiry_date) {
         const expiryDate = new Date(item.expiry_date);
         const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
@@ -315,7 +371,7 @@ const FeedInventoryView = ({
     stats.remainingFeed = stats.totalQuantity - stats.totalAssigned;
 
     return stats;
-  }, [filteredInventory]);
+  }, [aggregatedFeedByType, filteredInventory]);
 
   // Row className function
   const getRowClassName = (item) => {
@@ -345,21 +401,104 @@ const FeedInventoryView = ({
 
   return (
     <div className="feed-inventory-view">
-      {/* Summary Cards */}
-      <div className="summary-cards">
-        <div className="summary-card">
-          <div className="summary-icon">📦</div>
-          <div className="summary-content">
-            <h4>Total Items</h4>
-            <p className="summary-value">{formatNumber(summaryStats.totalItems)}</p>
+      {/* View Mode Toggle */}
+      <div className="view-mode-toggle">
+        <button
+          className={`toggle-btn ${viewMode === 'aggregated' ? 'active' : ''}`}
+          onClick={() => setViewMode('aggregated')}
+        >
+          📊 By Feed Type
+        </button>
+        <button
+          className={`toggle-btn ${viewMode === 'detailed' ? 'active' : ''}`}
+          onClick={() => setViewMode('detailed')}
+        >
+          📋 Purchase History
+        </button>
+      </div>
+
+      {/* Feed Type Summary Cards (Aggregated View) */}
+      {viewMode === 'aggregated' && (
+        <div className="feed-type-summary">
+          <h3>📦 Feed Stock by Type</h3>
+          <div className="feed-type-cards">
+            {FEED_TYPES.map(feedType => {
+              const typeData = aggregatedFeedByType[feedType] || {
+                feedType,
+                totalQuantity: 0,
+                totalValue: 0,
+                totalAssigned: 0,
+                remainingQuantity: 0,
+                purchases: [],
+                lowStock: false,
+                outOfStock: false
+              };
+
+              const statusClass = typeData.outOfStock ? 'out-of-stock' :
+                                 typeData.lowStock ? 'low-stock' : 'normal';
+
+              return (
+                <div key={feedType} className={`feed-type-card ${statusClass}`}>
+                  <div className="feed-type-header">
+                    <h4>{feedType}</h4>
+                    <span className={`status-badge ${statusClass}`}>
+                      {typeData.outOfStock ? '🚫 Out' :
+                       typeData.lowStock ? '⚠️ Low' : '✓ OK'}
+                    </span>
+                  </div>
+                  <div className="feed-type-stats">
+                    <div className="stat-item">
+                      <span className="stat-label">Total Stock</span>
+                      <span className="stat-value">{formatNumber(typeData.totalQuantity, 2)} kg</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Assigned to Batches</span>
+                      <span className="stat-value">{formatNumber(typeData.totalAssigned, 2)} kg</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Available</span>
+                      <span className="stat-value highlight">{formatNumber(typeData.remainingQuantity, 2)} kg</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Total Value</span>
+                      <span className="stat-value">₦{formatNumber(typeData.totalValue, 2)}</span>
+                    </div>
+                    <div className="stat-item">
+                      <span className="stat-label">Purchases</span>
+                      <span className="stat-value">{typeData.purchases.length}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
+      )}
 
+      {/* Overall Summary Cards */}
+      <div className="summary-cards">
         <div className="summary-card">
           <div className="summary-icon">⚖️</div>
           <div className="summary-content">
-            <h4>Total Quantity</h4>
+            <h4>Total Stock</h4>
             <p className="summary-value">{formatNumber(summaryStats.totalQuantity, 2)} kg</p>
+          </div>
+        </div>
+
+        <div className="summary-card success">
+          <div className="summary-icon">📊</div>
+          <div className="summary-content">
+            <h4>Assigned to Batches</h4>
+            <p className="summary-value">{formatNumber(summaryStats.totalAssigned, 2)} kg</p>
+          </div>
+        </div>
+
+        <div className="summary-card primary">
+          <div className="summary-icon">🔄</div>
+          <div className="summary-content">
+            <h4>Available Feed</h4>
+            <p className="summary-value">{formatNumber(summaryStats.remainingFeed, 2)} kg</p>
+            <small>Unassigned stock</small>
           </div>
         </div>
 
@@ -371,35 +510,21 @@ const FeedInventoryView = ({
           </div>
         </div>
 
-        <div className="summary-card success">
-          <div className="summary-icon">📊</div>
-          <div className="summary-content">
-            <h4>Total Assigned</h4>
-            <p className="summary-value">{formatNumber(summaryStats.totalAssigned, 2)} kg</p>
-          </div>
-        </div>
-
-        <div className="summary-card primary">
-          <div className="summary-icon">🔄</div>
-          <div className="summary-content">
-            <h4>Remaining Feeds</h4>
-            <p className="summary-value">{formatNumber(summaryStats.remainingFeed, 2)} kg</p>
-          </div>
-        </div>
-
         <div className="summary-card warning">
           <div className="summary-icon">⚠️</div>
           <div className="summary-content">
-            <h4>Low Stock Items</h4>
-            <p className="summary-value">{formatNumber(summaryStats.lowStockItems)}</p>
+            <h4>Low Stock Types</h4>
+            <p className="summary-value">{formatNumber(summaryStats.lowStockTypes)}</p>
+            <small>Feed types running low</small>
           </div>
         </div>
 
         <div className="summary-card danger">
           <div className="summary-icon">🚫</div>
           <div className="summary-content">
-            <h4>Out of Stock</h4>
-            <p className="summary-value">{formatNumber(summaryStats.outOfStockItems)}</p>
+            <h4>Out of Stock Types</h4>
+            <p className="summary-value">{formatNumber(summaryStats.outOfStockTypes)}</p>
+            <small>Feed types depleted</small>
           </div>
         </div>
 
@@ -408,28 +533,29 @@ const FeedInventoryView = ({
           <div className="summary-content">
             <h4>Expiring Soon</h4>
             <p className="summary-value">{formatNumber(summaryStats.expiringItems)}</p>
+            <small>Within 30 days</small>
           </div>
         </div>
       </div>
 
       {/* Alerts Section */}
-      {(summaryStats.lowStockItems > 0 || summaryStats.outOfStockItems > 0 || summaryStats.expiringItems > 0) && (
+      {(summaryStats.lowStockTypes > 0 || summaryStats.outOfStockTypes > 0 || summaryStats.expiringItems > 0) && (
         <div className="alerts-section">
           <h4>⚠️ Stock Alerts</h4>
           <div className="alerts-container">
-            {summaryStats.outOfStockItems > 0 && (
+            {summaryStats.outOfStockTypes > 0 && (
               <div className="alert-card danger">
-                <strong>{summaryStats.outOfStockItems}</strong> items are out of stock
+                <strong>{summaryStats.outOfStockTypes}</strong> feed type(s) are out of stock
               </div>
             )}
-            {summaryStats.lowStockItems > 0 && (
+            {summaryStats.lowStockTypes > 0 && (
               <div className="alert-card warning">
-                <strong>{summaryStats.lowStockItems}</strong> items have low stock
+                <strong>{summaryStats.lowStockTypes}</strong> feed type(s) have low stock
               </div>
             )}
             {summaryStats.expiringItems > 0 && (
               <div className="alert-card info">
-                <strong>{summaryStats.expiringItems}</strong> items expire within 30 days
+                <strong>{summaryStats.expiringItems}</strong> purchase(s) expire within 30 days
               </div>
             )}
           </div>

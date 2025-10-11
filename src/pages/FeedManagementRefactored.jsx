@@ -7,7 +7,9 @@ import {
   FeedForm,
   FeedConsumptionView,
   FeedConsumptionForm,
-  FeedAnalyticsView
+  FeedAnalyticsView,
+  FeedAlerts,
+  FeedForecast
 } from '../components/FeedManagement';
 import './FeedManagement.css';
 
@@ -25,7 +27,9 @@ const FeedManagement = () => {
     deleteFeedBatchAssignment,
     loadFeedInventory,
     balance,
-    addExpense
+    addExpense,
+    getLastConsumptionForBatch,
+    get3DayAverageConsumption
   } = useAppContext();
 
   const { showError, showSuccess, showWarning } = useNotification();
@@ -63,22 +67,33 @@ const FeedManagement = () => {
 
   // Tab configuration
   const tabs = [
-    { 
-      key: 'inventory', 
-      label: 'Feed Inventory', 
+    {
+      key: 'inventory',
+      label: 'Feed Inventory',
       icon: '📦',
       badge: feedInventory?.length || 0
     },
-    { 
-      key: 'consumption', 
-      label: 'Feed Consumption', 
+    {
+      key: 'consumption',
+      label: 'Feed Consumption',
       icon: '🍽️',
       badge: feedConsumption?.length || 0
     },
-    { 
-      key: 'analytics', 
-      label: 'Analytics', 
-      icon: '📊' 
+    {
+      key: 'alerts',
+      label: 'Alerts',
+      icon: '🔔',
+      badge: null // Will be calculated from feedAlerts
+    },
+    {
+      key: 'forecast',
+      label: 'Forecast',
+      icon: '📈'
+    },
+    {
+      key: 'analytics',
+      label: 'Analytics',
+      icon: '📊'
     }
   ];
 
@@ -331,6 +346,14 @@ const FeedManagement = () => {
           />
         )}
 
+        {activeTab === 'alerts' && (
+          <FeedAlerts />
+        )}
+
+        {activeTab === 'forecast' && (
+          <FeedForecast />
+        )}
+
         {activeTab === 'analytics' && (
           <FeedAnalyticsView
             feedInventory={feedInventory}
@@ -360,6 +383,9 @@ const FeedManagement = () => {
         onSubmit={handleConsumptionSubmit}
         feedInventory={feedInventory}
         liveChickens={liveChickens}
+        feedConsumption={feedConsumption}
+        getLastConsumptionForBatch={getLastConsumptionForBatch}
+        get3DayAverageConsumption={get3DayAverageConsumption}
         loading={loading}
       />
     </div>
