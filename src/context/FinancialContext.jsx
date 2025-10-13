@@ -50,8 +50,27 @@ export function FinancialProvider({ children }) {
           .select('*')
           .order('date', { ascending: false });
 
-        if (transactionsError) throw transactionsError;
-        setTransactions(transactionsData || []);
+        if (transactionsError && !transactionsError.message.includes('relation "transactions" does not exist')) {
+          throw transactionsError;
+        }
+
+        // Use database data if available, otherwise fallback to localStorage
+        if (transactionsData && transactionsData.length > 0) {
+          setTransactions(transactionsData);
+        } else {
+          // Fallback to localStorage if no database data exists
+          const localTransactions = localStorage.getItem('transactions');
+          if (localTransactions && localTransactions !== 'undefined') {
+            try {
+              setTransactions(JSON.parse(localTransactions));
+            } catch (e) {
+              console.warn('Invalid transactions data in localStorage:', e);
+              setTransactions([]);
+            }
+          } else {
+            setTransactions([]);
+          }
+        }
 
         // Load balance
         const { data: balanceData, error: balanceError } = await supabase
@@ -63,24 +82,38 @@ export function FinancialProvider({ children }) {
         if (balanceError && !balanceError.message.includes('relation "balance" does not exist')) {
           throw balanceError;
         }
-        const currentBalance = balanceData?.amount || 0;
-        setBalance(currentBalance);
+
+        // Use database balance if available, otherwise fallback to localStorage
+        if (balanceData && balanceError === null) {
+          setBalance(balanceData.amount);
+        } else {
+          // Fallback to localStorage if no database data exists
+          const localBalance = localStorage.getItem('balance');
+          if (localBalance && localBalance !== 'undefined') {
+            setBalance(parseFloat(localBalance));
+          } else {
+            setBalance(0);
+          }
+        }
 
       } catch (err) {
         console.error('Error loading financial data:', err);
-        
-        // Fallback to localStorage if Supabase fails
-        const localBalance = localStorage.getItem('balance');
-        if (localBalance && localBalance !== 'undefined') {
-          setBalance(parseFloat(localBalance));
-        }
 
-        const localTransactions = localStorage.getItem('transactions');
-        if (localTransactions && localTransactions !== 'undefined') {
-          try {
-            setTransactions(JSON.parse(localTransactions));
-          } catch (e) {
-            console.warn('Invalid transactions data in localStorage:', e);
+        // Fallback to localStorage if Supabase fails (only for non-table-exists errors)
+        if (!err.message.includes('relation "transactions" does not exist') && !err.message.includes('relation "balance" does not exist')) {
+          const localBalance = localStorage.getItem('balance');
+          if (localBalance && localBalance !== 'undefined') {
+            setBalance(parseFloat(localBalance));
+          }
+
+          const localTransactions = localStorage.getItem('transactions');
+          if (localTransactions && localTransactions !== 'undefined') {
+            try {
+              setTransactions(JSON.parse(localTransactions));
+            } catch (e) {
+              console.warn('Invalid transactions data in localStorage:', e);
+              setTransactions([]);
+            }
           }
         }
 

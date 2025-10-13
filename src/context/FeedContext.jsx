@@ -15,6 +15,8 @@ export function FeedProvider({ children }) {
   const [feedInventory, setFeedInventoryState] = useState([]);
   const [feedConsumption, setFeedConsumptionState] = useState([]);
   const [feedBatchAssignments, setFeedBatchAssignmentsState] = useState([]);
+  const [feedAlerts, setFeedAlertsState] = useState([]);
+  const [batchFeedSummaries, setBatchFeedSummariesState] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -46,6 +48,24 @@ export function FeedProvider({ children }) {
     }
   };
 
+  const setFeedAlerts = (newAlerts) => {
+    setFeedAlertsState(newAlerts);
+    try {
+      localStorage.setItem('feedAlerts', JSON.stringify(newAlerts));
+    } catch (e) {
+      console.warn('Failed to save feedAlerts to localStorage:', e);
+    }
+  };
+
+  const setBatchFeedSummaries = (newSummaries) => {
+    setBatchFeedSummariesState(newSummaries);
+    try {
+      localStorage.setItem('batchFeedSummaries', JSON.stringify(newSummaries));
+    } catch (e) {
+      console.warn('Failed to save batchFeedSummaries to localStorage:', e);
+    }
+  };
+
   // Load data from Supabase
   useEffect(() => {
     const loadFeedData = async () => {
@@ -53,43 +73,47 @@ export function FeedProvider({ children }) {
         setLoading(true);
         setError(null);
 
-        // Load feed inventory with batch assignments
+        // Load feed inventory
         const { data: feedInventoryData, error: feedInventoryError } = await supabase
           .from('feed_inventory')
-          .select(`
-            *,
-            feed_batch_assignments (
-              id,
-              chicken_batch_id,
-              assigned_quantity_kg,
-              assigned_date
-            )
-          `)
+          .select('*')
           .order('purchase_date', { ascending: false });
 
         if (feedInventoryError && !feedInventoryError.message.includes('relation "feed_inventory" does not exist')) {
           throw feedInventoryError;
         }
 
-        // Transform the data to match frontend expectations
-        const transformedFeedData = feedInventoryData?.map(feed => ({
-          ...feed,
-          assigned_batches: feed.feed_batch_assignments?.map(assignment => ({
-            batch_id: assignment.chicken_batch_id,
-            assigned_quantity_kg: assignment.assigned_quantity_kg
-          })) || []
-        })) || [];
+        // Load feed batch assignments separately for joining
+        const { data: batchAssignmentsForFeed, error: batchAssignmentsError } = await supabase
+          .from('feed_batch_assignments')
+          .select('*')
+          .order('assigned_date', { ascending: false });
 
-        // Only set from Supabase if we have actual data, otherwise keep localStorage data
+        if (batchAssignmentsError && !batchAssignmentsError.message.includes('relation "feed_batch_assignments" does not exist')) {
+          console.warn('Error loading batch assignments:', batchAssignmentsError);
+        }
+
+        // Transform the data to match frontend expectations and manually join assignments
+        const transformedFeedData = feedInventoryData?.map(feed => {
+          const feedAssignments = batchAssignmentsForFeed?.filter(a => a.feed_id === feed.id) || [];
+          return {
+            ...feed,
+            remaining_kg: feed.remaining_kg ?? feed.quantity_kg,
+            assigned_batches: feedAssignments.map(assignment => ({
+              batch_id: assignment.chicken_batch_id,
+              assigned_quantity_kg: assignment.assigned_quantity_kg,
+              auto_assigned: assignment.auto_assigned
+            }))
+          };
+        }) || [];
+
         if (transformedFeedData && transformedFeedData.length > 0) {
           setFeedInventory(transformedFeedData);
         } else {
-          // Fallback to localStorage
           const localFeedInventory = localStorage.getItem('feedInventory');
           if (localFeedInventory && localFeedInventory !== 'undefined') {
             try {
-              const parsedFeedInventory = JSON.parse(localFeedInventory);
-              setFeedInventory(parsedFeedInventory);
+              setFeedInventory(JSON.parse(localFeedInventory));
             } catch (e) {
               console.warn('Invalid feedInventory data in localStorage:', e);
               setFeedInventory([]);
@@ -107,16 +131,13 @@ export function FeedProvider({ children }) {
           throw feedConsumptionError;
         }
 
-        // Only set from Supabase if we have actual data, otherwise keep localStorage data
         if (feedConsumptionData && feedConsumptionData.length > 0) {
           setFeedConsumption(feedConsumptionData);
         } else {
-          // Fallback to localStorage if no database data exists
           const localFeedConsumption = localStorage.getItem('feedConsumption');
           if (localFeedConsumption && localFeedConsumption !== 'undefined') {
             try {
-              const parsedFeedConsumption = JSON.parse(localFeedConsumption);
-              setFeedConsumption(parsedFeedConsumption);
+              setFeedConsumption(JSON.parse(localFeedConsumption));
             } catch (e) {
               console.warn('Invalid feedConsumption data in localStorage:', e);
               setFeedConsumption([]);
@@ -125,26 +146,51 @@ export function FeedProvider({ children }) {
         }
 
         // Load feed batch assignments
-        try {
-          const { data: feedBatchAssignmentsData, error: feedBatchAssignmentsError } = await supabase
-            .from('feed_batch_assignments')
-            .select('*')
-            .order('assigned_date', { ascending: false });
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from('feed_batch_assignments')
+          .select('*')
+          .order('assigned_date', { ascending: false });
 
-          if (feedBatchAssignmentsError) {
-            console.warn('Feed batch assignments table not found - this is expected for new installations:', feedBatchAssignmentsError);
-            setFeedBatchAssignments([]);
-          } else {
-            setFeedBatchAssignments(feedBatchAssignmentsData || []);
-          }
-        } catch (err) {
-          console.warn('Feed batch assignments feature not available yet:', err);
-          setFeedBatchAssignments([]);
+        if (assignmentsError && !assignmentsError.message.includes('relation "feed_batch_assignments" does not exist')) {
+          throw assignmentsError;
+        }
+
+        if (assignmentsData && assignmentsData.length > 0) {
+          setFeedBatchAssignments(assignmentsData);
+        }
+
+        // Load feed alerts
+        const { data: alertsData, error: alertsError } = await supabase
+          .from('feed_alerts')
+          .select('*')
+          .eq('acknowledged', false)
+          .order('created_at', { ascending: false });
+
+        if (alertsError && !alertsError.message.includes('relation "feed_alerts" does not exist')) {
+          throw alertsError;
+        }
+
+        if (alertsData && alertsData.length > 0) {
+          setFeedAlerts(alertsData);
+        }
+
+        // Load batch feed summaries
+        const { data: summariesData, error: summariesError } = await supabase
+          .from('batch_feed_summary')
+          .select('*')
+          .order('summary_date', { ascending: false });
+
+        if (summariesError && !summariesError.message.includes('relation "batch_feed_summary" does not exist')) {
+          throw summariesError;
+        }
+
+        if (summariesData && summariesData.length > 0) {
+          setBatchFeedSummaries(summariesData);
         }
 
       } catch (err) {
         console.error('Error loading feed data:', err);
-        setError('Failed to load feed data');
+        setError(err.message);
       } finally {
         setLoading(false);
       }
@@ -156,20 +202,21 @@ export function FeedProvider({ children }) {
   // CRUD operations for feed inventory
   const addFeedInventory = async (feedData) => {
     try {
-      // Extract assigned_batches before creating feed item
       const { assigned_batches, ...feedItemData } = feedData;
-
+      
       const feedItem = {
         id: Date.now().toString(),
         ...feedItemData,
-        purchase_date: feedItemData.purchase_date || new Date().toISOString().split('T')[0],
+        remaining_kg: feedItemData.quantity_kg,
+        total_cost: feedItemData.number_of_bags * feedItemData.cost_per_bag,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
-      // Insert feed inventory
       const { error } = await supabase.from('feed_inventory').insert(feedItem);
       if (error) throw error;
+
+      setFeedInventory(prev => [feedItem, ...prev]);
 
       // Handle batch assignments if any
       if (assigned_batches && assigned_batches.length > 0) {
@@ -179,6 +226,7 @@ export function FeedProvider({ children }) {
           chicken_batch_id: ab.batch_id,
           assigned_quantity_kg: parseFloat(ab.assigned_quantity_kg),
           assigned_date: new Date().toISOString().split('T')[0],
+          auto_assigned: ab.auto_assigned || false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }));
@@ -189,16 +237,11 @@ export function FeedProvider({ children }) {
 
         if (assignmentError) {
           console.error('Error creating batch assignments:', assignmentError);
-          // Don't throw - feed was created successfully
+        } else {
+          setFeedBatchAssignments(prev => [...assignments, ...prev]);
         }
-
-        // Add assignments to feed item for local state
-        feedItem.assigned_batches = assigned_batches;
       }
 
-      setFeedInventory(prev => [feedItem, ...prev]);
-
-      // Log audit action
       await logAuditAction('CREATE', 'feed_inventory', feedItem.id, null, feedItem);
 
       return feedItem;
@@ -208,87 +251,27 @@ export function FeedProvider({ children }) {
     }
   };
 
-  const updateFeedInventory = async (id, feedData) => {
+  const updateFeedInventory = async (id, updatedData) => {
     try {
-      const oldFeedItem = feedInventory.find(item => item.id === id);
-      if (!oldFeedItem) {
-        // If feed item not found in current state, check if it's the newly added item
-        // This handles the case where balance deduction happens immediately after adding
-        if (feedData && feedData.id === id) {
-          // Use the provided feed data as the old item for comparison
-          console.log('Feed item not in state yet, using provided data for update');
-        } else {
-          throw new Error('Feed item not found');
-        }
-      }
-
-      // Extract assigned_batches before updating feed item
-      const { assigned_batches, ...feedItemData } = feedData;
-
-      const updatedFeedItem = {
-        ...(oldFeedItem || feedData),
-        ...feedItemData,
+      const oldFeed = feedInventory.find(f => f.id === id);
+      
+      const feedUpdate = {
+        ...updatedData,
         updated_at: new Date().toISOString()
       };
 
-      // Update feed inventory
       const { error } = await supabase
         .from('feed_inventory')
-        .update(updatedFeedItem)
+        .update(feedUpdate)
         .eq('id', id);
 
       if (error) throw error;
 
-      // Handle batch assignments if provided
-      if (assigned_batches !== undefined) {
-        // Delete existing assignments
-        await supabase
-          .from('feed_batch_assignments')
-          .delete()
-          .eq('feed_id', id);
+      setFeedInventory(prev => prev.map(f => f.id === id ? { ...f, ...feedUpdate } : f));
 
-        // Insert new assignments if any
-        if (assigned_batches.length > 0) {
-          const assignments = assigned_batches.map(ab => ({
-            id: `${id}-${ab.batch_id}-${Date.now()}`,
-            feed_id: id,
-            chicken_batch_id: ab.batch_id,
-            assigned_quantity_kg: parseFloat(ab.assigned_quantity_kg),
-            assigned_date: new Date().toISOString().split('T')[0],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }));
+      await logAuditAction('UPDATE', 'feed_inventory', id, oldFeed, feedUpdate);
 
-          const { error: assignmentError } = await supabase
-            .from('feed_batch_assignments')
-            .insert(assignments);
-
-          if (assignmentError) {
-            console.error('Error updating batch assignments:', assignmentError);
-          }
-        }
-
-        // Add assignments to updated item for local state
-        updatedFeedItem.assigned_batches = assigned_batches;
-      }
-
-      setFeedInventory(prev => {
-        const existingIndex = prev.findIndex(item => item.id === id);
-        if (existingIndex >= 0) {
-          // Update existing item
-          return prev.map(item =>
-            item.id === id ? updatedFeedItem : item
-          );
-        } else {
-          // Add new item if it doesn't exist (for immediate balance deduction updates)
-          return [updatedFeedItem, ...prev];
-        }
-      });
-
-      // Log audit action
-      await logAuditAction('UPDATE', 'feed_inventory', id, oldFeedItem || feedData, updatedFeedItem);
-
-      return updatedFeedItem;
+      return { ...oldFeed, ...feedUpdate };
     } catch (err) {
       console.error('Error updating feed inventory:', err);
       throw err;
@@ -297,8 +280,7 @@ export function FeedProvider({ children }) {
 
   const deleteFeedInventory = async (id) => {
     try {
-      const feedToDelete = feedInventory.find(item => item.id === id);
-      if (!feedToDelete) throw new Error('Feed item not found');
+      const feedToDelete = feedInventory.find(f => f.id === id);
 
       const { error } = await supabase
         .from('feed_inventory')
@@ -307,9 +289,8 @@ export function FeedProvider({ children }) {
 
       if (error) throw error;
 
-      setFeedInventory(prev => prev.filter(item => item.id !== id));
+      setFeedInventory(prev => prev.filter(f => f.id !== id));
 
-      // Log audit action
       await logAuditAction('DELETE', 'feed_inventory', id, feedToDelete, null);
 
       return feedToDelete;
@@ -334,7 +315,19 @@ export function FeedProvider({ children }) {
 
       setFeedConsumption(prev => [consumption, ...prev]);
 
-      // Log audit action
+      // Update feed inventory remaining quantity
+      const feed = feedInventory.find(f => f.id === consumption.feed_id);
+      if (feed) {
+        const newRemainingKg = Math.max(0, (feed.remaining_kg || feed.quantity_kg) - consumption.quantity_consumed);
+        await updateFeedInventory(feed.id, {
+          ...feed,
+          remaining_kg: newRemainingKg
+        });
+      }
+
+      // Recalculate FCR for the batch
+      await recalculateBatchFCR(consumption.chicken_batch_id);
+
       await logAuditAction('CREATE', 'feed_consumption', consumption.id, null, consumption);
 
       return consumption;
@@ -346,8 +339,7 @@ export function FeedProvider({ children }) {
 
   const deleteFeedConsumption = async (id) => {
     try {
-      const consumptionToDelete = feedConsumption.find(item => item.id === id);
-      if (!consumptionToDelete) throw new Error('Feed consumption record not found');
+      const consumptionToDelete = feedConsumption.find(c => c.id === id);
 
       const { error } = await supabase
         .from('feed_consumption')
@@ -356,9 +348,23 @@ export function FeedProvider({ children }) {
 
       if (error) throw error;
 
-      setFeedConsumption(prev => prev.filter(item => item.id !== id));
+      setFeedConsumption(prev => prev.filter(c => c.id !== id));
 
-      // Log audit action
+      // Restore feed inventory quantity
+      if (consumptionToDelete) {
+        const feed = feedInventory.find(f => f.id === consumptionToDelete.feed_id);
+        if (feed) {
+          const newRemainingKg = (feed.remaining_kg || feed.quantity_kg) + consumptionToDelete.quantity_consumed;
+          await updateFeedInventory(feed.id, {
+            ...feed,
+            remaining_kg: newRemainingKg
+          });
+        }
+
+        // Recalculate FCR for the batch
+        await recalculateBatchFCR(consumptionToDelete.chicken_batch_id);
+      }
+
       await logAuditAction('DELETE', 'feed_consumption', id, consumptionToDelete, null);
 
       return consumptionToDelete;
@@ -368,14 +374,15 @@ export function FeedProvider({ children }) {
     }
   };
 
-  // Feed batch assignment operations
+  // CRUD operations for feed batch assignments
   const addFeedBatchAssignment = async (assignmentData) => {
     try {
       const assignment = {
         id: Date.now().toString(),
         ...assignmentData,
         assigned_date: assignmentData.assigned_date || new Date().toISOString().split('T')[0],
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       const { error } = await supabase.from('feed_batch_assignments').insert(assignment);
@@ -383,7 +390,6 @@ export function FeedProvider({ children }) {
 
       setFeedBatchAssignments(prev => [assignment, ...prev]);
 
-      // Log audit action
       await logAuditAction('CREATE', 'feed_batch_assignments', assignment.id, null, assignment);
 
       return assignment;
@@ -395,8 +401,7 @@ export function FeedProvider({ children }) {
 
   const deleteFeedBatchAssignment = async (id) => {
     try {
-      const assignmentToDelete = feedBatchAssignments.find(item => item.id === id);
-      if (!assignmentToDelete) throw new Error('Feed batch assignment not found');
+      const assignmentToDelete = feedBatchAssignments.find(a => a.id === id);
 
       const { error } = await supabase
         .from('feed_batch_assignments')
@@ -405,9 +410,8 @@ export function FeedProvider({ children }) {
 
       if (error) throw error;
 
-      setFeedBatchAssignments(prev => prev.filter(item => item.id !== id));
+      setFeedBatchAssignments(prev => prev.filter(a => a.id !== id));
 
-      // Log audit action
       await logAuditAction('DELETE', 'feed_batch_assignments', id, assignmentToDelete, null);
 
       return assignmentToDelete;
@@ -417,34 +421,469 @@ export function FeedProvider({ children }) {
     }
   };
 
-  // Feed analysis functions
-  const getLowFeedAlerts = React.useCallback(() => {
-    return feedInventory.filter(feed => {
-      const currentStock = feed.quantity_kg || 0;
-      const minThreshold = feed.min_threshold || 50; // Default 50kg threshold
-      return currentStock <= minThreshold;
-    });
-  }, [feedInventory]);
-
-  const calculateProjectedFeedNeeds = (days = 30) => {
-    // Calculate average daily consumption for each feed type
-    const dailyConsumption = {};
-    
-    feedConsumption.forEach(consumption => {
-      const feedId = consumption.feed_id;
-      if (!dailyConsumption[feedId]) {
-        dailyConsumption[feedId] = { total: 0, days: 0 };
+  // Auto-assign feed to active batches
+  const autoAssignFeedToBatches = async (feedId, activeBatches) => {
+    try {
+      const feed = feedInventory.find(f => f.id === feedId);
+      if (!feed || !activeBatches || activeBatches.length === 0) {
+        return [];
       }
-      dailyConsumption[feedId].total += consumption.quantity_consumed;
-      dailyConsumption[feedId].days += 1;
+
+      // Calculate total bird count
+      const totalBirds = activeBatches.reduce((sum, batch) => sum + (batch.current_count || 0), 0);
+
+      if (totalBirds === 0) {
+        return [];
+      }
+
+      // Distribute feed proportionally based on bird count
+      const assignments = activeBatches.map(batch => {
+        const proportion = (batch.current_count || 0) / totalBirds;
+        const assignedQuantity = feed.quantity_kg * proportion;
+
+        return {
+          id: `${feedId}-${batch.id}-${Date.now()}`,
+          feed_id: feedId,
+          chicken_batch_id: batch.id,
+          assigned_quantity_kg: parseFloat(assignedQuantity.toFixed(2)),
+          assigned_date: new Date().toISOString().split('T')[0],
+          auto_assigned: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      });
+
+      const { error } = await supabase
+        .from('feed_batch_assignments')
+        .insert(assignments);
+
+      if (error) throw error;
+
+      setFeedBatchAssignments(prev => [...assignments, ...prev]);
+
+      // Update feed to mark as auto-assigned
+      await updateFeedInventory(feedId, {
+        ...feed,
+        auto_assigned: true
+      });
+
+      return assignments;
+    } catch (err) {
+      console.error('Error auto-assigning feed to batches:', err);
+      throw err;
+    }
+  };
+
+  // FCR Calculation
+  const calculateBatchFCR = (batchId, liveChickens, weightHistory) => {
+    try {
+      const batch = liveChickens?.find(b => b.id === batchId);
+      if (!batch) return null;
+
+      // Get total feed consumed for this batch
+      const batchConsumption = feedConsumption.filter(c => c.chicken_batch_id === batchId);
+      const totalFeedKg = batchConsumption.reduce((sum, c) => sum + c.quantity_consumed, 0);
+
+      // Calculate weight gain
+      const batchWeightHistory = weightHistory?.filter(w => w.chicken_batch_id === batchId) || [];
+
+      let totalWeightGain = 0;
+      if (batchWeightHistory.length > 0) {
+        // Sort by date
+        const sortedWeights = [...batchWeightHistory].sort((a, b) =>
+          new Date(a.recorded_date) - new Date(b.recorded_date)
+        );
+
+        const initialWeight = sortedWeights[0]?.weight || batch.expected_weight || 0;
+        const currentWeight = batch.current_weight || sortedWeights[sortedWeights.length - 1]?.weight || 0;
+
+        totalWeightGain = (currentWeight - initialWeight) * batch.current_count;
+      } else {
+        // Fallback to batch data
+        const initialWeight = batch.expected_weight || 0;
+        const currentWeight = batch.current_weight || 0;
+        totalWeightGain = (currentWeight - initialWeight) * batch.current_count;
+      }
+
+      if (totalWeightGain <= 0) return null;
+
+      const fcr = totalFeedKg / totalWeightGain;
+
+      // Determine FCR rating
+      let rating = 'average';
+      let color = 'yellow';
+
+      if (fcr < 1.5) {
+        rating = 'excellent';
+        color = 'green';
+      } else if (fcr < 1.8) {
+        rating = 'good';
+        color = 'green';
+      } else if (fcr < 2.2) {
+        rating = 'average';
+        color = 'yellow';
+      } else {
+        rating = 'poor';
+        color = 'red';
+      }
+
+      return {
+        fcr: parseFloat(fcr.toFixed(4)),
+        totalFeedKg,
+        totalWeightGain,
+        rating,
+        color
+      };
+    } catch (err) {
+      console.error('Error calculating FCR:', err);
+      return null;
+    }
+  };
+
+  const recalculateBatchFCR = async (batchId) => {
+    try {
+      // This will be called after consumption is logged
+      // The actual FCR will be calculated on-demand when needed
+      // We can optionally store it in batch_feed_summary table
+      return true;
+    } catch (err) {
+      console.error('Error recalculating FCR:', err);
+      return false;
+    }
+  };
+
+  // Generate batch feed summary
+  const generateBatchFeedSummary = async (batchId, liveChickens, weightHistory) => {
+    try {
+      const batch = liveChickens?.find(b => b.id === batchId);
+      if (!batch) throw new Error('Batch not found');
+
+      // Get all consumption for this batch
+      const batchConsumption = feedConsumption.filter(c => c.chicken_batch_id === batchId);
+      const totalFeedKg = batchConsumption.reduce((sum, c) => sum + c.quantity_consumed, 0);
+      const totalFeedBags = totalFeedKg / 25; // Assuming 25kg per bag
+
+      // Calculate total cost
+      let totalFeedCost = 0;
+      batchConsumption.forEach(consumption => {
+        const feed = feedInventory.find(f => f.id === consumption.feed_id);
+        if (feed) {
+          totalFeedCost += consumption.quantity_consumed * feed.cost_per_kg;
+        }
+      });
+
+      // Calculate FCR
+      const fcrData = calculateBatchFCR(batchId, liveChickens, weightHistory);
+
+      const summary = {
+        id: `${batchId}-${Date.now()}`,
+        chicken_batch_id: batchId,
+        total_feed_kg: parseFloat(totalFeedKg.toFixed(2)),
+        total_feed_bags: parseFloat(totalFeedBags.toFixed(2)),
+        total_feed_cost: parseFloat(totalFeedCost.toFixed(2)),
+        average_fcr: fcrData?.fcr || null,
+        total_weight_gain: fcrData?.totalWeightGain || null,
+        feed_efficiency_rating: fcrData?.rating || 'unknown',
+        summary_date: new Date().toISOString().split('T')[0],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await supabase.from('batch_feed_summary').insert(summary);
+      if (error) throw error;
+
+      setBatchFeedSummaries(prev => [summary, ...prev]);
+
+      await logAuditAction('CREATE', 'batch_feed_summary', summary.id, null, summary);
+
+      return summary;
+    } catch (err) {
+      console.error('Error generating batch feed summary:', err);
+      throw err;
+    }
+  };
+
+  // Get last consumption for a batch
+  const getLastConsumptionForBatch = (batchId) => {
+    const batchConsumptions = feedConsumption
+      .filter(c => c.chicken_batch_id === batchId)
+      .sort((a, b) => new Date(b.consumption_date) - new Date(a.consumption_date));
+
+    return batchConsumptions[0] || null;
+  };
+
+  // Get 3-day average consumption for a batch
+  const get3DayAverageConsumption = (batchId) => {
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+    const recentConsumptions = feedConsumption.filter(c =>
+      c.chicken_batch_id === batchId &&
+      new Date(c.consumption_date) >= threeDaysAgo
+    );
+
+    if (recentConsumptions.length === 0) return 0;
+
+    const totalConsumed = recentConsumptions.reduce((sum, c) => sum + c.quantity_consumed, 0);
+    return totalConsumed / recentConsumptions.length;
+  };
+
+  // Generate feed alerts
+  const generateFeedAlerts = async (liveChickens, weightHistory) => {
+    try {
+      const alerts = [];
+
+      // Check for low stock
+      feedInventory.forEach(feed => {
+        const remainingKg = feed.remaining_kg ?? feed.quantity_kg;
+        const lowStockThreshold = feed.quantity_kg * 0.2; // 20% threshold
+
+        if (remainingKg <= lowStockThreshold && remainingKg > 0) {
+          alerts.push({
+            id: `low-stock-${feed.id}-${Date.now()}`,
+            alert_type: 'low_stock',
+            severity: remainingKg <= feed.quantity_kg * 0.1 ? 'critical' : 'warning',
+            feed_id: feed.id,
+            chicken_batch_id: null,
+            message: `Low stock alert: ${feed.feed_type} - ${feed.brand} has only ${remainingKg.toFixed(2)} kg remaining`,
+            action_link: '/feed-management?action=purchase',
+            acknowledged: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        }
+      });
+
+      // Check for no consumption logged (last 3 days)
+      if (liveChickens) {
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+        liveChickens.forEach(batch => {
+          if (batch.status === 'healthy' || batch.status === 'active') {
+            const recentConsumption = feedConsumption.filter(c =>
+              c.chicken_batch_id === batch.id &&
+              new Date(c.consumption_date) >= threeDaysAgo
+            );
+
+            if (recentConsumption.length === 0) {
+              alerts.push({
+                id: `no-consumption-${batch.id}-${Date.now()}`,
+                alert_type: 'no_consumption',
+                severity: 'warning',
+                feed_id: null,
+                chicken_batch_id: batch.id,
+                message: `No feed consumption logged for batch ${batch.batch_id} in the last 3 days`,
+                action_link: `/feed-management?action=log-consumption&batch=${batch.id}`,
+                acknowledged: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              });
+            }
+          }
+        });
+
+        // Check for FCR deviations
+        liveChickens.forEach(batch => {
+          const fcrData = calculateBatchFCR(batch.id, liveChickens, weightHistory);
+
+          if (fcrData && (fcrData.rating === 'poor' || fcrData.fcr > 2.5)) {
+            alerts.push({
+              id: `fcr-deviation-${batch.id}-${Date.now()}`,
+              alert_type: 'fcr_deviation',
+              severity: fcrData.fcr > 3.0 ? 'critical' : 'warning',
+              feed_id: null,
+              chicken_batch_id: batch.id,
+              message: `Poor FCR detected for batch ${batch.batch_id}: ${fcrData.fcr.toFixed(2)} (Rating: ${fcrData.rating})`,
+              action_link: `/feed-management?action=review-data&batch=${batch.id}`,
+              acknowledged: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+          }
+        });
+      }
+
+      // Check for expiring feed
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+      feedInventory.forEach(feed => {
+        if (feed.expiry_date) {
+          const expiryDate = new Date(feed.expiry_date);
+          if (expiryDate <= thirtyDaysFromNow && expiryDate > new Date()) {
+            const daysUntilExpiry = Math.ceil((expiryDate - new Date()) / (1000 * 60 * 60 * 24));
+            alerts.push({
+              id: `expiry-warning-${feed.id}-${Date.now()}`,
+              alert_type: 'expiry_warning',
+              severity: daysUntilExpiry <= 7 ? 'critical' : 'warning',
+              feed_id: feed.id,
+              chicken_batch_id: null,
+              message: `Feed expiring soon: ${feed.feed_type} - ${feed.brand} expires in ${daysUntilExpiry} days`,
+              action_link: '/feed-management',
+              acknowledged: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+          }
+        }
+      });
+
+      // Save alerts to database
+      if (alerts.length > 0) {
+        const { error } = await supabase.from('feed_alerts').insert(alerts);
+        if (error) {
+          console.error('Error saving alerts:', error);
+        } else {
+          setFeedAlerts(prev => [...alerts, ...prev]);
+        }
+      }
+
+      return alerts;
+    } catch (err) {
+      console.error('Error generating feed alerts:', err);
+      return [];
+    }
+  };
+
+  // Acknowledge alert
+  const acknowledgeAlert = async (alertId, userId) => {
+    try {
+      const { error } = await supabase
+        .from('feed_alerts')
+        .update({
+          acknowledged: true,
+          acknowledged_at: new Date().toISOString(),
+          acknowledged_by: userId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', alertId);
+
+      if (error) throw error;
+
+      setFeedAlerts(prev => prev.filter(a => a.id !== alertId));
+
+      return true;
+    } catch (err) {
+      console.error('Error acknowledging alert:', err);
+      throw err;
+    }
+  };
+
+  // Predictive feed forecasting
+  const calculateFeedForecast = (feedId, days = 14) => {
+    try {
+      const feed = feedInventory.find(f => f.id === feedId);
+      if (!feed) return null;
+
+      // Get consumption history for this feed (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const recentConsumption = feedConsumption.filter(c =>
+        c.feed_id === feedId &&
+        new Date(c.consumption_date) >= thirtyDaysAgo
+      );
+
+      if (recentConsumption.length === 0) {
+        return {
+          feedId,
+          feedName: `${feed.feed_type} - ${feed.brand}`,
+          currentStock: feed.remaining_kg ?? feed.quantity_kg,
+          avgDailyConsumption: 0,
+          projectedDaysRemaining: Infinity,
+          depletionDate: null,
+          suggestedPurchaseQuantity: 0,
+          forecast: 'No consumption data available'
+        };
+      }
+
+      // Calculate average daily consumption
+      const totalConsumed = recentConsumption.reduce((sum, c) => sum + c.quantity_consumed, 0);
+      const daysWithData = recentConsumption.length;
+      const avgDailyConsumption = totalConsumed / daysWithData;
+
+      // Calculate projected days remaining
+      const currentStock = feed.remaining_kg ?? feed.quantity_kg;
+      const projectedDaysRemaining = avgDailyConsumption > 0
+        ? currentStock / avgDailyConsumption
+        : Infinity;
+
+      // Calculate depletion date
+      let depletionDate = null;
+      if (projectedDaysRemaining !== Infinity) {
+        depletionDate = new Date();
+        depletionDate.setDate(depletionDate.getDate() + Math.ceil(projectedDaysRemaining));
+      }
+
+      // Suggest purchase quantity for next X days
+      const suggestedPurchaseQuantity = avgDailyConsumption * days;
+      const suggestedBags = Math.ceil(suggestedPurchaseQuantity / 25); // 25kg per bag
+
+      return {
+        feedId,
+        feedName: `${feed.feed_type} - ${feed.brand}`,
+        currentStock: parseFloat(currentStock.toFixed(2)),
+        avgDailyConsumption: parseFloat(avgDailyConsumption.toFixed(2)),
+        projectedDaysRemaining: Math.ceil(projectedDaysRemaining),
+        depletionDate: depletionDate ? depletionDate.toISOString().split('T')[0] : null,
+        suggestedPurchaseQuantity: parseFloat(suggestedPurchaseQuantity.toFixed(2)),
+        suggestedBags,
+        forecast: projectedDaysRemaining < 7
+          ? 'Critical - Purchase needed urgently'
+          : projectedDaysRemaining < 14
+          ? 'Warning - Purchase needed soon'
+          : 'Good - Stock sufficient'
+      };
+    } catch (err) {
+      console.error('Error calculating feed forecast:', err);
+      return null;
+    }
+  };
+
+  // Get all forecasts
+  const getAllFeedForecasts = (days = 14) => {
+    return feedInventory
+      .filter(feed => feed.status === 'active')
+      .map(feed => calculateFeedForecast(feed.id, days))
+      .filter(forecast => forecast !== null)
+      .sort((a, b) => a.projectedDaysRemaining - b.projectedDaysRemaining);
+  };
+
+  // Legacy functions for backward compatibility
+  const getLowFeedAlerts = () => {
+    return feedInventory
+      .filter(feed => {
+        const remainingKg = feed.remaining_kg ?? feed.quantity_kg;
+        return remainingKg <= feed.quantity_kg * 0.2;
+      })
+      .map(feed => ({
+        ...feed,
+        remainingKg: feed.remaining_kg ?? feed.quantity_kg,
+        alertLevel: (feed.remaining_kg ?? feed.quantity_kg) <= feed.quantity_kg * 0.1 ? 'critical' : 'warning'
+      }));
+  };
+
+  const calculateProjectedFeedNeeds = (days = 7) => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const dailyConsumption = {};
+    feedConsumption.forEach(consumption => {
+      if (new Date(consumption.consumption_date) >= thirtyDaysAgo) {
+        if (!dailyConsumption[consumption.feed_id]) {
+          dailyConsumption[consumption.feed_id] = { total: 0, days: 0 };
+        }
+        dailyConsumption[consumption.feed_id].total += consumption.quantity_consumed;
+        dailyConsumption[consumption.feed_id].days += 1;
+      }
     });
 
-    // Project needs for each feed item
     return feedInventory.map(feed => {
       const consumption = dailyConsumption[feed.id];
       const avgDailyConsumption = consumption ? consumption.total / consumption.days : 0;
       const projectedNeed = avgDailyConsumption * days;
-      const currentStock = feed.quantity_kg || 0;
+      const currentStock = feed.remaining_kg ?? feed.quantity_kg;
       const shortfall = Math.max(0, projectedNeed - currentStock);
 
       return {
@@ -463,6 +902,8 @@ export function FeedProvider({ children }) {
     feedInventory,
     feedConsumption,
     feedBatchAssignments,
+    feedAlerts,
+    batchFeedSummaries,
     loading,
     error,
 
@@ -475,7 +916,29 @@ export function FeedProvider({ children }) {
     addFeedBatchAssignment,
     deleteFeedBatchAssignment,
 
-    // Analysis functions
+    // Auto-assignment
+    autoAssignFeedToBatches,
+
+    // FCR calculations
+    calculateBatchFCR,
+    recalculateBatchFCR,
+
+    // Batch summary
+    generateBatchFeedSummary,
+
+    // Consumption helpers
+    getLastConsumptionForBatch,
+    get3DayAverageConsumption,
+
+    // Alerts
+    generateFeedAlerts,
+    acknowledgeAlert,
+
+    // Forecasting
+    calculateFeedForecast,
+    getAllFeedForecasts,
+
+    // Legacy functions
     getLowFeedAlerts,
     calculateProjectedFeedNeeds
   };
@@ -488,3 +951,4 @@ export function FeedProvider({ children }) {
 }
 
 export { FeedContext };
+

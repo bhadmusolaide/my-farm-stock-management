@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context';
 import { TabNavigation } from '../components/UI';
 import {
@@ -28,7 +28,15 @@ const LiveChickenStock = () => {
   const [editingBatch, setEditingBatch] = useState(null);
   const [selectedBatchForTransactions, setSelectedBatchForTransactions] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [dismissedAlerts, setDismissedAlerts] = useState([]);
+  const [dismissedAlerts, setDismissedAlerts] = useState(() => {
+    try {
+      const stored = localStorage.getItem('dismissedAlerts-livechicken');
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      console.warn('Failed to load dismissed alerts from localStorage:', e);
+      return [];
+    }
+  });
   
   // Filter states
   const [batchFilters, setBatchFilters] = useState({
@@ -63,13 +71,23 @@ const LiveChickenStock = () => {
       });
   }, [liveChickens, getLowFeedAlerts, dismissedAlerts]);
 
+  const [showCompleted, setShowCompleted] = useState(false);
+
+  // Filtered batches for display in BatchList
+  const filteredBatches = useMemo(() => {
+    if (showCompleted) {
+      return liveChickens;
+    }
+    return liveChickens.filter(batch => batch.status !== 'completed');
+  }, [liveChickens, showCompleted]);
+
   // Tab configuration
   const tabs = [
     { 
       key: 'batches', 
       label: 'Chicken Batches', 
       icon: '🐔',
-      badge: liveChickens?.length || 0
+      badge: filteredBatches?.length || 0
     },
     { 
       key: 'analytics', 
@@ -149,7 +167,27 @@ const LiveChickenStock = () => {
   };
 
   const handleDismissAlert = (alertId) => {
-    setDismissedAlerts(prev => [...prev, alertId]);
+    setDismissedAlerts(prev => {
+      const newArray = [...prev, alertId];
+      try {
+        localStorage.setItem('dismissedAlerts-livechicken', JSON.stringify(newArray));
+        console.log('Feed alert dismissed and saved:', alertId);
+      } catch (e) {
+        console.warn('Failed to save dismissed alerts to localStorage:', e);
+      }
+      return newArray;
+    });
+  };
+
+  // Optional: Function to clear all dismissed alerts (for testing)
+  const clearDismissedAlerts = () => {
+    setDismissedAlerts([]);
+    try {
+      localStorage.removeItem('dismissedAlerts-livechicken');
+      console.log('All dismissed feed alerts cleared');
+    } catch (e) {
+      console.warn('Failed to clear dismissed alerts from localStorage:', e);
+    }
   };
 
   return (
@@ -165,6 +203,14 @@ const LiveChickenStock = () => {
           >
             Add New Batch
           </button>
+          <label className="checkbox-container ml-3">
+            <input
+              type="checkbox"
+              checked={showCompleted}
+              onChange={(e) => setShowCompleted(e.target.checked)}
+            />
+            <span className="checkmark"></span> Show Completed Batches
+          </label>
         </div>
       </div>
 
@@ -204,11 +250,11 @@ const LiveChickenStock = () => {
         {activeTab === 'batches' && (
           <div className="batches-tab">
             {/* Summary Cards */}
-            <SummaryCards batches={liveChickens} />
+            <SummaryCards batches={liveChickens.filter(batch => batch.status !== 'completed')} />
             
             {/* Batch List */}
             <BatchList
-              batches={liveChickens}
+              batches={filteredBatches}
               onEdit={handleEditBatch}
               onDelete={handleDeleteBatch}
               onVaccinate={handleVaccinateBatch}

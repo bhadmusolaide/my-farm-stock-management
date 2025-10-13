@@ -17,15 +17,19 @@ import './Reports.css';
 
 const Reports = () => {
   const {
-    chickens,
     liveChickens,
-    feedInventory,
-    transactions,
-    balance,
     dressedChickens,
+    feedInventory,
     feedConsumption,
-    chickenInventoryTransactions
+    chickenInventoryTransactions,
+    loadPaginatedData,
+    balance
   } = useAppContext();
+
+  // Load data using the same pattern as working pages
+  const [chickens, setChickens] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // State management
   const [viewMode, setViewMode] = useState('monthly'); // 'weekly', 'monthly', or 'custom'
@@ -34,6 +38,72 @@ const Reports = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [aggregatedData, setAggregatedData] = useState(null);
   const [loadingAggregated, setLoadingAggregated] = useState(false);
+
+  // Load data using the same pattern as working pages
+  useEffect(() => {
+    const loadReportData = async () => {
+      setLoading(true);
+      try {
+        // Load chickens data (same pattern as ChickenOrders page)
+        try {
+          const chickensResult = await loadPaginatedData('chickens', 1, 1000, {});
+          setChickens(chickensResult.data || []);
+        } catch (chickensError) {
+          // Fallback to localStorage
+          const localChickens = localStorage.getItem('chickens');
+          if (localChickens && localChickens !== 'undefined') {
+            try {
+              const parsed = JSON.parse(localChickens);
+              const chickensData = parsed.data ? parsed.data : (Array.isArray(parsed) ? parsed : []);
+              setChickens(chickensData);
+            } catch (e) {
+              setChickens([]);
+            }
+          } else {
+            setChickens([]);
+          }
+        }
+
+        // Load transactions data (same pattern as Transactions page)
+        try {
+          const { data: transactionsData, error: transactionsError } = await supabase
+            .from('transactions')
+            .select('*')
+            .order('date', { ascending: false })
+            .limit(1000);
+
+          if (transactionsError && !transactionsError.message.includes('relation "transactions" does not exist')) {
+            throw transactionsError;
+          }
+
+          setTransactions(transactionsData || []);
+        } catch (transactionsLoadError) {
+          // Fallback to localStorage
+          const localTransactions = localStorage.getItem('transactions');
+          if (localTransactions && localTransactions !== 'undefined') {
+            try {
+              const parsedTransactions = JSON.parse(localTransactions);
+              setTransactions(parsedTransactions);
+            } catch (e) {
+              setTransactions([]);
+            }
+          } else {
+            setTransactions([]);
+          }
+        }
+
+      } catch (error) {
+        console.error('Reports: Error loading report data:', error);
+        // Fallback to empty arrays
+        setChickens([]);
+        setTransactions([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadReportData();
+  }, [loadPaginatedData]);
 
   // Load aggregated data for better performance
   useEffect(() => {
@@ -294,7 +364,7 @@ const Reports = () => {
       const batchFeedConsumption = feedConsumption.filter(consumption => consumption.chicken_batch_id === batch.id);
       const feedCost = batchFeedConsumption.reduce((sum, consumption) => {
         const feedItem = feedInventory.find(feed => feed.id === consumption.feed_id);
-        const costPerKg = feedItem ? (feedItem.cost_per_bag || 0) / (feedItem.weight_per_bag_kg || 1) : 0;
+        const costPerKg = feedItem ? feedItem.cost_per_kg || 0 : 0;
         return sum + (consumption.quantity_consumed * costPerKg);
       }, 0);
 
@@ -467,7 +537,7 @@ const Reports = () => {
       cashFlowData,
       inventoryTurnover
     };
-  }, [chickens, transactions, liveChickens, feedInventory, balance, viewMode, startDate, endDate]);
+  }, [chickens, transactions, liveChickens, feedInventory, balance, viewMode, startDate, endDate, feedConsumption]);
 
   // Event handlers
   const handleDateRangeChange = () => {
@@ -481,6 +551,19 @@ const Reports = () => {
     setStartDate('');
     setEndDate('');
   };
+
+  // Show loading state while data is being loaded
+  if (loading) {
+    return (
+      <div className="reports-page">
+        <div className="loading-overlay">
+          <div className="loading-spinner">
+            <p>Loading report data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="reports-page">
@@ -559,14 +642,6 @@ const Reports = () => {
         )}
       </div>
 
-      {/* Loading indicator for aggregated data */}
-      {loadingAggregated && (
-        <div className="loading-overlay">
-          <div className="loading-spinner">
-            <p>Loading aggregated data...</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

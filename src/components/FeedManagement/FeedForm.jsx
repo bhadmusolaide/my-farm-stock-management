@@ -28,10 +28,13 @@ const FeedForm = ({
     status: 'active',
     deduct_from_balance: false,
     balance_deducted: false,
+    auto_assign_to_batches: false,
     assigned_batches: []
   });
 
   const [errors, setErrors] = useState({});
+  const [showBatchAssignment, setShowBatchAssignment] = useState(false);
+  const [totalCost, setTotalCost] = useState(0);
 
   // Reset form when modal opens/closes or editing feed changes
   useEffect(() => {
@@ -75,12 +78,29 @@ const FeedForm = ({
           status: 'active',
           deduct_from_balance: false,
           balance_deducted: false,
+          auto_assign_to_batches: false,
           assigned_batches: []
         });
       }
       setErrors({});
+      setShowBatchAssignment(false);
     }
   }, [isOpen, editingFeed]);
+
+  // Calculate total cost
+  useEffect(() => {
+    if (formData.number_of_bags && formData.cost_per_bag) {
+      const bags = parseFloat(formData.number_of_bags);
+      const costPerBag = parseFloat(formData.cost_per_bag);
+      if (bags > 0 && costPerBag > 0) {
+        setTotalCost(bags * costPerBag);
+      } else {
+        setTotalCost(0);
+      }
+    } else {
+      setTotalCost(0);
+    }
+  }, [formData.number_of_bags, formData.cost_per_bag]);
 
   // Auto-calculate quantity when bags change
   useEffect(() => {
@@ -130,11 +150,17 @@ const FeedForm = ({
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    // Handle auto-assign toggle
+    if (name === 'auto_assign_to_batches' && checked) {
+      handleAutoAssignToBatches();
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-    
+
     // Clear error for this field
     if (errors[name]) {
       setErrors(prev => ({
@@ -142,6 +168,52 @@ const FeedForm = ({
         [name]: ''
       }));
     }
+  };
+
+  // Auto-assign feed to active batches proportionally
+  const handleAutoAssignToBatches = () => {
+    const activeBatches = liveChickens.filter(
+      batch => batch.status === 'healthy' || batch.status === 'active'
+    );
+
+    if (activeBatches.length === 0) {
+      alert('No active batches found to assign feed to.');
+      return;
+    }
+
+    const totalBirds = activeBatches.reduce((sum, batch) => sum + (batch.current_count || 0), 0);
+
+    if (totalBirds === 0) {
+      alert('No birds found in active batches.');
+      return;
+    }
+
+    const totalQuantity = parseFloat(formData.quantity_kg || 0);
+
+    if (totalQuantity <= 0) {
+      alert('Please enter feed quantity first.');
+      return;
+    }
+
+    // Calculate proportional distribution
+    const assignments = activeBatches.map(batch => {
+      const proportion = (batch.current_count || 0) / totalBirds;
+      const assignedQuantity = totalQuantity * proportion;
+
+      return {
+        batch_id: batch.id,
+        assigned: true,
+        assigned_quantity_kg: parseFloat(assignedQuantity.toFixed(2)),
+        auto_assigned: true
+      };
+    });
+
+    setFormData(prev => ({
+      ...prev,
+      assigned_batches: assignments
+    }));
+
+    setShowBatchAssignment(true);
   };
 
   const handleBatchAssignmentChange = (batchId, field, value) => {
@@ -276,8 +348,7 @@ const FeedForm = ({
     batch => batch.status === 'healthy' || batch.status === 'sick'
   );
 
-  // Calculate totals
-  const totalCost = (parseFloat(formData.number_of_bags) || 0) * (parseFloat(formData.cost_per_bag) || 0);
+  // Calculate totals (totalCost is already managed in state via useEffect)
   const totalAssignedQuantity = formData.assigned_batches.reduce(
     (sum, ab) => sum + (ab.assigned ? parseFloat(ab.assigned_quantity_kg || 0) : 0), 0
   );
@@ -501,57 +572,124 @@ const FeedForm = ({
           </div>
         </div>
 
-        {/* Batch Assignments */}
-        {activeChickenBatches.length > 0 && (
+        {/* Financial Options */}
+        {!editingFeed && (
           <div className="form-section">
-            <h4>Batch Assignments (Optional)</h4>
+            <h4>Financial Options</h4>
+            <div className="form-group checkbox-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="deduct_from_balance"
+                  checked={formData.deduct_from_balance}
+                  onChange={handleInputChange}
+                />
+                <span>Deduct purchase cost from farm balance</span>
+              </label>
+              {formData.deduct_from_balance && (
+                <div className="info-box">
+                  <p>
+                    <strong>Amount to deduct:</strong> ₦{formatNumber(totalCost, 2)}
+                  </p>
+                  <small>This will create an expense transaction and update your farm balance.</small>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Batch Assignments */}
+        {!editingFeed && activeChickenBatches.length > 0 && (
+          <div className="form-section">
+            <div className="section-header-with-action">
+              <h4>Batch Assignments (Optional)</h4>
+              <div className="form-group checkbox-group inline">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    name="auto_assign_to_batches"
+                    checked={formData.auto_assign_to_batches}
+                    onChange={handleInputChange}
+                  />
+                  <span>Auto-assign to active batches</span>
+                </label>
+              </div>
+            </div>
+
             <p className="form-help">
-              Assign portions of this feed to specific chicken batches. 
-              Remaining: {formatNumber(remainingQuantity, 2)} kg
+              {formData.auto_assign_to_batches
+                ? 'Feed will be distributed proportionally based on bird count in each batch.'
+                : 'Manually assign portions of this feed to specific chicken batches.'
+              }
+              {' '}Remaining: <strong>{formatNumber(remainingQuantity, 2)} kg</strong>
             </p>
-            
+
             {errors.assigned_batches && (
               <div className="error-message">{errors.assigned_batches}</div>
             )}
 
-            <div className="batch-assignments">
-              {activeChickenBatches.map(batch => {
-                const assignment = formData.assigned_batches.find(ab => ab.batch_id === batch.id);
-                const isAssigned = assignment?.assigned || false;
-                const assignedQuantity = assignment?.assigned_quantity_kg || '';
+            {formData.auto_assign_to_batches && formData.assigned_batches.length > 0 && (
+              <div className="info-box success">
+                <p>
+                  ✓ Feed auto-assigned to {formData.assigned_batches.length} active batch(es)
+                </p>
+              </div>
+            )}
 
-                return (
-                  <div key={batch.id} className="batch-assignment">
-                    <div className="batch-info">
-                      <label className="batch-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={isAssigned}
-                          onChange={(e) => handleBatchAssignmentChange(batch.id, 'assigned', e.target.checked)}
-                        />
-                        <span className="batch-details">
-                          <strong>{batch.batch_id}</strong> - {batch.breed}
-                          <small>({batch.current_count} birds, {batch.status})</small>
-                        </span>
-                      </label>
-                    </div>
-                    
-                    {isAssigned && (
-                      <div className="quantity-input">
-                        <input
-                          type="number"
-                          value={assignedQuantity}
-                          onChange={(e) => handleBatchAssignmentChange(batch.id, 'assigned_quantity_kg', e.target.value)}
-                          placeholder="Quantity (kg)"
-                          min="0"
-                          step="0.01"
-                        />
+            {(showBatchAssignment || formData.assigned_batches.length > 0 || !formData.auto_assign_to_batches) && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setShowBatchAssignment(!showBatchAssignment)}
+                style={{ marginBottom: '1rem' }}
+              >
+                {showBatchAssignment ? 'Hide' : 'Show'} Batch Details
+              </button>
+            )}
+
+            {showBatchAssignment && (
+              <div className="batch-assignments">
+                {activeChickenBatches.map(batch => {
+                  const assignment = formData.assigned_batches.find(ab => ab.batch_id === batch.id);
+                  const isAssigned = assignment?.assigned || false;
+                  const assignedQuantity = assignment?.assigned_quantity_kg || '';
+
+                  return (
+                    <div key={batch.id} className="batch-assignment">
+                      <div className="batch-info">
+                        <label className="batch-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={isAssigned}
+                            onChange={(e) => handleBatchAssignmentChange(batch.id, 'assigned', e.target.checked)}
+                            disabled={formData.auto_assign_to_batches}
+                          />
+                          <span className="batch-details">
+                            <strong>{batch.batch_id}</strong> - {batch.breed}
+                            <small>({batch.current_count} birds, {batch.status})</small>
+                          </span>
+                        </label>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+
+                      {isAssigned && (
+                        <div className="quantity-input">
+                          <input
+                            type="number"
+                            value={assignedQuantity}
+                            onChange={(e) => handleBatchAssignmentChange(batch.id, 'assigned_quantity_kg', e.target.value)}
+                            placeholder="Quantity (kg)"
+                            min="0"
+                            step="0.01"
+                            disabled={formData.auto_assign_to_batches}
+                          />
+                          <span className="unit">kg</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

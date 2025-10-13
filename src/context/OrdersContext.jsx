@@ -63,41 +63,59 @@ export function OrdersProvider({ children }) {
           .select('*')
           .order('date', { ascending: false });
 
-        if (stockError) throw stockError;
-        setStock(stockData || []);
+        if (stockError && !stockError.message.includes('relation "stock" does not exist')) {
+          throw stockError;
+        }
+
+        // Use database data if available, otherwise fallback to localStorage
+        if (stockData && stockData.length > 0) {
+          setStock(stockData);
+        } else {
+          // Fallback to localStorage if no database data exists
+          const localStock = localStorage.getItem('stock');
+          if (localStock && localStock !== 'undefined') {
+            try {
+              const parsed = JSON.parse(localStock);
+              // Handle both old format (array) and new format (object with data property)
+              const stockData = parsed.data ? parsed.data : (Array.isArray(parsed) ? parsed : []);
+              setStock(stockData);
+            } catch (e) {
+              console.warn('Invalid stock data in localStorage:', e);
+              setStock([]);
+            }
+          } else {
+            setStock([]);
+          }
+        }
 
       } catch (err) {
         console.error('Error loading orders data:', err);
 
-        // Fallback to localStorage if Supabase fails
-        const localChickens = localStorage.getItem('chickens');
-        if (localChickens && localChickens !== 'undefined') {
-          try {
-            const parsed = JSON.parse(localChickens);
-            // Handle both old format (array) and new format (object with data property)
-            const chickensData = parsed.data ? parsed.data : (Array.isArray(parsed) ? parsed : []);
-            setChickensState(chickensData);
-          } catch (e) {
-            console.warn('Invalid chickens data in localStorage:', e);
-            setChickensState([]);
+        // Fallback to localStorage if Supabase fails (only for non-table-exists errors)
+        if (!err.message.includes('relation "chickens" does not exist') && !err.message.includes('relation "stock" does not exist')) {
+          const localChickens = localStorage.getItem('chickens');
+          if (localChickens && localChickens !== 'undefined') {
+            try {
+              const parsed = JSON.parse(localChickens);
+              const chickensData = parsed.data ? parsed.data : (Array.isArray(parsed) ? parsed : []);
+              setChickensState(chickensData);
+            } catch (e) {
+              console.warn('Invalid chickens data in localStorage:', e);
+              setChickensState([]);
+            }
           }
-        } else {
-          setChickensState([]);
-        }
 
-        const localStock = localStorage.getItem('stock');
-        if (localStock && localStock !== 'undefined') {
-          try {
-            const parsed = JSON.parse(localStock);
-            // Handle both old format (array) and new format (object with data property)
-            const stockData = parsed.data ? parsed.data : (Array.isArray(parsed) ? parsed : []);
-            setStockState(stockData);
-          } catch (e) {
-            console.warn('Invalid stock data in localStorage:', e);
-            setStockState([]);
+          const localStock = localStorage.getItem('stock');
+          if (localStock && localStock !== 'undefined') {
+            try {
+              const parsed = JSON.parse(localStock);
+              const stockData = parsed.data ? parsed.data : (Array.isArray(parsed) ? parsed : []);
+              setStockState(stockData);
+            } catch (e) {
+              console.warn('Invalid stock data in localStorage:', e);
+              setStockState([]);
+            }
           }
-        } else {
-          setStockState([]);
         }
 
         setError('Failed to load orders data');
@@ -424,8 +442,30 @@ export function OrdersProvider({ children }) {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (chickensError) throw chickensError;
-      setChickens(chickensData || []);
+      if (chickensError && !chickensError.message.includes('relation "chickens" does not exist')) {
+        throw chickensError;
+      }
+
+      // Use database data if available, otherwise fallback to localStorage
+      if (chickensData && chickensData.length > 0) {
+        setChickens(chickensData);
+      } else {
+        // Fallback to localStorage if no database data exists
+        const localChickens = localStorage.getItem('chickens');
+        if (localChickens && localChickens !== 'undefined') {
+          try {
+            const parsed = JSON.parse(localChickens);
+            // Handle both old format (array) and new format (object with data property)
+            const chickensData = parsed.data ? parsed.data : (Array.isArray(parsed) ? parsed : []);
+            setChickens(chickensData);
+          } catch (e) {
+            console.warn('Invalid chickens data in localStorage:', e);
+            setChickens([]);
+          }
+        } else {
+          setChickens([]);
+        }
+      }
       console.log(`Refreshed OrdersContext data: ${chickensData?.length || 0} orders loaded`);
     } catch (err) {
       console.error('Error refreshing orders data:', err);

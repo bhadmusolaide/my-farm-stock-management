@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { formatCurrency, formatNumber } from '../utils/formatters';
 
 /**
  * Custom hook for generating report data with aggregations and grouping
@@ -572,9 +573,233 @@ function generateChartColors(count) {
 
 function calculateVolatility(values) {
   if (values.length < 2) return 0;
-  
+
   const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
   const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
-  
+
   return Math.sqrt(variance);
+}
+
+/**
+ * Custom hook for financial calculations
+ * @param {Array} transactions - Financial transactions data
+ * @param {Array} chickens - Chicken orders data
+ * @param {Object} options - Configuration options
+ * @returns {Object} - Financial metrics
+ */
+export function useFinancialCalculations(transactions = [], chickens = [], options = {}) {
+  const { currency = '₦', dateRange } = options;
+
+  return useMemo(() => {
+    // Filter transactions by date range if provided
+    let filteredTransactions = transactions;
+    if (dateRange && dateRange.start && dateRange.end) {
+      const startDate = new Date(dateRange.start);
+      const endDate = new Date(dateRange.end);
+      filteredTransactions = transactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return transactionDate >= startDate && transactionDate <= endDate;
+      });
+    }
+
+    // Filter chickens by date range if provided
+    let filteredChickens = chickens;
+    if (dateRange && dateRange.start && dateRange.end) {
+      const startDate = new Date(dateRange.start);
+      const endDate = new Date(dateRange.end);
+      filteredChickens = chickens.filter(c => {
+        const chickenDate = new Date(c.date);
+        return chickenDate >= startDate && chickenDate <= endDate;
+      });
+    }
+
+    // Calculate financial metrics
+    const orderRevenue = filteredChickens.reduce((sum, chicken) =>
+      sum + (chicken.count * chicken.size * chicken.price), 0);
+
+    const totalExpenses = filteredTransactions
+      .filter(t => t.type === 'expense' || t.type === 'stock_expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const fundsAdded = filteredTransactions
+      .filter(t => t.type === 'fund')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const fundsWithdrawn = filteredTransactions
+      .filter(t => t.type === 'withdrawal')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const currentBalance = filteredTransactions
+      .reduce((balance, t) => {
+        if (t.type === 'fund') return balance + t.amount;
+        if (t.type === 'expense' || t.type === 'stock_expense' || t.type === 'withdrawal') return balance - t.amount;
+        return balance;
+      }, 0);
+
+    const grossProfit = orderRevenue - totalExpenses;
+    const profitMargin = orderRevenue > 0 ? (grossProfit / orderRevenue) * 100 : 0;
+    const roi = totalExpenses > 0 ? (grossProfit / totalExpenses) * 100 : 0;
+
+    // Stock metrics
+    const totalStockItems = 0; // Would need stock data
+    const totalStockValue = 0; // Would need stock data
+
+    // Feed stock (placeholder)
+    const feedStock = 0;
+
+    // Customer metrics
+    const customerMap = new Map();
+    filteredChickens.forEach(chicken => {
+      const customerId = chicken.customer;
+      if (!customerMap.has(customerId)) {
+        customerMap.set(customerId, {
+          orders: 0,
+          totalRevenue: 0,
+          totalBalance: 0,
+          statusCounts: { pending: 0, partial: 0, paid: 0 }
+        });
+      }
+
+      const customer = customerMap.get(customerId);
+      customer.orders += 1;
+      customer.totalRevenue += chicken.count * chicken.size * chicken.price;
+      customer.totalBalance += chicken.balance || 0;
+
+      if (chicken.status === 'pending') customer.statusCounts.pending += 1;
+      else if (chicken.status === 'partial') customer.statusCounts.partial += 1;
+      else if (chicken.status === 'paid') customer.statusCounts.paid += 1;
+    });
+
+    const customers = Array.from(customerMap.values());
+    const totalCustomers = customers.length;
+    const outstandingBalance = customers.reduce((sum, customer) => sum + customer.totalBalance, 0);
+    const pendingOrders = customers.reduce((sum, customer) => sum + customer.statusCounts.pending, 0);
+    const partiallyPaidOrders = customers.reduce((sum, customer) => sum + customer.statusCounts.partial, 0);
+
+    // Monthly breakdown
+    const monthlyBreakdown = [];
+    const monthlyMap = {};
+
+    filteredChickens.forEach(chicken => {
+      const date = new Date(chicken.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!monthlyMap[monthKey]) {
+        monthlyMap[monthKey] = { month: monthKey, income: 0, expenses: 0, orders: 0 };
+      }
+
+      monthlyMap[monthKey].income += chicken.count * chicken.size * chicken.price;
+      monthlyMap[monthKey].orders += 1;
+    });
+
+    filteredTransactions.forEach(transaction => {
+      const date = new Date(transaction.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!monthlyMap[monthKey]) {
+        monthlyMap[monthKey] = { month: monthKey, income: 0, expenses: 0, orders: 0 };
+      }
+
+      if (transaction.type === 'fund') {
+        monthlyMap[monthKey].income += transaction.amount;
+      } else if (transaction.type === 'expense' || transaction.type === 'stock_expense') {
+        monthlyMap[monthKey].expenses += transaction.amount;
+      }
+    });
+
+    Object.values(monthlyMap).forEach(month => {
+      monthlyBreakdown.push(month);
+    });
+
+    return {
+      orderRevenue,
+      totalExpenses,
+      grossProfit,
+      profitMargin,
+      roi,
+      fundsAdded,
+      fundsWithdrawn,
+      currentBalance,
+      totalStockItems,
+      totalStockValue,
+      feedStock,
+      totalCustomers,
+      outstandingBalance,
+      pendingOrders,
+      partiallyPaidOrders,
+      monthlyBreakdown,
+      formatted: {
+        orderRevenue: formatCurrency(orderRevenue),
+        totalExpenses: formatCurrency(totalExpenses),
+        grossProfit: formatCurrency(grossProfit),
+        profitMargin: `${profitMargin.toFixed(1)}%`,
+        roi: `${roi.toFixed(1)}%`,
+        fundsAdded: formatCurrency(fundsAdded),
+        fundsWithdrawn: formatCurrency(fundsWithdrawn),
+        currentBalance: formatCurrency(currentBalance),
+        outstandingBalance: formatCurrency(outstandingBalance)
+      }
+    };
+  }, [transactions, chickens, currency, dateRange]);
+}
+
+/**
+ * Custom hook for livestock metrics calculations
+ * @param {Array} liveChickens - Live chickens data
+ * @param {Array} weightHistory - Weight history data
+ * @returns {Object} - Livestock metrics
+ */
+export function useLivestockMetrics(liveChickens = [], weightHistory = []) {
+  return useMemo(() => {
+    if (!liveChickens || liveChickens.length === 0) {
+      return {
+        totalChickens: 0,
+        totalMortality: 0,
+        mortalityRate: 0,
+        averageWeight: 0,
+        averageFCR: 0,
+        batchMetrics: []
+      };
+    }
+
+    const totalChickens = liveChickens.reduce((sum, batch) => sum + (batch.current_count || 0), 0);
+    const totalMortality = liveChickens.reduce((sum, batch) =>
+      sum + ((batch.initial_count || 0) - (batch.current_count || 0)), 0);
+    const mortalityRate = liveChickens.length > 0
+      ? (totalMortality / liveChickens.reduce((sum, batch) => sum + (batch.initial_count || 0), 0)) * 100
+      : 0;
+
+    // Calculate average weight from weight history
+    const validWeights = weightHistory
+      .map(record => parseFloat(record.weight))
+      .filter(weight => !isNaN(weight) && weight > 0);
+
+    const averageWeight = validWeights.length > 0
+      ? validWeights.reduce((sum, weight) => sum + weight, 0) / validWeights.length
+      : 0;
+
+    // Calculate average FCR (placeholder - would need feed consumption data)
+    const averageFCR = 2.5; // Placeholder value
+
+    // Batch-level metrics
+    const batchMetrics = liveChickens.map(batch => ({
+      batch_id: batch.batch_id || `Batch ${batch.id}`,
+      breed: batch.breed || 'Unknown',
+      current_count: batch.current_count || 0,
+      initial_count: batch.initial_count || 0,
+      mortality: (batch.initial_count || 0) - (batch.current_count || 0),
+      mortality_rate: batch.initial_count > 0 ?
+        (((batch.initial_count - (batch.current_count || 0)) / batch.initial_count) * 100) : 0,
+      status: batch.status || 'unknown'
+    }));
+
+    return {
+      totalChickens,
+      totalMortality,
+      mortalityRate,
+      averageWeight,
+      averageFCR,
+      batchMetrics
+    };
+  }, [liveChickens, weightHistory]);
 }

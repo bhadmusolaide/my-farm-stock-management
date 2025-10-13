@@ -1,5 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useAppContext } from '../../context';
 import { DataTable } from '../UI';
+import { BatchFeedSummary } from './';
 import { formatNumber, formatDate } from '../../utils/formatters';
 import './FeedManagement.css';
 
@@ -8,6 +10,14 @@ const FeedAnalyticsView = ({
   feedConsumption = [],
   liveChickens = []
 }) => {
+  const { calculateBatchFCR, weightHistory = [] } = useAppContext();
+  const [showSummary, setShowSummary] = useState(false);
+  const [selectedBatchId, setSelectedBatchId] = useState(null);
+
+  const handleViewSummary = (batchId) => {
+    setSelectedBatchId(batchId);
+    setShowSummary(true);
+  };
   // Calculate comprehensive analytics
   const analytics = useMemo(() => {
     // Overall statistics
@@ -31,7 +41,7 @@ const FeedAnalyticsView = ({
       batch.status === 'healthy' || batch.status === 'sick'
     ).length;
 
-    // Per-batch analysis
+    // Per-batch analysis with proper FCR calculation
     const batchStats = {};
     liveChickens.filter(batch => batch.status === 'healthy' || batch.status === 'sick').forEach(batch => {
       // Calculate assigned feed for this batch
@@ -46,14 +56,23 @@ const FeedAnalyticsView = ({
         .reduce((sum, consumption) => sum + consumption.quantity_consumed, 0);
 
       const remaining = assigned - consumed;
-      const fcr = batch.current_count > 0 ? consumed / batch.current_count : 0;
+
+      // Use proper FCR calculation from context
+      let fcrData = null;
+      if (calculateBatchFCR) {
+        fcrData = calculateBatchFCR(batch.id, liveChickens, weightHistory);
+      }
 
       batchStats[batch.id] = {
         batch,
         assigned,
         consumed,
         remaining,
-        fcr
+        fcr: fcrData?.fcr || 0,
+        fcrRating: fcrData?.rating || 'N/A',
+        fcrColor: fcrData?.color || '#999',
+        totalWeightGain: fcrData?.totalWeightGain || 0,
+        avgFeedPerBird: consumed / (batch.current_count || 1)
       };
     });
 
@@ -170,9 +189,46 @@ const FeedAnalyticsView = ({
     },
     {
       key: 'fcr',
-      label: 'FCR (kg/bird)',
+      label: 'FCR',
       sortable: true,
-      render: (row) => formatNumber(row.fcr, 3)
+      render: (row) => {
+        if (!row.fcr || row.fcr === 0) {
+          return <span className="fcr-badge na">N/A</span>;
+        }
+
+        return (
+          <div className="fcr-display">
+            <span
+              className="fcr-badge"
+              style={{
+                backgroundColor: row.fcrColor,
+                color: 'white'
+              }}
+            >
+              {formatNumber(row.fcr, 2)}
+            </span>
+            <small className="fcr-rating">{row.fcrRating}</small>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'weight_gain',
+      label: 'Weight Gain (kg)',
+      sortable: true,
+      render: (row) => formatNumber(row.totalWeightGain, 2)
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (row) => (
+        <button
+          className="btn btn-sm btn-primary"
+          onClick={() => handleViewSummary(row.batch.id)}
+        >
+          📋 View Summary
+        </button>
+      )
     }
   ];
 
@@ -304,6 +360,75 @@ const FeedAnalyticsView = ({
         </div>
       </div>
 
+      {/* FCR Analysis Section */}
+      <div className="fcr-analysis-section">
+        <h3>📊 Feed Conversion Ratio (FCR) Analysis</h3>
+        <div className="fcr-info-box">
+          <p>
+            <strong>FCR</strong> measures feed efficiency: <em>Total Feed Consumed (kg) ÷ Total Weight Gain (kg)</em>
+          </p>
+          <div className="fcr-legend">
+            <span className="fcr-legend-item excellent">
+              <span className="fcr-dot" style={{ backgroundColor: '#28a745' }}></span>
+              Excellent (&lt; 1.5)
+            </span>
+            <span className="fcr-legend-item good">
+              <span className="fcr-dot" style={{ backgroundColor: '#17a2b8' }}></span>
+              Good (1.5 - 1.8)
+            </span>
+            <span className="fcr-legend-item average">
+              <span className="fcr-dot" style={{ backgroundColor: '#ffc107' }}></span>
+              Average (1.8 - 2.2)
+            </span>
+            <span className="fcr-legend-item poor">
+              <span className="fcr-dot" style={{ backgroundColor: '#dc3545' }}></span>
+              Poor (≥ 2.2)
+            </span>
+          </div>
+        </div>
+
+        {/* FCR Cards */}
+        <div className="fcr-cards-grid">
+          {analytics.batchStats.map(stat => (
+            <div key={stat.batch.id} className="fcr-card">
+              <div className="fcr-card-header">
+                <h4>{stat.batch.batch_id}</h4>
+                <span className="fcr-breed">{stat.batch.breed}</span>
+              </div>
+              <div className="fcr-card-body">
+                <div
+                  className="fcr-value-large"
+                  style={{ color: stat.fcrColor }}
+                >
+                  {stat.fcr > 0 ? formatNumber(stat.fcr, 2) : 'N/A'}
+                </div>
+                <div className="fcr-rating-badge" style={{ backgroundColor: stat.fcrColor }}>
+                  {stat.fcrRating}
+                </div>
+              </div>
+              <div className="fcr-card-stats">
+                <div className="fcr-stat">
+                  <span className="fcr-stat-label">Feed Consumed</span>
+                  <span className="fcr-stat-value">{formatNumber(stat.consumed, 2)} kg</span>
+                </div>
+                <div className="fcr-stat">
+                  <span className="fcr-stat-label">Weight Gain</span>
+                  <span className="fcr-stat-value">{formatNumber(stat.totalWeightGain, 2)} kg</span>
+                </div>
+                <div className="fcr-stat">
+                  <span className="fcr-stat-label">Birds</span>
+                  <span className="fcr-stat-value">{formatNumber(stat.batch.current_count)}</span>
+                </div>
+                <div className="fcr-stat">
+                  <span className="fcr-stat-label">Avg Feed/Bird</span>
+                  <span className="fcr-stat-value">{formatNumber(stat.avgFeedPerBird, 2)} kg</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Per-Batch Analysis */}
       <div className="batch-analysis">
         <h3>🐔 Per-Batch Feed Analysis</h3>
@@ -418,6 +543,13 @@ const FeedAnalyticsView = ({
           </div>
         </div>
       </div>
+
+      {/* Batch Feed Summary Modal */}
+      <BatchFeedSummary
+        isOpen={showSummary}
+        onClose={() => setShowSummary(false)}
+        batchId={selectedBatchId}
+      />
     </div>
   );
 };
