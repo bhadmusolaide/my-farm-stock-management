@@ -153,3 +153,10 @@ docs/REFACTORING_COMPLETE.md
 docs/chicken-inventory-transactions-schema.md
 src/docs/GLOBAL_COMPONENTS_MIGRATION.md
 src/docs/GLOBAL_STYLING_SOLUTION.md
+
+# Ignore all .sql files in root except schema.sql
+*.sql
+!schema.sql
+
+feed_management_migration.sql
+verify_migration.sql
