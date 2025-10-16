@@ -249,6 +249,15 @@ const OrderList = ({
       label: 'Balance',
       sortable: true,
       render: (order) => {
+        // If status is paid, balance should always be 0
+        if (order.status === 'paid') {
+          return (
+            <span className="balance-paid">
+              ₦{formatNumber(0, 2)}
+            </span>
+          );
+        }
+
         let total = 0;
         const calcMode = order.calculation_mode || 'count_size_cost';
 
@@ -364,7 +373,14 @@ const OrderList = ({
 
       stats.totalValue += total;
       stats.totalPaid += amountPaid;
-      stats.totalBalance += total - amountPaid;
+
+      // For balance calculation, use the same logic as the table display
+      if (order.status === 'paid') {
+        stats.totalBalance += 0; // Paid orders contribute 0 to balance
+      } else {
+        stats.totalBalance += total - amountPaid;
+      }
+
       stats.statusCounts[order.status] = (stats.statusCounts[order.status] || 0) + 1;
     });
 
