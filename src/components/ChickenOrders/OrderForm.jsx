@@ -104,6 +104,11 @@ const OrderForm = ({
       if (showHistory && editingOrder && editingOrder.id) {
         setHistoryLoading(true);
         try {
+          console.log('Fetching edit history for order:', editingOrder.id);
+
+          // Small delay to ensure audit log is saved
+          await new Promise(resolve => setTimeout(resolve, 500));
+
           const { data, error } = await supabase
             .from('audit_logs')
             .select('*, users(full_name)')
@@ -111,7 +116,12 @@ const OrderForm = ({
             .eq('record_id', editingOrder.id)
             .order('created_at', { ascending: false });
 
-          if (error) throw error;
+          if (error) {
+            console.error('Supabase error fetching edit history:', error);
+            throw error;
+          }
+
+          console.log('Edit history data:', data);
           setEditHistory(data || []);
         } catch (err) {
           console.error('Failed to fetch edit history:', err);
@@ -429,32 +439,38 @@ const OrderForm = ({
             {historyLoading ? (
               <div className="history-loading">Loading edit history...</div>
             ) : editHistory.length > 0 ? (
-              <>
-                <div className="history-list">
-                  {editHistory.map(renderHistoryItem).filter(item => item !== null)}
-                </div>
-                {editHistory.filter(log => {
-                  try {
-                    const oldValues = log.old_values ? JSON.parse(log.old_values) : {};
-                    const newValues = log.new_values ? JSON.parse(log.new_values) : {};
-                    const allKeys = new Set([...Object.keys(oldValues), ...Object.keys(newValues)]);
-                    return Array.from(allKeys).some(key =>
-                      JSON.stringify(oldValues[key]) !== JSON.stringify(newValues[key])
-                    );
-                  } catch (e) {
-                    return false;
-                  }
-                }).length === 0 && (
-                  <div className="no-relevant-changes">
-                    <p>No relevant changes found in edit history</p>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="no-history">
-                <p>No edit history available for this order</p>
-              </div>
-            )}
+               <>
+                 <div className="history-list">
+                   {editHistory.map(renderHistoryItem).filter(item => item !== null)}
+                 </div>
+                 {editHistory.filter(log => {
+                   try {
+                     const oldValues = log.old_values ? JSON.parse(log.old_values) : {};
+                     const newValues = log.new_values ? JSON.parse(log.new_values) : {};
+                     const allKeys = new Set([...Object.keys(oldValues), ...Object.keys(newValues)]);
+                     return Array.from(allKeys).some(key =>
+                       JSON.stringify(oldValues[key]) !== JSON.stringify(newValues[key])
+                     );
+                   } catch (e) {
+                     return false;
+                   }
+                 }).length === 0 && (
+                   <div className="no-relevant-changes">
+                     <p>No relevant changes found in edit history</p>
+                   </div>
+                 )}
+               </>
+             ) : (
+               <div className="no-history">
+                 <p>No edit history available for this order</p>
+                 <small>This could be because:</small>
+                 <ul>
+                   <li>This is a newly created order</li>
+                   <li>Audit logging is not enabled</li>
+                   <li>There was an issue saving the edit history</li>
+                 </ul>
+               </div>
+             )}
           </div>
         )}
 
