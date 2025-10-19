@@ -169,8 +169,8 @@ export function OrdersProvider({ children }) {
 
       setChickens(prev => [chicken, ...prev]);
 
-      // Log audit action
-      await logAuditAction('CREATE', 'chickens', chicken.id, null, chicken);
+      // Log audit action (force immediate for order creation)
+      await logAuditAction('CREATE', 'chickens', chicken.id, null, chicken, true);
 
       return chicken;
     } catch (err) {
@@ -234,23 +234,36 @@ export function OrdersProvider({ children }) {
 
       if (error) throw error;
 
-      // Update financial balance if amount_paid changed
+      // Update financial balance if amount_paid changed or status changed to paid
       const oldAmountPaid = oldChicken.amount_paid || 0;
       const newAmountPaid = amountPaid !== undefined ? amountPaid : oldAmountPaid;
       const paymentDifference = newAmountPaid - oldAmountPaid;
 
-      if (paymentDifference !== 0) {
-        // Create a financial transaction for the payment change
+      // Check if status changed to 'paid' (this should trigger a credit transaction for remaining balance)
+      const oldStatus = oldChicken.status;
+      const newStatus = chickenData.status !== undefined ? chickenData.status : oldStatus;
+      const statusChangedToPaid = oldStatus !== 'paid' && newStatus === 'paid';
+
+      if (paymentDifference !== 0 || statusChangedToPaid) {
         const customerName = updatedChicken.customer || 'Unknown Customer';
 
         if (paymentDifference > 0) {
           // Payment received - increase balance
           const description = `Payment received from ${customerName} (Order #${id.substring(0, 8)})`;
           await addFunds(paymentDifference, description);
-        } else {
+        } else if (paymentDifference < 0) {
           // Refund - decrease balance
           const description = `Payment refund to ${customerName} (Order #${id.substring(0, 8)})`;
           await addExpense(Math.abs(paymentDifference), description);
+        }
+
+        // Handle status change to 'paid' - create credit transaction for remaining balance
+        if (statusChangedToPaid) {
+          const remainingBalance = updatedChicken.balance || 0;
+          if (remainingBalance > 0) {
+            const description = `Payment completed for ${customerName} (Order #${id.substring(0, 8)}) - Remaining balance credited`;
+            await addFunds(remainingBalance, description);
+          }
         }
       }
 
@@ -269,8 +282,8 @@ export function OrdersProvider({ children }) {
         }
       });
 
-      // Log audit action
-      await logAuditAction('UPDATE', 'chickens', id, oldChicken, updatedChicken);
+      // Log audit action (force immediate for order updates)
+      await logAuditAction('UPDATE', 'chickens', id, oldChicken, updatedChicken, true);
 
       return updatedChicken;
     } catch (err) {
@@ -293,8 +306,8 @@ export function OrdersProvider({ children }) {
 
       setChickens(prev => prev.filter(chicken => chicken.id !== id));
 
-      // Log audit action
-      await logAuditAction('DELETE', 'chickens', id, chickenToDelete, null);
+      // Log audit action (force immediate for order deletion)
+      await logAuditAction('DELETE', 'chickens', id, chickenToDelete, null, true);
 
       return chickenToDelete;
     } catch (err) {
@@ -318,8 +331,8 @@ export function OrdersProvider({ children }) {
 
       setStock(prev => [stockItem, ...prev]);
 
-      // Log audit action
-      await logAuditAction('CREATE', 'stock', stockItem.id, null, stockItem);
+      // Log audit action (force immediate for stock creation)
+      await logAuditAction('CREATE', 'stock', stockItem.id, null, stockItem, true);
 
       return stockItem;
     } catch (err) {
@@ -342,8 +355,8 @@ export function OrdersProvider({ children }) {
 
       setStock(prev => prev.filter(item => item.id !== id));
 
-      // Log audit action
-      await logAuditAction('DELETE', 'stock', id, stockToDelete, null);
+      // Log audit action (force immediate for stock deletion)
+      await logAuditAction('DELETE', 'stock', id, stockToDelete, null, true);
 
       return stockToDelete;
     } catch (err) {
