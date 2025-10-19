@@ -119,15 +119,26 @@ export const AuthProvider = ({ children }) => {
 
   // Batch flush function for audit logs
   const flushAuditBatch = async () => {
-    if (auditBatch.length === 0) return;
+    if (auditBatch.length === 0) {
+      console.log('📦 AUDIT BATCH FLUSH: No items to flush');
+      return;
+    }
 
     try {
+      console.log('📦 AUDIT BATCH FLUSH ATTEMPT:', auditBatch.length, 'items');
       const batchToFlush = [...auditBatch];
       setAuditBatch([]);
 
-      await supabase.from('audit_logs').insert(batchToFlush);
+      const { data, error } = await supabase.from('audit_logs').insert(batchToFlush);
+      if (error) {
+        console.error('❌ AUDIT BATCH FLUSH FAILED:', error);
+        // Re-queue failed batch items
+        setAuditBatch(prev => [...prev, ...batchToFlush]);
+      } else {
+        console.log('✅ AUDIT BATCH FLUSH SUCCESS:', data);
+      }
     } catch (err) {
-      console.error('Error flushing audit batch:', err);
+      console.error('❌ AUDIT BATCH FLUSH ERROR:', err);
       // Re-queue failed batch items
       setAuditBatch(prev => [...prev, ...auditBatch]);
     }
@@ -135,13 +146,31 @@ export const AuthProvider = ({ children }) => {
 
   const logAuditAction = async (action, tableName, recordId, oldValues, newValues, forceImmediate = false) => {
     try {
-      if (!user && action !== 'LOGIN') return;
+      console.log('🔍 AUDIT LOG ATTEMPT:', {
+        action,
+        tableName,
+        recordId,
+        hasUser: !!user,
+        userId: user?.id,
+        userEmail: user?.email,
+        forceImmediate,
+        timestamp: new Date().toISOString()
+      });
+
+      if (!user && action !== 'LOGIN') {
+        console.log('❌ AUDIT LOG SKIPPED: No user logged in (user state:', user, ')');
+        return;
+      }
 
       // Conditional logging: skip certain non-critical actions
       const skipActions = ['VIEW', 'SEARCH', 'FILTER'];
-      if (skipActions.includes(action) && !forceImmediate) return;
+      if (skipActions.includes(action) && !forceImmediate) {
+        console.log('⏭️ AUDIT LOG SKIPPED: Non-critical action');
+        return;
+      }
 
       const auditData = {
+        id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         user_id: user?.id || null,
         action,
         table_name: tableName,
@@ -153,19 +182,29 @@ export const AuthProvider = ({ children }) => {
         created_at: new Date().toISOString()
       };
 
+      console.log('📝 AUDIT DATA PREPARED:', auditData);
+
       // For critical actions, log immediately
       const criticalActions = ['DELETE', 'LOGIN', 'LOGOUT', 'CREATE'];
       if (criticalActions.includes(action) || forceImmediate) {
-        await supabase.from('audit_logs').insert([auditData]);
+        console.log('🚀 AUDIT LOG IMMEDIATE SAVE ATTEMPT');
+        const { data, error } = await supabase.from('audit_logs').insert([auditData]);
+        if (error) {
+          console.error('❌ AUDIT LOG IMMEDIATE SAVE FAILED:', error);
+        } else {
+          console.log('✅ AUDIT LOG IMMEDIATE SAVE SUCCESS:', data);
+        }
         return;
       }
 
       // Add to batch
+      console.log('📦 AUDIT LOG ADDED TO BATCH');
       setAuditBatch(prev => [...prev, auditData]);
 
       // Set timeout to flush batch if not already set
       if (!auditBatchTimeout) {
         const timeout = setTimeout(() => {
+          console.log('⏰ AUDIT BATCH FLUSH TIMEOUT TRIGGERED');
           flushAuditBatch();
           setAuditBatchTimeout(null);
         }, 5000); // Flush every 5 seconds
@@ -174,6 +213,7 @@ export const AuthProvider = ({ children }) => {
 
       // Flush immediately if batch gets too large
       if (auditBatch.length >= 10) {
+        console.log('📦 AUDIT BATCH SIZE LIMIT REACHED, FLUSHING');
         if (auditBatchTimeout) {
           clearTimeout(auditBatchTimeout);
           setAuditBatchTimeout(null);
@@ -181,7 +221,7 @@ export const AuthProvider = ({ children }) => {
         await flushAuditBatch();
       }
     } catch (err) {
-      console.error('Error logging audit action:', err);
+      console.error('❌ AUDIT LOG ERROR:', err);
     }
   };
 

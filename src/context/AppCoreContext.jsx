@@ -169,7 +169,25 @@ export function AppCoreProvider({ children }) {
         const revenue = (chicken.count || 0) * (chicken.size || 0) * (chicken.price || 0);
         return sum + revenue;
       }, 0);
-      const totalBalance = chickens.reduce((sum, chicken) => sum + (chicken.balance || 0), 0);
+
+      // Recalculate balance properly based on status - not using stored balance field
+      const totalBalance = chickens.reduce((sum, chicken) => {
+        if (chicken.status === 'paid') {
+          return sum + 0; // Paid orders contribute 0 to balance
+        }
+
+        // Calculate total based on calculation mode
+        let orderTotal = 0;
+        if (chicken.calculation_mode === 'count_cost') {
+          orderTotal = chicken.count * chicken.price;
+        } else if (chicken.calculation_mode === 'size_cost') {
+          orderTotal = chicken.size * chicken.price;
+        } else {
+          orderTotal = chicken.count * chicken.size * chicken.price;
+        }
+
+        return sum + (orderTotal - (chicken.amount_paid || 0));
+      }, 0);
 
       // Transaction statistics
       const totalIncome = transactions

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weight Corruption Diagnostic</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>🔍 Weight Data Corruption Diagnostic</h1>
+    <div id="status">Running diagnostic...</div>
+    <div id="results"></div>
+
+    <script type="module">
+        // Import environment variables from .env file
+        const env = {
+            VITE_SUPABASE_URL: 'https://wyszlfekxikqxkjzjeqm.supabase.co',
+            VITE_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5c3psZmVreGlrcXhranpqZXFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxODk3NDQsImV4cCI6MjA2ODc2NTc0NH0.0cgKlflBUpfk8rjNaVL7GllvYddSUwQ_-ao21903-Yw'
+        };
+
+        // Create Supabase client
+        const supabase = supabase.createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
+
+        async function diagnoseWeightCorruption() {
+            console.log('🔍 Starting weight corruption diagnosis...');
+            document.getElementById('status').textContent = '🔍 Analyzing database for weight corruption...';
+
+            const results = {
+                summary: { totalIssues: 0, corruptionPatterns: [] },
+                liveChickens: { suspiciousRecords: [], inconsistencyRecords: [], exactCorruptionMatches: [] },
+                weightHistory: { suspiciousRecords: [] },
+                dressedChickens: { suspiciousRecords: [] }
+            };
+
+            try {
+                // 1. Check live_chickens for 0.33kg pattern
+                const { data: liveChickensData, error: liveChickensError } = await supabase
+                    .from('live_chickens')
+                    .select('*')
+                    .not('current_weight', 'is', null)
+                    .order('current_weight');
+
+                if (liveChickensError) {
+                    console.error('Error fetching live_chickens:', liveChickensError);
+                    document.getElementById('results').innerHTML += `<p>❌ Error: ${liveChickensError.message}</p>`;
+                } else {
+                    console.log(`Found ${liveChickensData?.length || 0} live chicken records`);
+
+                    liveChickensData?.forEach(record => {
+                        const weight = parseFloat(record.current_weight);
+
+                        // Check for exact 0.33kg corruption
+                        if (Math.abs(weight - 0.33) < 0.01) {
+                            results.liveChickens.exactCorruptionMatches.push({
+                                id: record.id,
+                                batch_id: record.batch_id,
+                                current_weight: weight,
+                                expected_weight: parseFloat(record.expected_weight) || null,
+                                potential_original: Math.round(weight * 7.57 * 100) / 100
+                            });
+                            results.summary.totalIssues++;
+                        }
+
+                        // Check for suspicious range
+                        if (weight >= 0.3 && weight <= 0.4) {
+                            results.liveChickens.suspiciousRecords.push({
+                                id: record.id,
+                                batch_id: record.batch_id,
+                                current_weight: weight
+                            });
+                        }
+                    });
+
+                    console.log(`🚨 Found ${results.liveChickens.exactCorruptionMatches.length} exact 0.33kg matches`);
+                }
+
+                // 2. Check for 2.5kg -> 0.33kg pattern
+                const { data: inconsistencyData, error: inconsistencyError } = await supabase
+                    .from('live_chickens')
+                    .select('*')
+                    .not('current_weight', 'is', null)
+                    .not('expected_weight', 'is', null);
+
+                if (inconsistencyError) {
+                    console.error('Error checking inconsistencies:', inconsistencyError);
+                } else {
+                    inconsistencyData?.forEach(record => {
+                        const current = parseFloat(record.current_weight);
+                        const expected = parseFloat(record.expected_weight);
+
+                        // Specific 2.5kg -> 0.33kg pattern
+                        if (Math.abs(expected - 2.5) < 0.01 && Math.abs(current - 0.33) < 0.01) {
+                            results.liveChickens.inconsistencyRecords.push({
+                                id: record.id,
+                                batch_id: record.batch_id,
+                                current_weight: current,
+                                expected_weight: expected,
+                                corruption_ratio: Math.round((current / expected) * 100) / 100
+                            });
+                            results.summary.totalIssues++;
+                        }
+                    });
+                }
+
+                // 3. Check weight_history
+                const { data: weightHistoryData, error: weightHistoryError } = await supabase
+                    .from('weight_history')
+                    .select('*')
+                    .not('weight', 'is', null);
+
+                if (weightHistoryError) {
+                    console.error('Error fetching weight_history:', weightHistoryError);
+                } else {
+                    weightHistoryData?.forEach(record => {
+                        const weight = parseFloat(record.weight);
+                        if (Math.abs(weight - 0.33) < 0.01) {
+                            results.weightHistory.suspiciousRecords.push({
+                                id: record.id,
+                                chicken_batch_id: record.chicken_batch_id,
+                                weight: weight,
+                                potential_original: Math.round(weight * 7.57 * 100) / 100
+                            });
+                            results.summary.totalIssues++;
+                        }
+                    });
+                }
+
+                // 4. Display results
+                displayResults(results);
+
+            } catch (error) {
+                console.error('Diagnostic failed:', error);
+                document.getElementById('results').innerHTML = `<p>❌ Diagnostic failed: ${error.message}</p>`;
+            }
+        }
+
+        function displayResults(results) {
+            const resultsDiv = document.getElementById('results');
+
+            resultsDiv.innerHTML = `
+                <h2>📋 Diagnostic Results</h2>
+                <div style="background: ${results.summary.totalIssues > 0 ? '#ffebee' : '#e8f5e8'}; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h3>Summary</h3>
+                    <p><strong>Total Issues:</strong> ${results.summary.totalIssues}</p>
+                    <p><strong>Exact 0.33kg Matches:</strong> ${results.liveChickens.exactCorruptionMatches.length}</p>
+                    <p><strong>2.5kg→0.33kg Patterns:</strong> ${results.liveChickens.inconsistencyRecords.length}</p>
+                    <p><strong>Weight History Issues:</strong> ${results.weightHistory.suspiciousRecords.length}</p>
+                </div>
+
+                ${results.liveChickens.exactCorruptionMatches.length > 0 ? `
+                <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    <h3>🚨 Critical Corruption Found!</h3>
+                    <p>The following batches show the exact 0.33kg corruption pattern:</p>
+                    <ul>
+                        ${results.liveChickens.exactCorruptionMatches.map(record =>
+                            `<li><strong>${record.batch_id}</strong>: ${record.current_weight}kg (should be ~${record.potential_original}kg)</li>`
+                        ).join('')}
+                    </ul>
+                </div>` : ''}
+
+                ${results.liveChickens.inconsistencyRecords.length > 0 ? `
+                <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    <h3>⚠️ Weight Inconsistencies Found</h3>
+                    <p>The following batches show the 2.5kg → 0.33kg corruption pattern:</p>
+                    <ul>
+                        ${results.liveChickens.inconsistencyRecords.map(record =>
+                            `<li><strong>${record.batch_id}</strong>: Expected ${record.expected_weight}kg, showing ${record.current_weight}kg (ratio: ${record.corruption_ratio})</li>`
+                        ).join('')}
+                    </ul>
+                </div>` : ''}
+
+                ${results.summary.totalIssues === 0 ? `
+                <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    <h3>✅ No Corruption Detected</h3>
+                    <p>Your weight data appears to be consistent. The issue you reported might be:</p>
+                    <ul>
+                        <li>A one-time display issue</li>
+                        <li>A browser caching problem</li>
+                        <li>A specific record that has since been corrected</li>
+                    </ul>
+                </div>` : ''}
+            `;
+
+            document.getElementById('status').textContent = '✅ Diagnostic completed';
+        }
+
+        // Run diagnostic when page loads
+        diagnoseWeightCorruption();
+    </script>
+</body>
+</html>

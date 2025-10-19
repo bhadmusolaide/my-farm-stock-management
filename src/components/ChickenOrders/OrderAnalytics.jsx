@@ -44,7 +44,7 @@ const OrderAnalytics = ({
 
     orders.forEach(order => {
       const orderDate = new Date(order.date);
-      
+
       // Calculate order total
       let orderTotal = 0;
       if (order.calculation_mode === 'count_cost') {
@@ -57,7 +57,11 @@ const OrderAnalytics = ({
 
       totalRevenue += orderTotal;
       totalPaid += order.amount_paid || 0;
-      totalBalance += orderTotal - (order.amount_paid || 0);
+
+      // For balance calculation, if status is paid, balance should be 0
+      // Otherwise, balance = total - amount_paid
+      const balance = order.status === 'paid' ? 0 : orderTotal - (order.amount_paid || 0);
+      totalBalance += balance;
 
       // Status counts
       statusCounts[order.status]++;
