@@ -51,7 +51,11 @@ const CustomerManagement = ({
 
       customer.totalValue += orderTotal;
       customer.totalPaid += order.amount_paid || 0;
-      customer.totalBalance += orderTotal - (order.amount_paid || 0);
+
+      // For balance calculation, if status is paid, balance should be 0
+      // Otherwise, balance = total - amount_paid
+      const balance = order.status === 'paid' ? 0 : orderTotal - (order.amount_paid || 0);
+      customer.totalBalance += balance;
       customer.statusCounts[order.status]++;
 
       // Update last order date

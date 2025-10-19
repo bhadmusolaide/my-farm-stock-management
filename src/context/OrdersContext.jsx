@@ -140,6 +140,8 @@ export function OrdersProvider({ children }) {
         totalCost = chickenData.count * chickenData.price;
       } else if (calcMode === 'size_cost') {
         totalCost = chickenData.size * chickenData.price;
+      } else if (calcMode === 'size_cost_only') {
+        totalCost = chickenData.size * chickenData.price;  // Size × Price for amount, Count only for inventory deduction
       } else {
         totalCost = chickenData.count * chickenData.size * chickenData.price;
       }
@@ -152,7 +154,7 @@ export function OrdersProvider({ children }) {
         calculation_mode: calcMode,
         inventory_type: inventoryType || 'live',
         batch_id: batch_id || null,
-        balance: totalCost - (amountPaid || 0),
+        balance: chickenData.status === 'paid' ? 0 : totalCost - (amountPaid || 0),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -212,6 +214,8 @@ export function OrdersProvider({ children }) {
         totalCost = chickenData.count * chickenData.price;
       } else if (calcMode === 'size_cost') {
         totalCost = chickenData.size * chickenData.price;
+      } else if (calcMode === 'size_cost_only') {
+        totalCost = chickenData.size * chickenData.price;  // Size × Price for amount, Count only for inventory deduction
       } else {
         totalCost = chickenData.count * chickenData.size * chickenData.price;
       }
@@ -219,11 +223,13 @@ export function OrdersProvider({ children }) {
       const updatedChicken = {
         ...oldChicken,
         ...otherData,
-        amount_paid: amountPaid || 0,
+        amount_paid: (amountPaid !== undefined ? amountPaid : (oldChicken.amount_paid || 0)),
         calculation_mode: calcMode,
         inventory_type: inventoryType || oldChicken.inventory_type || 'live',
         batch_id: batch_id || null,
-        balance: totalCost - (amountPaid || 0),
+        balance: ((chickenData.status !== undefined ? chickenData.status : oldChicken.status) === 'paid')
+          ? 0
+          : totalCost - ((amountPaid !== undefined ? amountPaid : (oldChicken.amount_paid || 0)) || 0),
         updated_at: new Date().toISOString()
       };
 
@@ -244,6 +250,7 @@ export function OrdersProvider({ children }) {
       const newStatus = chickenData.status !== undefined ? chickenData.status : oldStatus;
       const statusChangedToPaid = oldStatus !== 'paid' && newStatus === 'paid';
 
+
       if (paymentDifference !== 0 || statusChangedToPaid) {
         const customerName = updatedChicken.customer || 'Unknown Customer';
 
@@ -259,7 +266,7 @@ export function OrdersProvider({ children }) {
 
         // Handle status change to 'paid' - create credit transaction for remaining balance
         if (statusChangedToPaid) {
-          const remainingBalance = updatedChicken.balance || 0;
+          const remainingBalance = totalCost - (oldAmountPaid || 0);
           if (remainingBalance > 0) {
             const description = `Payment completed for ${customerName} (Order #${id.substring(0, 8)}) - Remaining balance credited`;
             await addFunds(remainingBalance, description);

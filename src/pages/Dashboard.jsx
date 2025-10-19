@@ -32,23 +32,24 @@ const Dashboard = () => {
   
   // Enhanced status data with filtering and trends - optimized for performance
   const enhancedStatusData = useMemo(() => {
-    const filteredChickens = selectedStatusFilter === 'all' 
-      ? chickens 
+    const filteredChickens = selectedStatusFilter === 'all'
+      ? chickens
       : chickens.filter(chicken => chicken.status === selectedStatusFilter)
-    
+
     // Single pass through data for better performance
     const statusData = filteredChickens.reduce((acc, chicken) => {
       const status = chicken.status
       const revenue = chicken.count * chicken.size * chicken.price
-      
+      const balance = chicken.status === 'paid' ? 0 : (chicken.balance || 0)
+
       if (!acc[status]) {
         acc[status] = { count: 0, revenue: 0, balance: 0 }
       }
-      
+
       acc[status].count += 1
       acc[status].revenue += revenue
-      acc[status].balance += chicken.balance
-      
+      acc[status].balance += balance
+
       return acc
     }, {})
     

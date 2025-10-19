@@ -230,6 +230,8 @@ const OrderList = ({
           total = count * price;
         } else if (calcMode === 'size_cost') {
           total = size * price;
+        } else if (calcMode === 'size_cost_only') {
+          total = size * price;  // Size × Price for amount, Count only for inventory deduction
         } else {
           // Default: count_size_cost
           total = count * size * price;
@@ -271,6 +273,8 @@ const OrderList = ({
           total = count * price;
         } else if (calcMode === 'size_cost') {
           total = size * price;
+        } else if (calcMode === 'size_cost_only') {
+          total = size * price;  // Size × Price for amount, Count only for inventory deduction
         } else {
           // Default: count_size_cost
           total = count * size * price;
@@ -366,6 +370,8 @@ const OrderList = ({
         total = count * price;
       } else if (calcMode === 'size_cost') {
         total = size * price;
+      } else if (calcMode === 'size_cost_only') {
+        total = size * price;  // Size × Price for amount, Count only for inventory deduction
       } else {
         // Default: count_size_cost
         total = count * size * price;

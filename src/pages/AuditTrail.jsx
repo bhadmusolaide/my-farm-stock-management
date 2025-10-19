@@ -33,6 +33,37 @@ const AuditTrail = () => {
     fetchAuditLogs();
   }, [currentPage, filters]);
 
+  // Check if audit_logs table exists and test database connection
+  useEffect(() => {
+    const checkTableExists = async () => {
+      try {
+        console.log('🔍 CHECKING AUDIT_LOGS TABLE EXISTENCE');
+        const { data, error } = await supabase
+          .from('audit_logs')
+          .select('id')
+          .limit(1);
+
+        if (error) {
+          if (error.message.includes('relation "audit_logs" does not exist')) {
+            console.error('❌ AUDIT_LOGS TABLE DOES NOT EXIST');
+            setError('Audit logs table does not exist. Please run the database schema setup.');
+          } else {
+            console.error('❌ DATABASE ERROR:', error);
+            setError(`Database error: ${error.message}`);
+          }
+        } else {
+          console.log('✅ AUDIT_LOGS TABLE EXISTS, CONNECTION OK');
+          console.log('📊 SAMPLE DATA:', data);
+        }
+      } catch (err) {
+        console.error('❌ CONNECTION ERROR:', err);
+        setError(`Connection error: ${err.message}`);
+      }
+    };
+
+    checkTableExists();
+  }, []);
+
   const fetchUsers = async () => {
     try {
       const { data, error } = await supabase
@@ -50,7 +81,10 @@ const AuditTrail = () => {
   const fetchAuditLogs = async () => {
     try {
       setLoading(true);
-      
+      setError(null);
+
+      console.log('Fetching audit logs with filters:', filters);
+
       let query = supabase
         .from('audit_logs')
         .select('*, users(full_name, email)', { count: 'exact' })
@@ -80,13 +114,19 @@ const AuditTrail = () => {
 
       const { data, error, count } = await query;
 
-      if (error) throw error;
-      
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      console.log('Audit logs fetched:', data?.length || 0, 'records');
       setAuditLogs(data || []);
       setTotalPages(Math.ceil((count || 0) / logsPerPage));
     } catch (err) {
-      setError('Failed to fetch audit logs');
       console.error('Error fetching audit logs:', err);
+      setError(`Failed to fetch audit logs: ${err.message}`);
+      setAuditLogs([]);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
@@ -209,6 +249,29 @@ const AuditTrail = () => {
           <h1>Audit Trail</h1>
           <p>Track all user actions and system events</p>
         </div>
+        <div className="header-actions">
+          <button
+            className="refresh-btn"
+            onClick={() => fetchAuditLogs()}
+            disabled={loading}
+          >
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <button
+            className="test-btn"
+            onClick={async () => {
+              try {
+                console.log('🧪 MANUAL AUDIT LOG TEST');
+                // This should trigger an audit log
+                await fetchAuditLogs();
+              } catch (err) {
+                console.error('Test failed:', err);
+              }
+            }}
+          >
+            Test Logging
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -216,7 +279,20 @@ const AuditTrail = () => {
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          {typeof error === 'string' ? error : error?.message || 'An error occurred'}
+          <div className="error-content">
+            <div className="error-message">
+              {typeof error === 'string' ? error : error?.message || 'An error occurred'}
+            </div>
+            <button
+              className="retry-btn"
+              onClick={() => {
+                setError(null);
+                fetchAuditLogs();
+              }}
+            >
+              Retry
+            </button>
+          </div>
         </div>
       )}
 
@@ -347,6 +423,17 @@ const AuditTrail = () => {
                       <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                     <p>No audit logs found</p>
+                    <p className="no-data-help">
+                      {filters.action || filters.table_name || filters.user_id || filters.date_from || filters.date_to
+                        ? 'Try adjusting your filters or clearing them to see all audit logs.'
+                        : 'Audit logs will appear here once users start interacting with the system.'
+                      }
+                    </p>
+                    {(!filters.action && !filters.table_name && !filters.user_id && !filters.date_from && !filters.date_to) && (
+                      <button className="check-connection-btn" onClick={() => fetchAuditLogs()}>
+                        Check for Recent Activity
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

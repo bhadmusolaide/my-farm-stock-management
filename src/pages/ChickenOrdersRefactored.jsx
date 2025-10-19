@@ -129,47 +129,58 @@ const ChickenOrders = () => {
     return dressedChicken.current_count || 0;
   };
 
-  // Handle inventory deduction
-  const handleInventoryDeduction = async (inventoryType, batchId, count, partType, description, orderId) => {
-    if (inventoryType === 'live') {
-      const batch = liveChickens.find(b => b.id === batchId);
-      if (batch) {
-        const newCount = Math.max(0, batch.current_count - count);
-        await updateLiveChicken(batchId, { ...batch, current_count: newCount });
-        
-        // Log transaction
-        await logChickenTransaction({
-          batch_id: batchId,
-          transaction_type: 'sale',
-          quantity: count,
-          description,
-          order_id: orderId
-        });
-      }
-    } else if (inventoryType === 'dressed') {
-      const batch = dressedChickens.find(b => b.id === batchId);
-      if (batch) {
-        if (partType && batch.parts_count) {
-          // Deduct from specific part
-          const newPartsCount = { ...batch.parts_count };
-          newPartsCount[partType] = Math.max(0, (newPartsCount[partType] || 0) - count);
-          await updateDressedChicken(batchId, { ...batch, parts_count: newPartsCount });
-        } else {
-          // Deduct from whole chickens
-          const newCount = Math.max(0, getWholeChickenCount(batch) - count);
-          await updateDressedChicken(batchId, { ...batch, current_count: newCount });
+  // Handle inventory deduction with proper state management
+  const handleInventoryDeduction = async (inventoryType, batchId, count, partType, description, orderId, reverseCount = 0) => {
+    try {
+      if (inventoryType === 'live') {
+        const batch = liveChickens.find(b => b.id === batchId);
+        if (batch) {
+          // First, reverse any previous deduction (for edits)
+          const baseCount = (batch.current_count || 0) + reverseCount;
+          // Then apply the new deduction
+          const newCount = Math.max(0, baseCount - count);
+
+          await updateLiveChicken(batchId, { ...batch, current_count: newCount });
+
+          // Log transaction
+          await logChickenTransaction({
+            batch_id: batchId,
+            transaction_type: 'sale',
+            quantity: count,
+            description,
+            order_id: orderId
+          });
         }
-        
-        // Log transaction
-        await logChickenTransaction({
-          batch_id: batchId,
-          transaction_type: 'sale',
-          quantity: count,
-          description,
-          order_id: orderId,
-          part_type: partType
-        });
+      } else if (inventoryType === 'dressed' || inventoryType === 'parts') {
+        const batch = dressedChickens.find(b => b.id === batchId);
+        if (batch) {
+          if (partType && batch.parts_count) {
+            // Deduct from specific part (chicken parts)
+            const newPartsCount = { ...batch.parts_count };
+            const currentPartCount = (newPartsCount[partType] || 0) + reverseCount;
+            newPartsCount[partType] = Math.max(0, currentPartCount - count);
+            await updateDressedChicken(batchId, { ...batch, parts_count: newPartsCount });
+          } else {
+            // Deduct from whole dressed chickens (use current_count as source of truth)
+            const baseCount = (batch.current_count || 0) + reverseCount;
+            const newCount = Math.max(0, baseCount - count);
+            await updateDressedChicken(batchId, { ...batch, current_count: newCount });
+          }
+
+          // Log transaction
+          await logChickenTransaction({
+            batch_id: batchId,
+            transaction_type: 'sale',
+            quantity: count,
+            description,
+            order_id: orderId,
+            part_type: partType
+          });
+        }
       }
+    } catch (error) {
+      console.error('Error during inventory deduction:', error);
+      throw error;
     }
   };
 
@@ -178,15 +189,42 @@ const ChickenOrders = () => {
     try {
       setLoading(true);
 
+      // Normalize incoming field names (snake_case from form vs camelCase from DB/state)
+      const calcModeNew = orderData.calculation_mode ?? orderData.calculationMode;
+      const invTypeNew = orderData.inventory_type ?? orderData.inventoryType;
+      const batchIdNew = orderData.batch_id ?? orderData.batchId;
+
+      const editingCalcMode = editingOrder ? (editingOrder.calculation_mode ?? editingOrder.calculationMode) : undefined;
+      const editingInvType = editingOrder ? (editingOrder.inventory_type ?? editingOrder.inventoryType) : undefined;
+
+      // Calculate reverse count for edits (to undo previous deduction)
+      let reverseCount = 0;
+      if (editingOrder && (editingOrder.batch_id ?? editingOrder.batchId) === batchIdNew) {
+        // If editing the same batch, reverse the previous deduction
+        reverseCount = editingOrder.count || 0;
+      }
+
       // Handle inventory deduction if batch is selected
-      if (orderData.batch_id && orderData.calculationMode !== 'size_cost') {
+      if (batchIdNew && calcModeNew !== 'size_cost') {
         await handleInventoryDeduction(
-          orderData.inventoryType,
-          orderData.batch_id,
+          invTypeNew,
+          batchIdNew,
           orderData.count,
           orderData.part_type,
           `Order ${editingOrder ? 'update' : 'sale'} for ${orderData.customer}`,
-          orderData.id || Date.now().toString()
+          orderData.id || Date.now().toString(),
+          reverseCount
+        );
+      } else if (editingOrder && (editingOrder.batch_id ?? editingOrder.batchId) && editingCalcMode !== 'size_cost') {
+        // If removing batch assignment, reverse the previous deduction
+        await handleInventoryDeduction(
+          editingInvType,
+          (editingOrder.batch_id ?? editingOrder.batchId),
+          0, // No new deduction
+          editingOrder.part_type,
+          `Order update (batch removed) for ${orderData.customer}`,
+          editingOrder.id,
+          editingOrder.count // Reverse the full previous deduction
         );
       }
 
@@ -225,7 +263,13 @@ const ChickenOrders = () => {
         showSuccess('Order added successfully!');
       }
 
-      // Trigger data refresh
+      // Refresh supporting data (live and dressed chickens) to update batch counts
+      await Promise.all([
+        loadLiveChickensData(),
+        loadDressedChickensData()
+      ]);
+
+      // Trigger orders data refresh
       setRefreshTrigger(prev => prev + 1);
 
     } catch (error) {

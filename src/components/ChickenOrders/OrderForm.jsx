@@ -38,21 +38,10 @@ const OrderForm = ({
   // Helper to get actual whole chicken count from dressed chicken batch
   const getWholeChickenCount = (dressedChicken) => {
     if (!dressedChicken) return 0;
-    
-    if (dressedChicken.processing_quantity && dressedChicken.processing_quantity > 0) {
-      return dressedChicken.processing_quantity;
-    }
-    
-    const partsCount = dressedChicken.parts_count || {};
-    const totalPartsCount = Object.values(partsCount).reduce((sum, count) => sum + (count || 0), 0);
-    
-    if (dressedChicken.current_count === totalPartsCount && totalPartsCount > 0) {
-      const partsCounts = Object.values(partsCount).filter(c => c > 0);
-      return partsCounts.length > 0 ? Math.min(...partsCounts) : dressedChicken.current_count;
-    }
-    
+    // Use current_count as the canonical availability for whole dressed chickens
     return dressedChicken.current_count || 0;
   };
+
 
   // Reset form when modal opens/closes or editing order changes
   useEffect(() => {
@@ -145,6 +134,8 @@ const OrderForm = ({
       return count * price;
     } else if (formData.calculation_mode === 'size_cost') {
       return size * price;
+    } else if (formData.calculation_mode === 'size_cost_only') {
+      return size * price;  // Size × Price for amount, Count only for inventory deduction
     } else if (formData.calculation_mode === 'count_size_cost') {
       return count * size * price;
     }
@@ -238,7 +229,7 @@ const OrderForm = ({
       newErrors.part_type = 'Part type is required for parts inventory';
     }
 
-    // Validate inventory availability if batch is selected
+    // Validate inventory availability if batch is selected (except pure size-only sales)
     if (formData.batch_id && formData.calculation_mode !== 'size_cost') {
       const count = parseFloat(formData.count) || 0;
       let availableCount = 0;
@@ -248,11 +239,10 @@ const OrderForm = ({
         availableCount = batch?.current_count || 0;
       } else if (formData.inventory_type === 'dressed') {
         const batch = dressedChickens.find(b => b.id === formData.batch_id);
-        if (formData.inventory_type === 'parts' && formData.part_type) {
-          availableCount = batch?.parts_count?.[formData.part_type] || 0;
-        } else {
-          availableCount = getWholeChickenCount(batch);
-        }
+        availableCount = getWholeChickenCount(batch);
+      } else if (formData.inventory_type === 'parts') {
+        const batch = dressedChickens.find(b => b.id === formData.batch_id);
+        availableCount = batch?.parts_count?.[formData.part_type] || 0;
       }
 
       if (availableCount < count) {
@@ -321,7 +311,8 @@ const OrderForm = ({
   const calculationModes = [
     { value: 'count_size_cost', label: 'Count × Size × Price (Standard)' },
     { value: 'count_cost', label: 'Count × Price' },
-    { value: 'size_cost', label: 'Size × Price' }
+    { value: 'size_cost', label: 'Size × Price' },
+    { value: 'size_cost_only', label: 'Size × Price (Count for Inventory)' }
   ];
 
   const inventoryTypes = [
